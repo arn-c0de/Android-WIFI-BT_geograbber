@@ -122,8 +122,8 @@ public class MapActivity extends AppCompatActivity {
         MainActivity.DatabaseHelper dbHelper = new MainActivity.DatabaseHelper(this);
         database = dbHelper.getReadableDatabase();
         
-        Toast.makeText(this, "Interne Datenbank geladen", Toast.LENGTH_SHORT).show();
-        dbStatusText.setText("🏠 Interne App-Datenbank");
+        Toast.makeText(this, R.string.internal_database_loaded, Toast.LENGTH_SHORT).show();
+        dbStatusText.setText(R.string.internal_app_database);
         dbStatusText.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
         
         // Button-Listener
@@ -376,7 +376,7 @@ public class MapActivity extends AppCompatActivity {
     }
     
     private void refreshMap() {
-        Toast.makeText(this, "Karte wird aktualisiert...", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, R.string.map_updating, Toast.LENGTH_SHORT).show();
         
         // Nur Daten im aktuellen Viewport neu laden
         deviceList = getDevicesInBoundingBox(bboxMinLat, bboxMinLon, bboxMaxLat, bboxMaxLon);
@@ -405,7 +405,7 @@ public class MapActivity extends AppCompatActivity {
             "<head>\n" +
             "    <meta charset='utf-8'>\n" +
             "    <meta name='viewport' content='width=device-width, initial-scale=1.0'>\n" +
-            "    <title>WiFi & Bluetooth Karte</title>\n" +
+            "    <title>" + getString(R.string.wifi_bluetooth_map) + "</title>\n" +
             "    <link rel='stylesheet' href='https://unpkg.com/leaflet@1.7.1/dist/leaflet.css' />\n" +
             "    <style>\n" +
             "        body { margin: 0; padding: 0; }\n" +
@@ -954,13 +954,13 @@ public class MapActivity extends AppCompatActivity {
                     int wifi = cursor.getInt(1);
                     int bt = cursor.getInt(2);
                     cursor.close();
-                    return String.format("Gesamt: %d (%d WiFi, %d BT)", total, wifi, bt);
+                    return String.format(getString(R.string.total_stats), total, wifi, bt);
                 }
                 cursor.close();
             } catch (Exception e) {
                 Log.e("MapActivity", "Error getting total device count: " + e.getMessage());
             }
-            return "Gesamt: Unbekannt";
+            return getString(R.string.total_unknown);
         }
     }
     
@@ -974,9 +974,9 @@ public class MapActivity extends AppCompatActivity {
                 .addOnSuccessListener(this, location -> {
                     if (location != null) {
                         mapWebView.evaluateJavascript("javascript:centerOnUserLocation(" + location.getLatitude() + ", " + location.getLongitude() + ");", null);
-                        Toast.makeText(MapActivity.this, "Zentriere auf deinen Standort", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(MapActivity.this, R.string.centering_on_location, Toast.LENGTH_SHORT).show();
                     } else {
-                        Toast.makeText(MapActivity.this, "Standort nicht verfügbar. Aktiviere GPS.", Toast.LENGTH_LONG).show();
+                        Toast.makeText(MapActivity.this, R.string.location_unavailable, Toast.LENGTH_LONG).show();
                     }
                 });
     }

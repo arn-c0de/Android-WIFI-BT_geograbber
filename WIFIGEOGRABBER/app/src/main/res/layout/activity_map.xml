@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <!-- WebView für die Karte -->
+    <!-- WebView for the map -->
     <WebView
         android:id="@+id/map_webview"
         android:layout_width="match_parent"
@@ -12,20 +12,20 @@
         android:layout_above="@+id/button_layout"
         android:layout_below="@+id/db_status_text" />
 
-    <!-- Status-Text für Datenbank -->
+    <!-- Status text for database -->
     <TextView
         android:id="@+id/db_status_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
         android:background="#AA000000"
-        android:text="Interne Datenbank"
+        android:text="@string/internal_database"
         android:textColor="#FFFFFF"
         android:textSize="12sp"
         android:padding="4dp"
         android:gravity="center" />
 
-    <!-- Button-Layout am unteren Rand -->
+    <!-- Button layout at bottom -->
     <LinearLayout
         android:id="@+id/button_layout"
         android:layout_width="match_parent"
@@ -36,19 +36,19 @@
         android:padding="8dp"
         android:gravity="center">
 
-        <!-- Zurück Button -->
+        <!-- Back Button -->
         <Button
             android:id="@+id/back_button"
             android:layout_width="0dp"
             android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_marginEnd="8dp"
-            android:text="← Zurück"
+            android:text="@string/back"
             android:textColor="#FFFFFF"
             android:background="#FF4444"
             android:textSize="14sp" />
 
-        <!-- Aktualisieren Button -->
+        <!-- Refresh Button -->
         <Button
             android:id="@+id/refresh_button"
             android:layout_width="0dp"
@@ -56,7 +56,7 @@
             android:layout_weight="1"
             android:layout_marginStart="4dp"
             android:layout_marginEnd="4dp"
-            android:text="🔄 Aktualisieren"
+            android:text="@string/refresh"
             android:textColor="#FFFFFF"
             android:background="#4488FF"
             android:textSize="14sp" />
@@ -68,7 +68,7 @@
             android:layout_height="48dp"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
-            android:text="📍 Standort"
+            android:text="@string/location"
             android:textColor="#FFFFFF"
             android:background="#4CAF50"
             android:textSize="14sp" />

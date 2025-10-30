@@ -414,12 +414,12 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception ex) {}
         if (!gpsEnabled && !networkEnabled) {
             new android.app.AlertDialog.Builder(this)
-                    .setMessage("Standortdienste sind deaktiviert. Bitte aktiviere GPS oder Netzwerk-Standort, damit WLAN-Scans funktionieren.")
+                    .setMessage(R.string.location_services_disabled)
                     .setCancelable(false)
-                    .setPositiveButton("Einstellungen", (dialog, which) -> {
+                    .setPositiveButton(R.string.settings, (dialog, which) -> {
                         startActivity(new Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS));
                     })
-                    .setNegativeButton("Abbrechen", null)
+                    .setNegativeButton(R.string.cancel, null)
                     .show();
         }
     }
@@ -521,7 +521,7 @@ public class MainActivity extends AppCompatActivity {
             if (cachedResults != null && !cachedResults.isEmpty()) {
                 displayResults(cachedResults);
                 if (!isShowingStoredData) {
-                    statusText.setText("Aktuelle Netzwerke (" + cachedResults.size() + ") - wird aktualisiert...");
+                    statusText.setText(String.format(getString(R.string.current_networks_updating), cachedResults.size()));
                 }
                 
                 // Diese Ergebnisse auch speichern
@@ -540,9 +540,9 @@ public class MainActivity extends AppCompatActivity {
                     boolean scanStarted = wifiManager.startScan();
                     if (scanStarted) {
                         if (!isShowingStoredData) {
-                            statusText.setText("Aktiver Scan läuft... (" + (cachedResults != null ? cachedResults.size() : 0) + " Netzwerke verfügbar)");
+                            statusText.setText(String.format(getString(R.string.active_scan_running), (cachedResults != null ? cachedResults.size() : 0)));
                         }
-                        addLogMessage("WiFi Scan erfolgreich gestartet");
+                        addLogMessage("WiFi scan started successfully");
                         Log.d("MainActivity", "WiFi scan started successfully");
                     } else {
                         if (!isShowingStoredData) {
@@ -679,17 +679,17 @@ public class MainActivity extends AppCompatActivity {
         }
         oldWifiCursor.close();
         
-        String infoText = "Aktiv: " + activeWifi + " WiFi";
+        String infoText = getString(R.string.active_label) + activeWifi + getString(R.string.wifi_label);
         if (isBluetoothScanningEnabled) {
-            infoText += ", " + activeBluetooth + " BT";
+            infoText += ", " + activeBluetooth + getString(R.string.bt_label);
         } else {
-            infoText += ", BT aus";
+            infoText += getString(R.string.bt_disabled_label);
         }
-        infoText += " | Gesamt: " + totalWifi + " WiFi, " + totalBluetooth + " BT";
+        infoText += getString(R.string.total_label) + totalWifi + getString(R.string.wifi_label) + ", " + totalBluetooth + getString(R.string.bt_label);
         if (oldWifiCount > 0) {
-            infoText += " (+" + oldWifiCount + " alt)";
+            infoText += String.format(getString(R.string.old_count_label), oldWifiCount);
         }
-        
+
         infoSummary.setText(infoText);
     }
 
@@ -726,19 +726,19 @@ public class MainActivity extends AppCompatActivity {
                     List<ScanResult> results = wifiManager.getScanResults();
                     if (results != null && !results.isEmpty()) {
                         if (!isShowingStoredData) {
-                            statusText.setText("Neuer Scan: " + results.size() + " Netzwerke gefunden");
+                            statusText.setText(String.format(getString(R.string.new_scan_found), results.size()));
                             displayResults(results);
                         }
-                        addLogMessage("WiFi Scan erfolgreich: " + results.size() + " Netzwerke");
+                        addLogMessage(String.format(getString(R.string.wifi_scan_successful), results.size()));
                         
                         // Speichern der neuen Ergebnisse
                         Location location = getLocationForSaving();
                         saveData(results, location);
                     } else {
                         if (!isShowingStoredData) {
-                            statusText.setText("Neuer Scan: keine Netzwerke gefunden");
+                            statusText.setText(R.string.new_scan_no_networks);
                         }
-                        addLogMessage("WiFi Scan: keine Netzwerke gefunden");
+                        addLogMessage(getString(R.string.wifi_scan_no_networks));
                     }
                 } else {
                     if (!isShowingStoredData) {
@@ -751,7 +751,7 @@ public class MainActivity extends AppCompatActivity {
                 if (cachedResults != null && !cachedResults.isEmpty()) {
                     displayResults(cachedResults);
                     if (!isShowingStoredData) {
-                        statusText.setText("Scan-Update fehlgeschlagen - nutze vorherige Ergebnisse (" + cachedResults.size() + " Netzwerke)");
+                        statusText.setText(String.format(getString(R.string.scan_update_failed), cachedResults.size()));
                     }
                     
                     // Cache-Ergebnisse trotzdem speichern falls sie neu sind
@@ -892,8 +892,8 @@ public class MainActivity extends AppCompatActivity {
                     ", Lon: " + String.format("%.4f", location.getLongitude());
             dataList.add(data);
         }
-        statusText.setText("Data saved: " + results.size() + " networks");
-        addLogMessage("Daten gespeichert: " + results.size() + " WiFi-Netzwerke");
+        statusText.setText(String.format(getString(R.string.data_saved), results.size()));
+        addLogMessage(String.format(getString(R.string.data_saved), results.size()));
         // Zeige aktuelle Netzwerke direkt an - nur wenn nicht in Show Data Modus
         if (!isShowingStoredData) {
             ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, dataList);
@@ -1157,14 +1157,14 @@ public class MainActivity extends AppCompatActivity {
     // Popup mit weiteren Aktionen
     private void showMoreDialog() {
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
-        builder.setTitle("Weitere Aktionen");
-        
+        builder.setTitle(R.string.more_actions);
+
         // Vereinfachte Liste da alle DBs in interne DB übertragen werden
         String[] items = {
-            "DB als Datei speichern",
-            "Datenbank löschen", 
-            "Anzahl Netzwerke anzeigen",
-            "Externe DB importieren"
+            getString(R.string.save_db_as_file),
+            getString(R.string.delete_database),
+            getString(R.string.show_network_count),
+            getString(R.string.import_external_db)
         };
         
         builder.setItems(items, (dialog, which) -> {
@@ -1241,7 +1241,7 @@ public class MainActivity extends AppCompatActivity {
     private void clearDatabase() {
         database.execSQL("DELETE FROM wifi_data");
         database.execSQL("DELETE FROM device_data");
-        Toast.makeText(this, "Alle Netzwerke und Bluetooth-Geräte gelöscht", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, R.string.all_networks_deleted, Toast.LENGTH_SHORT).show();
         showData();
     }
 
@@ -1319,19 +1319,19 @@ public class MainActivity extends AppCompatActivity {
                     testDb.close();
                     
                     // Bestätigung anzeigen
-                    String message = String.format("Externe DB geladen!\n\nGefundene Geräte:\n• %d WiFi-Netzwerke\n• %d Bluetooth-Geräte\n\nKarte öffnen?", 
+                    String message = String.format(getString(R.string.external_db_loaded),
                                                  wifiCount, bluetoothCount);
-                    
+
                     android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
-                    builder.setTitle("Externe Datenbank")
+                    builder.setTitle(R.string.external_database)
                            .setMessage(message)
-                           .setPositiveButton("Karte öffnen", (dialog, which) -> {
+                           .setPositiveButton(R.string.open_map, (dialog, which) -> {
                                // Karte mit externer DB öffnen
                                Intent mapIntent = new Intent(MainActivity.this, MapActivity.class);
                                mapIntent.putExtra("external_db_path", tempFile.getAbsolutePath());
                                startActivity(mapIntent);
                            })
-                           .setNegativeButton("Abbrechen", (dialog, which) -> {
+                           .setNegativeButton(R.string.cancel, (dialog, which) -> {
                                // Temp-Datei löschen
                                if (tempFile.exists()) {
                                    tempFile.delete();
@@ -1433,17 +1433,17 @@ public class MainActivity extends AppCompatActivity {
                 final int bluetoothCount = bluetoothCountTemp;
                 
                 // Bestätigung anzeigen
-                String message = String.format("Externe DB als aktive Datenbank laden?\n\nVorhandene Geräte:\n• %d WiFi-Netzwerke\n• %d Bluetooth-Geräte\n\nNeue Scans werden zu dieser DB hinzugefügt!", 
+                String message = String.format(getString(R.string.load_external_db),
                                              wifiCount, bluetoothCount);
-                
+
                 android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
-                builder.setTitle("Externe DB als aktive DB")
+                builder.setTitle(R.string.external_db_as_active)
                        .setMessage(message)
-                       .setPositiveButton("Ja, aktivieren", (dialog, which) -> {
+                       .setPositiveButton(R.string.yes_activate, (dialog, which) -> {
                            // Wechsle zur externen Datenbank
                            switchToExternalDatabase(externalDbFile.getAbsolutePath(), wifiCount, bluetoothCount);
                        })
-                       .setNegativeButton("Abbrechen", (dialog, which) -> {
+                       .setNegativeButton(R.string.cancel, (dialog, which) -> {
                            // Externe Datei löschen
                            if (externalDbFile.exists()) {
                                externalDbFile.delete();

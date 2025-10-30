@@ -176,7 +176,7 @@ public class ScanService extends Service {
                 "WiFi & Bluetooth Scanner Service",
                 NotificationManager.IMPORTANCE_LOW
         );
-        serviceChannel.setDescription("Scannt kontinuierlich nach WiFi-Netzwerken und Bluetooth-Geräten");
+        serviceChannel.setDescription(getString(R.string.scan_service_description));
         
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.createNotificationChannel(serviceChannel);
