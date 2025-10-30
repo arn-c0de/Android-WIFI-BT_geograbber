@@ -1,0 +1,1013 @@
+package com.example.wifi_geograbber;
+
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
+import android.webkit.JavascriptInterface;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.widget.Button;
+import android.widget.Toast;
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+import java.util.List;
+import java.util.ArrayList;
+
+public class MapActivity extends AppCompatActivity {
+    private static final String PREFS_NAME = "MapPrefs";
+    private static final String PREF_FILTERS = "activeFilters";
+    private static final String PREF_CENTER_LAT = "centerLat";
+    private static final String PREF_CENTER_LON = "centerLon";
+    private static final String PREF_ZOOM = "zoomLevel";
+    private WebView mapWebView;
+    private SQLiteDatabase database;
+    private Button backButton, refreshButton, locationButton;
+    private FusedLocationProviderClient fusedLocationClient;
+    private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
+    private android.widget.TextView dbStatusText;
+    private List<DeviceData> deviceList;
+    private boolean isMapInitialized = false;
+    
+    // Bounding Box für Performance-Optimierung (nur sichtbare Marker laden)
+    private double bboxMinLat = -90, bboxMinLon = -180, bboxMaxLat = 90, bboxMaxLon = 180;
+    private static final int MAX_MARKERS_PER_LOAD = 500; // Maximale Anzahl Marker pro Ladung
+    
+    // Vollbild-Flags für System UI
+    private final int FULLSCREEN_FLAGS = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            | View.SYSTEM_UI_FLAG_FULLSCREEN
+            | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+            | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+            | View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
+    
+    // Datenklasse für Geräte
+    public static class DeviceData {
+        public String name;
+        public String address;
+        public String type;
+        public int signal;
+        public String encryption;
+        public double lat;
+        public double lon;
+        public long timestamp;
+        public String vendor;
+        public int frequency;
+        public int channel;
+        public String standard;
+        public int channelWidth;
+        public int maxSpeed;
+        // Bewegungsanalyse-Felder
+        public double lastSeenLat;
+        public double lastSeenLon;
+        public long lastSeenTimestamp;
+        public double movementDistance;
+        
+        public DeviceData() {}
+        
+        public JSONObject toJSON() throws JSONException {
+            JSONObject json = new JSONObject();
+            json.put("name", name != null ? name : "");
+            json.put("address", address != null ? address : "");
+            json.put("type", type != null ? type : "");
+            json.put("signal", signal);
+            json.put("encryption", encryption != null ? encryption : "");
+            json.put("lat", lat);
+            json.put("lon", lon);
+            json.put("timestamp", timestamp);
+            json.put("vendor", vendor != null ? vendor : "");
+            json.put("frequency", frequency);
+            json.put("channel", channel);
+            json.put("standard", standard != null ? standard : "");
+            json.put("channel_width", channelWidth);
+            json.put("max_speed", maxSpeed);
+            // Bewegungsanalyse-Felder
+            json.put("last_seen_lat", lastSeenLat);
+            json.put("last_seen_lon", lastSeenLon);
+            json.put("last_seen_timestamp", lastSeenTimestamp);
+            json.put("movement_distance", movementDistance);
+            return json;
+        }
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_map);
+
+        // System UI für Vollbild ausblenden (Statusleiste, Navigation, Homebutton)
+        hideSystemUI();
+        
+        // Views initialisieren
+        mapWebView = findViewById(R.id.map_webview);
+        backButton = findViewById(R.id.back_button);
+        refreshButton = findViewById(R.id.refresh_button);
+        locationButton = findViewById(R.id.location_button);
+        dbStatusText = findViewById(R.id.db_status_text);
+
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+        
+        // Datenbank initialisieren - verwende immer interne DB
+        // (alle externen Daten wurden bereits importiert)
+        MainActivity.DatabaseHelper dbHelper = new MainActivity.DatabaseHelper(this);
+        database = dbHelper.getReadableDatabase();
+        
+        Toast.makeText(this, "Interne Datenbank geladen", Toast.LENGTH_SHORT).show();
+        dbStatusText.setText("🏠 Interne App-Datenbank");
+        dbStatusText.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
+        
+        // Button-Listener
+        backButton.setOnClickListener(v -> finish());
+        refreshButton.setOnClickListener(v -> refreshMap());
+        locationButton.setOnClickListener(v -> requestLocationAndCenterMap());
+        
+        // WebView konfigurieren
+        setupWebView();
+        
+        // Daten laden und Karte anzeigen
+        loadDataAndShowMap();
+    }
+
+    // Methode zum Ausblenden der System UI (Vollbild, Homebutton, Navigation)
+    private void hideSystemUI() {
+        View decorView = getWindow().getDecorView();
+        decorView.setSystemUiVisibility(FULLSCREEN_FLAGS);
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) {
+            hideSystemUI();
+        }
+    }
+    
+    private void setupWebView() {
+        WebSettings webSettings = mapWebView.getSettings();
+        webSettings.setJavaScriptEnabled(true);
+        webSettings.setDomStorageEnabled(true);
+        webSettings.setAllowFileAccess(true);
+        webSettings.setAllowContentAccess(true);
+        webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        
+        // JavaScript Interface hinzufügen
+        mapWebView.addJavascriptInterface(new WebAppInterface(), "Android");
+        
+        mapWebView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                // Daten an JavaScript übergeben wenn Seite geladen ist
+                if (deviceList != null && !deviceList.isEmpty()) {
+                    injectDeviceData();
+                }
+            }
+        });
+    }
+    
+    private void loadDataAndShowMap() {
+        // Initial mit Standard-Bounding Box laden (wird später durch Kartenbewegung aktualisiert)
+        deviceList = getDevicesInBoundingBox(bboxMinLat, bboxMinLon, bboxMaxLat, bboxMaxLon);
+        
+        Log.d("MapActivity", "Initial loaded " + deviceList.size() + " devices in viewport");
+        
+        // HTML-Karte nur beim ersten Mal laden
+        if (!isMapInitialized) {
+            loadMapHTML();
+        } else {
+            // Bei nachfolgenden Aufrufen nur Daten aktualisieren
+            if (deviceList != null && !deviceList.isEmpty()) {
+                injectDeviceData();
+            }
+        }
+    }
+    
+    // Lädt nur Geräte im sichtbaren Bereich der Karte (Performance-Optimierung)
+    private List<DeviceData> getDevicesInBoundingBox(double minLat, double minLon, double maxLat, double maxLon) {
+        List<DeviceData> filtered = new ArrayList<>();
+        try {
+            // SQL-Abfrage ohne LIMIT, alle Geräte im Bereich laden
+            String sql = "SELECT device_name, device_address, device_type, signal_strength, " +
+                "encryption_info, latitude, longitude, timestamp, frequency, channel, " +
+                "wifi_standard, vendor_info, channel_width, max_connection_speed, " +
+                "COALESCE(last_seen_latitude, 0) as last_seen_latitude, " +
+                "COALESCE(last_seen_longitude, 0) as last_seen_longitude, " +
+                "COALESCE(last_seen_timestamp, 0) as last_seen_timestamp, " +
+                "COALESCE(movement_distance, 0) as movement_distance " +
+                "FROM device_data WHERE latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? " +
+                "AND latitude != 0 AND longitude != 0 " +
+                "ORDER BY signal_strength DESC";
+
+            Cursor deviceCursor = database.rawQuery(sql, new String[]{
+                String.valueOf(minLat), String.valueOf(maxLat),
+                String.valueOf(minLon), String.valueOf(maxLon)
+            });
+
+            while (deviceCursor.moveToNext()) {
+                DeviceData device = new DeviceData();
+                device.name = deviceCursor.getString(0);
+                device.address = deviceCursor.getString(1);
+                device.type = deviceCursor.getString(2);
+                device.signal = deviceCursor.getInt(3);
+                device.encryption = deviceCursor.getString(4);
+                device.lat = deviceCursor.getDouble(5);
+                device.lon = deviceCursor.getDouble(6);
+                device.timestamp = deviceCursor.getLong(7);
+                device.frequency = deviceCursor.getInt(8);
+                device.channel = deviceCursor.getInt(9);
+                device.standard = deviceCursor.getString(10);
+                device.vendor = deviceCursor.getString(11);
+                device.channelWidth = deviceCursor.getInt(12);
+                device.maxSpeed = deviceCursor.getInt(13);
+                device.lastSeenLat = deviceCursor.getDouble(14);
+                device.lastSeenLon = deviceCursor.getDouble(15);
+                device.lastSeenTimestamp = deviceCursor.getLong(16);
+                device.movementDistance = deviceCursor.getDouble(17);
+
+                // Vendor aus OUI ableiten falls nicht vorhanden
+                if (device.vendor == null || device.vendor.equals("Unknown")) {
+                    device.vendor = getVendorFromOUI(device.address);
+                }
+
+                filtered.add(device);
+            }
+            deviceCursor.close();
+
+            // Zusätzlich WiFi-Daten aus alter Tabelle laden (nur im sichtbaren Bereich, ohne LIMIT)
+            Cursor wifiCursor = database.rawQuery(
+                "SELECT ssid, bssid, signal_strength, verschluesselung, " +
+                "latitude, longitude, timestamp " +
+                "FROM wifi_data WHERE latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? " +
+                "AND latitude != 0 AND longitude != 0 " +
+                "AND bssid NOT IN (SELECT device_address FROM device_data WHERE device_type = 'WIFI') " +
+                "ORDER BY signal_strength DESC",
+                new String[]{
+                    String.valueOf(minLat), String.valueOf(maxLat),
+                    String.valueOf(minLon), String.valueOf(maxLon)
+                });
+
+            while (wifiCursor.moveToNext()) {
+                DeviceData device = new DeviceData();
+                device.name = wifiCursor.getString(0);
+                device.address = wifiCursor.getString(1);
+                device.type = "WIFI";
+                device.signal = wifiCursor.getInt(2);
+                device.encryption = wifiCursor.getString(3);
+                device.lat = wifiCursor.getDouble(4);
+                device.lon = wifiCursor.getDouble(5);
+                device.timestamp = wifiCursor.getLong(6);
+                device.vendor = getVendorFromOUI(device.address);
+
+                filtered.add(device);
+            }
+            wifiCursor.close();
+
+        } catch (Exception e) {
+            Log.e("MapActivity", "Error loading devices in bounding box: " + e.getMessage());
+        }
+        return filtered;
+    }
+    
+    private String getVendorFromOUI(String bssid) {
+        if (bssid == null || bssid.length() < 8) {
+            return "Unknown";
+        }
+        
+        String oui = bssid.substring(0, 8).toUpperCase().replace(":", "").replace("-", "");
+        if (oui.length() < 6) {
+            return "Unknown";
+        }
+        
+        // Bekannte Hersteller-OUIs (Auswahl)
+        String ouiKey = oui.substring(0, 6);
+        switch (ouiKey) {
+            case "F01898":
+            case "ACBC32":
+            case "00236C":
+            case "8C8590":
+            case "40CBC0":
+                return "Apple";
+            case "001DD8":
+            case "A00460":
+            case "204E7F":
+            case "C40415":
+                return "NETGEAR";
+            case "00223F":
+            case "C05627":
+            case "48F8B3":
+            case "0014BF":
+                return "Linksys";
+            case "302303":
+            case "0015E9":
+            case "00265A":
+            case "BCF685":
+                return "D-Link";
+            case "000B6B":
+            case "001302":
+            case "001500":
+            case "0016EA":
+            case "0019D1":
+            case "001B77":
+            case "00216A":
+            case "0024D7":
+            case "A434D9":
+                return "Intel";
+            case "0024E9":
+            case "002637":
+            case "A8F274":
+            case "F47B09":
+            case "183A2D":
+            case "E8508B":
+                return "Samsung";
+            case "188796":
+            case "000A41":
+            case "00D0BC":
+            case "00D058":
+            case "B8BEBF":
+                return "Cisco";
+            default:
+                return "Unknown (" + bssid.substring(0, 8) + ")";
+        }
+    }
+    
+    private void loadMapHTML() {
+        // Lade gespeicherte Filter und Kartenposition
+        android.content.SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String savedFilters = prefs.getString(PREF_FILTERS, null);
+        double centerLat = Double.longBitsToDouble(prefs.getLong(PREF_CENTER_LAT, Double.doubleToLongBits(0)));
+        double centerLon = Double.longBitsToDouble(prefs.getLong(PREF_CENTER_LON, Double.doubleToLongBits(0)));
+        int zoomLevel = prefs.getInt(PREF_ZOOM, 15);
+
+        String htmlContent = generateMapHTML(savedFilters, centerLat, centerLon, zoomLevel);
+        mapWebView.loadDataWithBaseURL("https://localhost/", htmlContent, "text/html", "UTF-8", null);
+    }
+    
+    private void injectDeviceData() {
+        try {
+            JSONArray deviceArray = new JSONArray();
+            for (DeviceData device : deviceList) {
+                deviceArray.put(device.toJSON());
+            }
+            
+            String jsCode;
+            if (isMapInitialized) {
+                // Wenn Karte bereits initialisiert ist, nur Daten aktualisieren ohne Zentrierung zu ändern
+                jsCode = "updateMapData(" + deviceArray.toString() + ");";
+            } else {
+                // Erste Initialisierung
+                jsCode = "initializeMap(" + deviceArray.toString() + ");";
+                isMapInitialized = true;
+            }
+            mapWebView.evaluateJavascript(jsCode, null);
+            
+        } catch (JSONException e) {
+            Log.e("MapActivity", "Error creating JSON: " + e.getMessage());
+        }
+    }
+    
+    private void refreshMap() {
+        Toast.makeText(this, "Karte wird aktualisiert...", Toast.LENGTH_SHORT).show();
+        
+        // Nur Daten im aktuellen Viewport neu laden
+        deviceList = getDevicesInBoundingBox(bboxMinLat, bboxMinLon, bboxMaxLat, bboxMaxLon);
+        
+        Log.d("MapActivity", "Refreshed " + deviceList.size() + " devices in current viewport");
+        
+        // Nur Daten injizieren, nicht HTML neu laden
+        if (deviceList != null && !deviceList.isEmpty()) {
+            injectDeviceData();
+        }
+    }
+    
+    // Überladene Methode für MapHTML mit Filter und Center
+    private String generateMapHTML(String savedFilters, double centerLat, double centerLon, int zoomLevel) {
+        // Prüfe ob externe DB verwendet wird
+        String externalDbPath = getIntent().getStringExtra("external_db_path");
+        boolean isExternalDb = (externalDbPath != null);
+        String dbInfo = isExternalDb ? "Externe DB" : "Interne DB";
+        // Filter- und Kartenstatus als JSON für JS
+        String filterJson = savedFilters != null ? savedFilters : "[]";
+        String centerJson = "{" +
+            "\"lat\":" + centerLat + ",\"lon\":" + centerLon + ",\"zoom\":" + zoomLevel + "}";
+
+        return "<!DOCTYPE html>\n" +
+            "<html>\n" +
+            "<head>\n" +
+            "    <meta charset='utf-8'>\n" +
+            "    <meta name='viewport' content='width=device-width, initial-scale=1.0'>\n" +
+            "    <title>WiFi & Bluetooth Karte</title>\n" +
+            "    <link rel='stylesheet' href='https://unpkg.com/leaflet@1.7.1/dist/leaflet.css' />\n" +
+            "    <style>\n" +
+            "        body { margin: 0; padding: 0; }\n" +
+            "        #map { height: 100vh; width: 100vw; }\n" +
+            "        .custom-control {\n" +
+            "            position: absolute;\n" +
+            "            top: 10px;\n" +
+            "            left: 10px;\n" +
+            "            background: white;\n" +
+            "            border: 2px solid rgba(0,0,0,0.2);\n" +
+            "            border-radius: 5px;\n" +
+            "            padding: 10px;\n" +
+            "            z-index: 10000;\n" +
+            "            max-width: 250px;\n" +
+            "            max-height: 400px;\n" +
+            "            overflow-y: auto;\n" +
+            "            box-shadow: 0 1px 7px rgba(0,0,0,0.4);\n" +
+            "        }\n" +
+            "        .filter-checkbox {\n" +
+            "            display: block;\n" +
+            "            margin: 5px 0;\n" +
+            "            font-size: 12px;\n" +
+            "            cursor: pointer;\n" +
+            "        }\n" +
+            "        .info-panel {\n" +
+            "            position: absolute;\n" +
+            "            bottom: 10px;\n" +
+            "            right: 10px;\n" +
+            "            background: rgba(0, 0, 0, 0.8);\n" +
+            "            color: white;\n" +
+            "            padding: 8px 12px;\n" +
+            "            border-radius: 5px;\n" +
+            "            font-size: 12px;\n" +
+            "            z-index: 10000;\n" +
+            "        }\n" +
+            "        .db-info {\n" +
+            "            position: absolute;\n" +
+            "            top: 10px;\n" +
+            "            right: 10px;\n" +
+            "            background: " + (isExternalDb ? "rgba(255, 140, 0, 0.9)" : "rgba(0, 100, 200, 0.9)") + ";\n" +
+            "            color: white;\n" +
+            "            padding: 6px 10px;\n" +
+            "            border-radius: 5px;\n" +
+            "            font-size: 11px;\n" +
+            "            z-index: 10000;\n" +
+            "            font-weight: bold;\n" +
+            "        }\n" +
+            "        .user-location-icon {\n" +
+            "            font-size: 20px;\n" +
+            "            text-align: center;\n" +
+            "            line-height: 20px;\n" +
+            "        }\n" +
+            "        .filter-toggle-btn {\n" +
+            "            display: block;\n" +
+            "            width: 100%;\n" +
+            "            background: #e0e0e0;\n" +
+            "            border: none;\n" +
+            "            border-radius: 4px;\n" +
+            "            padding: 6px 0;\n" +
+            "            margin-bottom: 8px;\n" +
+            "            font-size: 13px;\n" +
+            "            cursor: pointer;\n" +
+            "        }\n" +
+            "        .filter-content-collapsed { display: none; }\n" +
+            "    </style>\n" +
+            "</head>\n" +
+            "<body>\n" +
+            "    <div id='map'></div>\n" +
+            "    \n" +
+            "    <!-- DB Info -->\n" +
+            "    <div class='db-info'>\n" +
+            "        📁 " + dbInfo + "\n" +
+            "    </div>\n" +
+            "    \n" +
+            "    <div class='custom-control'>\n" +
+            "        <button class='filter-toggle-btn' id='filterToggleBtn' onclick='toggleFilterContainer()'>Filter ▼</button>\n" +
+            "        <div id='filterContent'>\n" +
+            "        <h4 style='margin: 0 0 10px 0; font-size: 14px;'>Filter</h4>\n" +
+            "        <label class='filter-checkbox'>\n" +
+            "            <input type='checkbox' id='wifi_open' onchange='toggleFilter(\"wifi_open\")'>\n" +
+            "            WiFi Offen\n" +
+            "        </label>\n" +
+            "        <label class='filter-checkbox'>\n" +
+            "            <input type='checkbox' id='wifi_open_no_vodafone' onchange='toggleFilter(\"wifi_open_no_vodafone\")'>\n" +
+            "            WiFi Offen ohne Vodafone\n" +
+            "        </label>\n" +
+            "        <label class='filter-checkbox'>\n" +
+            "            <input type='checkbox' id='wifi_encrypted' onchange='toggleFilter(\"wifi_encrypted\")'>\n" +
+            "            WiFi Verschlüsselt\n" +
+            "        </label>\n" +
+            "        <label class='filter-checkbox'>\n" +
+            "            <input type='checkbox' id='bluetooth' onchange='toggleFilter(\"bluetooth\")'>\n" +
+            "            Bluetooth\n" +
+            "        </label>\n" +
+            "        <label class='filter-checkbox'>\n" +
+            "            <input type='checkbox' id='bluetooth_known' onchange='toggleFilter(\"bluetooth_known\")'>\n" +
+            "            Bluetooth ohne Unknown\n" +
+            "        </label>\n" +
+            "        <label class='filter-checkbox'>\n" +
+            "            <input type='checkbox' id='signal_strong' onchange='toggleFilter(\"signal_strong\")'>\n" +
+            "            Signal Stark (≥-70 dBm)\n" +
+            "        </label>\n" +
+            "        <label class='filter-checkbox'>\n" +
+            "            <input type='checkbox' id='signal_weak' onchange='toggleFilter(\"signal_weak\")'>\n" +
+            "            Signal Schwach (<-70 dBm)\n" +
+            "        </label>\n" +
+            "        <hr style='margin: 10px 0;'>\n" +
+            "        <button onclick='toggleAllFilters(true)' style='margin: 2px; padding: 4px 8px; font-size: 11px;'>Alle Ein</button>\n" +
+            "        <button onclick='toggleAllFilters(false)' style='margin: 2px; padding: 4px 8px; font-size: 11px;'>Alle Aus</button>\n" +
+            "        <hr style='margin: 10px 0;'>\n" +
+            "        <button onclick='requestCenterOnUser()' style='margin: 2px; padding: 4px 8px; font-size: 11px; width: 100%;'>Live Standort</button>\n" +
+            "        </div>\n" +
+            "    </div>\n" +
+            "    \n" +
+            "    <div class='info-panel' id='info-panel'>\n" +
+            "        Laden...\n" +
+            "    </div>\n" +
+            "    \n" +
+            "    <script src='https://unpkg.com/leaflet@1.7.1/dist/leaflet.js'></script>\n" +
+            "    <script>\n" +
+            "    function toggleFilterContainer() {\n" +
+            "        var content = document.getElementById('filterContent');\n" +
+            "        var btn = document.getElementById('filterToggleBtn');\n" +
+            "        if (content.classList.contains('filter-content-collapsed')) {\n" +
+            "            content.classList.remove('filter-content-collapsed');\n" +
+            "            btn.innerHTML = 'Filter ▼';\n" +
+            "        } else {\n" +
+            "            content.classList.add('filter-content-collapsed');\n" +
+            "            btn.innerHTML = 'Filter ▲';\n" +
+            "        }\n" +
+            "    }\n" +
+            "    window.onload = function() {\n" +
+            "        try {\n" +
+            "            if (Array.isArray(savedFilters)) {\n" +
+            "                savedFilters.forEach(f => {\n" +
+            "                    const cb = document.getElementById(f);\n" +
+            "                    if (cb) { cb.checked = true; }\n" +
+            "                });\n" +
+            "            }\n" +
+            "        } catch (e) { console.log('Filter restore error', e); }\n" +
+            "    };\n" +
+            "\n" +
+            "    let map;\n" +
+            "    let deviceData = [];\n" +
+            "    let allMarkers = [];\n" +
+            "    let allCircles = [];\n" +
+            "    let activeFilters = new Set();\n" +
+            "    let deviceFilterMap = new Map();\n" +
+            "    let userMarker = null;\n" +
+            "    let currentCenter = null;\n" +
+            "    let currentZoom = 15;\n" +
+            "    const savedFilters = " + filterJson + ";\n" +
+            "    const savedCenter = " + centerJson + ";\n" +
+            "        \n" +
+            "        function initializeMap(devices) {\n" +
+            "            deviceData = devices;\n" +
+            "            console.log('Initializing map with', devices.length, 'devices');\n" +
+            "            if (devices.length === 0) {\n" +
+            "                document.getElementById('info-panel').textContent = 'Keine Geräte gefunden';\n" +
+            "                return;\n" +
+            "            }\n" +
+            "            if (savedCenter && savedCenter.lat !== 0 && savedCenter.lon !== 0) {\n" +
+            "                currentCenter = [savedCenter.lat, savedCenter.lon];\n" +
+            "                currentZoom = savedCenter.zoom;\n" +
+            "            } else {\n" +
+            "                let avgLat = devices.reduce((sum, d) => sum + d.lat, 0) / devices.length;\n" +
+            "                let avgLon = devices.reduce((sum, d) => sum + d.lon, 0) / devices.length;\n" +
+            "                currentCenter = [avgLat, avgLon];\n" +
+            "            }\n" +
+            "            map = L.map('map').setView(currentCenter, currentZoom);\n" +
+            "            \n" +
+            "            map.on('moveend', function() {\n" +
+            "                currentCenter = map.getCenter();\n" +
+            "                // Performance-Optimierung: Bounding Box an Android senden\n" +
+            "                setTimeout(notifyAndroidOfViewportChange, 200); // Debounce\n" +
+            "            });\n" +
+            "            \n" +
+            "            map.on('zoomend', function() {\n" +
+            "                currentZoom = map.getZoom();\n" +
+            "                // Performance-Optimierung: Bounding Box an Android senden\n" +
+            "                setTimeout(notifyAndroidOfViewportChange, 200); // Debounce\n" +
+            "            });\n" +
+            "            \n" +
+            "            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {\n" +
+            "                attribution: '© OpenStreetMap contributors'\n" +
+            "            }).addTo(map);\n" +
+            "            \n" +
+            "            addMarkers();\n" +
+            "            if (Array.isArray(savedFilters)) {\n" +
+            "                savedFilters.forEach(f => {\n" +
+            "                    const cb = document.getElementById(f);\n" +
+            "                    if (cb) { cb.checked = true; activeFilters.add(f); }\n" +
+            "                });\n" +
+            "                updateMarkerVisibility();\n" +
+            "            }\n" +
+            "            updateInfoPanel();\n" +
+            "            \n" +
+            "            // Initial Viewport an Android senden\n" +
+            "            setTimeout(notifyAndroidOfViewportChange, 1000);\n" +
+            "        }\n" +
+            "        \n" +
+            "        // NEUE FUNKTION: Sendet aktuellen Viewport an Android für Performance-Optimierung\n" +
+            "        function notifyAndroidOfViewportChange() {\n" +
+            "            if (map && typeof Android !== 'undefined' && Android.onMapViewportChanged) {\n" +
+            "                const bounds = map.getBounds();\n" +
+            "                const sw = bounds.getSouthWest();\n" +
+            "                const ne = bounds.getNorthEast();\n" +
+            "                Android.onMapViewportChanged(sw.lat, sw.lng, ne.lat, ne.lng);\n" +
+            "                console.log('Viewport sent to Android:', sw.lat, sw.lng, 'to', ne.lat, ne.lng);\n" +
+            "            }\n" +
+            "        }\n" +
+            "        \n" +
+            "        function updateMapData(devices) {\n" +
+            "            deviceData = devices;\n" +
+            "            console.log('Updating map with', devices.length, 'devices');\n" +
+            "            \n" +
+            "            if (devices.length === 0) {\n" +
+            "                document.getElementById('info-panel').textContent = 'Keine Geräte im sichtbaren Bereich';\n" +
+            "                // Alle vorhandenen Marker entfernen\n" +
+            "                allMarkers.forEach(marker => map.removeLayer(marker));\n" +
+            "                allCircles.forEach(circle => map.removeLayer(circle));\n" +
+            "                allMarkers = [];\n" +
+            "                allCircles = [];\n" +
+            "                deviceFilterMap.clear();\n" +
+            "                return;\n" +
+            "            }\n" +
+            "            \n" +
+            "            allMarkers.forEach(marker => map.removeLayer(marker));\n" +
+            "            allCircles.forEach(circle => map.removeLayer(circle));\n" +
+            "            allMarkers = [];\n" +
+            "            allCircles = [];\n" +
+            "            deviceFilterMap.clear();\n" +
+            "            \n" +
+            "            addMarkers();\n" +
+            "            \n" +
+            "            updateMarkerVisibility();\n" +
+            "            updateInfoPanel();\n" +
+            "        }\n" +
+            "        \n" +
+            "        function addMarkers() {\n" +
+            "            deviceData.forEach((device, index) => {\n" +
+            "                // Wenn Filter wifi_open_no_vodafone aktiv ist und device.name === '[Hidden/Unknown]', dann überspringen\n" +
+            "                if (activeFilters.has('wifi_open_no_vodafone') && device.type === 'WIFI' && device.name === '[Hidden/Unknown]') {\n" +
+            "                    return;\n" +
+            "                }\n" +
+            "                let filterClasses = [];\n" +
+            "                // Filter-Klassen bestimmen\n" +
+            "                if (device.type === 'WIFI') {\n" +
+            "                    if (device.encryption === 'offen') {\n" +
+            "                        filterClasses.push('wifi_open');\n" +
+            "                        // WiFi Offen ohne Vodafone: SSID darf nicht 'Vodafone Homespot' oder 'Vodafone Hotspot' enthalten\n" +
+            "                        if (typeof device.name === 'string' && device.name.toLowerCase().indexOf('vodafone') === -1 && device.name !== '[Hidden/Unknown]') {\n" +
+            "                            filterClasses.push('wifi_open_no_vodafone');\n" +
+            "                        }\n" +
+            "                    } else {\n" +
+            "                        filterClasses.push('wifi_encrypted');\n" +
+            "                    }\n" +
+            "                } else {\n" +
+            "                    filterClasses.push('bluetooth');\n" +
+            "                    // Bluetooth ohne Unknown: Gerätename darf nicht 'Unknown device' sein\n" +
+            "                    if (device.name && device.name.trim() !== '' && \n" +
+            "                        !device.name.toLowerCase().includes('unknown device') &&\n" +
+            "                        device.name !== '[Hidden/Unknown]') {\n" +
+            "                        filterClasses.push('bluetooth_known');\n" +
+            "                    }\n" +
+            "                }\n" +
+            "                if (device.signal >= -70) {\n" +
+            "                    filterClasses.push('signal_strong');\n" +
+            "                } else {\n" +
+            "                    filterClasses.push('signal_weak');\n" +
+            "                }\n" +
+            "                deviceFilterMap.set(device.address, filterClasses);\n" +
+            "                \n" +
+            "                // Icon und Farbe\n" +
+            "                let iconColor, iconName;\n" +
+            "                if (device.type === 'WIFI') {\n" +
+            "                    if (device.encryption === 'offen') {\n" +
+            "                        iconColor = 'red';\n" +
+            "                    } else {\n" +
+            "                        iconColor = 'green';\n" +
+            "                    }\n" +
+            "                } else {\n" +
+            "                    iconColor = 'blue';\n" +
+            "                }\n" +
+            "                \n" +
+            "                // Marker erstellen\n" +
+            "                let marker = L.marker([device.lat, device.lon]).addTo(map);\n" +
+            "                \n" +
+            "                // Popup-Inhalt\n" +
+            "                let popupContent = `\n" +
+            "                    <b>${device.type === 'WIFI' ? 'SSID' : 'Gerät'}:</b> ${device.name || '[Hidden/Unknown]'}<br>\n" +
+            "                    <b>${device.type === 'WIFI' ? 'BSSID' : 'MAC'}:</b> ${device.address}<br>\n" +
+            "                    <b>Signal:</b> ${device.signal} dBm<br>\n" +
+            "                    <b>${device.type === 'WIFI' ? 'Verschlüsselung' : 'Klasse'}:</b> ${device.encryption}<br>\n" +
+            "                    <b>Hersteller:</b> ${device.vendor}<br>\n" +
+            "                    <b>Koordinaten:</b> ${device.lat.toFixed(6)}, ${device.lon.toFixed(6)}\n" +
+            "                `;\n" +
+            "                \n" +
+            "                if (device.type === 'WIFI' && device.frequency) {\n" +
+            "                    popupContent += `<br><b>Frequenz:</b> ${device.frequency} MHz`;\n" +
+            "                }\n" +
+            "                if (device.channel) {\n" +
+            "                    popupContent += `<br><b>Kanal:</b> ${device.channel}`;\n" +
+            "                }\n" +
+            "                \n" +
+            "                marker.bindPopup(popupContent);\n" +
+            "                \n" +
+            "                // Kreis um Marker\n" +
+            "                let radius = device.signal >= -50 ? 10 : device.signal >= -70 ? 20 : 30;\n" +
+            "                let circle = L.circle([device.lat, device.lon], {\n" +
+            "                    color: iconColor,\n" +
+            "                    fillColor: iconColor,\n" +
+            "                    fillOpacity: 0.2,\n" +
+            "                    radius: radius,\n" +
+            "                    weight: 2\n" +
+            "                }).addTo(map);\n" +
+            "                \n" +
+            "                allMarkers.push(marker);\n" +
+            "                allCircles.push(circle);\n" +
+            "            });\n" +
+            "            \n" +
+            "            // Initial alle verstecken\n" +
+            "            updateMarkerVisibility();\n" +
+            "        }\n" +
+            "        \n" +
+            "        function toggleFilter(filterKey) {\n" +
+            "            const checkbox = document.getElementById(filterKey);\n" +
+            "            if (checkbox.checked) {\n" +
+            "                activeFilters.add(filterKey);\n" +
+            "            } else {\n" +
+            "                activeFilters.delete(filterKey);\n" +
+            "            }\n" +
+            "            updateMarkerVisibility();\n" +
+            "        }\n" +
+            "        \n" +
+            "        function toggleAllFilters(enable) {\n" +
+            "            const checkboxes = document.querySelectorAll('.custom-control input[type=\"checkbox\"]');\n" +
+            "            activeFilters.clear();\n" +
+            "            \n" +
+            "            checkboxes.forEach(checkbox => {\n" +
+            "                checkbox.checked = enable;\n" +
+            "                if (enable) {\n" +
+            "                    activeFilters.add(checkbox.id);\n" +
+            "                }\n" +
+            "            });\n" +
+            "            \n" +
+            "            updateMarkerVisibility();\n" +
+            "        }\n" +
+            "        \n" +
+            "        function updateMarkerVisibility() {\n" +
+            "            if (activeFilters.size === 0) {\n" +
+            "                // Alle verstecken\n" +
+            "                allMarkers.forEach(marker => map.removeLayer(marker));\n" +
+            "                allCircles.forEach(circle => map.removeLayer(circle));\n" +
+            "                return;\n" +
+            "            }\n" +
+            "            \n" +
+            "            deviceData.forEach((device, index) => {\n" +
+            "                const deviceFilters = deviceFilterMap.get(device.address) || [];\n" +
+            "                const shouldShow = deviceFilters.some(cls => activeFilters.has(cls));\n" +
+            "                \n" +
+            "                const marker = allMarkers[index];\n" +
+            "                const circle = allCircles[index];\n" +
+            "                \n" +
+            "                if (shouldShow) {\n" +
+            "                    if (!map.hasLayer(marker)) map.addLayer(marker);\n" +
+            "                    if (!map.hasLayer(circle)) map.addLayer(circle);\n" +
+            "                } else {\n" +
+            "                    if (map.hasLayer(marker)) map.removeLayer(marker);\n" +
+            "                    if (map.hasLayer(circle)) map.removeLayer(circle);\n" +
+            "                }\n" +
+            "            });\n" +
+            "            \n" +
+            "            updateInfoPanel();\n" +
+            "        }\n" +
+            "        \n" +
+            "        function updateInfoPanel() {\n" +
+            "            let wifiCount = 0;\n" +
+            "            let bluetoothCount = 0;\n" +
+            "            let bluetoothKnownCount = 0;\n" +
+            "            let visibleCount = 0;\n" +
+            "            \n" +
+            "            deviceData.forEach((device, index) => {\n" +
+            "                if (device.type === 'WIFI') {\n" +
+            "                    wifiCount++;\n" +
+            "                } else {\n" +
+            "                    bluetoothCount++;\n" +
+            "                    // Bluetooth ohne Unknown zählen\n" +
+            "                    if (device.name && device.name.trim() !== '' && \n" +
+            "                        !device.name.toLowerCase().includes('unknown device') &&\n" +
+            "                        device.name !== '[Hidden/Unknown]') {\n" +
+            "                        bluetoothKnownCount++;\n" +
+            "                    }\n" +
+            "                }\n" +
+            "                \n" +
+            "                const marker = allMarkers[index];\n" +
+            "                if (marker && map.hasLayer(marker)) {\n" +
+            "                    visibleCount++;\n" +
+            "                }\n" +
+            "            });\n" +
+            "            \n" +
+            "            // Gesamtstatistik von Android abrufen\n" +
+            "            let totalStats = '';\n" +
+            "            if (typeof Android !== 'undefined' && Android.getTotalDeviceCount) {\n" +
+            "                totalStats = Android.getTotalDeviceCount();\n" +
+            "            }\n" +
+            "            \n" +
+            "            document.getElementById('info-panel').innerHTML = \n" +
+            "                `Sichtbar: ${visibleCount} | WiFi: ${wifiCount} | BT: ${bluetoothCount} (${bluetoothKnownCount} bekannt)<br><small>Nur im aktuellen Bereich | ${totalStats}</small>`;\n" +
+            "        }\n" +
+            "        \n" +
+            "        function requestCenterOnUser() {\n" +
+            "            if (typeof Android !== 'undefined' && Android.requestDeviceLocation) {\n" +
+            "                Android.requestDeviceLocation();\n" +
+            "            } else {\n" +
+            "                alert('Standortfunktion nicht verfügbar.');\n" +
+            "            }\n" +
+            "        }\n" +
+            "\n" +
+            "        function centerOnUserLocation(lat, lon) {\n" +
+            "            if (!map) return;\n" +
+            "            const userLatLng = [lat, lon];\n" +
+            "            if (userMarker) {\n" +
+            "                userMarker.setLatLng(userLatLng);\n" +
+            "            } else {\n" +
+            "                const userIcon = L.divIcon({\n" +
+            "                    html: '&#128512;',\n" +
+            "                    className: 'user-location-icon',\n" +
+            "                    iconSize: [20, 20]\n" +
+            "                });\n" +
+            "                userMarker = L.marker(userLatLng, { icon: userIcon, zIndexOffset: 1000 }).addTo(map);\n" +
+            "                userMarker.bindPopup('<b>Dein Standort</b>');\n" +
+            "            }\n" +
+            "            map.setView(userLatLng, 15);\n" +
+            "        }\n" +
+            "\n" +
+            "        function updateLocationInDB(deviceAddress, deviceType, newLat, newLon) {\n" +
+            "            if (typeof Android !== 'undefined') {\n" +
+            "                Android.updateDeviceLocation(deviceAddress, deviceType, newLat, newLon);\n" +
+            "            }\n" +
+            "        }\n" +
+            "        function saveMapState() {\n" +
+            "            let filters = Array.from(activeFilters);\n" +
+            "            let center = map.getCenter();\n" +
+            "            let zoom = map.getZoom();\n" +
+            "            if (typeof Android !== 'undefined' && Android.saveMapState) {\n" +
+            "                Android.saveMapState(JSON.stringify(filters), center.lat, center.lng, zoom);\n" +
+            "            }\n" +
+            "        }\n" +
+            "        map.on('moveend', saveMapState);\n" +
+            "        map.on('zoomend', saveMapState);\n" +
+            "        document.querySelectorAll('.custom-control input[type=\"checkbox\"]').forEach(cb => {\n" +
+            "            cb.addEventListener('change', saveMapState);\n" +
+            "        });\n" +
+            "    </script>\n" +
+            "</body>\n" +
+            "</html>";
+    }
+    // Für Kompatibilität, falls alte Methode aufgerufen wird
+    private String generateMapHTML() {
+        return generateMapHTML(null, 0, 0, 15);
+    }
+    
+    // JavaScript Interface für Kommunikation zwischen WebView und Android
+    public class WebAppInterface {
+        @JavascriptInterface
+        public void updateDeviceLocation(String deviceAddress, String deviceType, double newLat, double newLon) {
+            runOnUiThread(() -> {
+                // Hier könnte die Datenbank aktualisiert werden
+                Toast.makeText(MapActivity.this, 
+                    "Position aktualisiert für " + deviceAddress + " -> " + 
+                    String.format("%.6f, %.6f", newLat, newLon), 
+                    Toast.LENGTH_SHORT).show();
+                Log.d("MapActivity", String.format("Device %s (%s) moved to: %.6f, %.6f", 
+                    deviceAddress, deviceType, newLat, newLon));
+            });
+        }
+
+        @JavascriptInterface
+        public void showToast(String message) {
+            runOnUiThread(() -> Toast.makeText(MapActivity.this, message, Toast.LENGTH_SHORT).show());
+        }
+
+        // Speichere Filter und Kartenstatus
+        @JavascriptInterface
+        public void saveMapState(String filters, double lat, double lon, int zoom) {
+            getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
+                .putString(PREF_FILTERS, filters)
+                .putLong(PREF_CENTER_LAT, Double.doubleToLongBits(lat))
+                .putLong(PREF_CENTER_LON, Double.doubleToLongBits(lon))
+                .putInt(PREF_ZOOM, zoom)
+                .apply();
+        }
+
+        @JavascriptInterface
+        public void requestDeviceLocation() {
+            runOnUiThread(() -> requestLocationAndCenterMap());
+        }
+        
+        // NEUE METHODE: Bounding Box Update für Performance-Optimierung
+        @JavascriptInterface
+        public void onMapViewportChanged(double minLat, double minLon, double maxLat, double maxLon) {
+            runOnUiThread(() -> {
+                Log.d("MapActivity", String.format("Viewport changed: %.6f,%.6f to %.6f,%.6f", 
+                    minLat, minLon, maxLat, maxLon));
+                
+                // Nur neu laden wenn sich der Viewport erheblich geändert hat
+                double latDiff = Math.abs(bboxMinLat - minLat) + Math.abs(bboxMaxLat - maxLat);
+                double lonDiff = Math.abs(bboxMinLon - minLon) + Math.abs(bboxMaxLon - maxLon);
+                
+                if (latDiff > 0.001 || lonDiff > 0.001) { // Schwellenwert für Aktualisierung
+                    bboxMinLat = minLat;
+                    bboxMinLon = minLon;
+                    bboxMaxLat = maxLat;
+                    bboxMaxLon = maxLon;
+                    
+                    // Neue Marker für den sichtbaren Bereich laden
+                    List<DeviceData> newDevices = getDevicesInBoundingBox(minLat, minLon, maxLat, maxLon);
+                    deviceList = newDevices;
+                    
+                    Log.d("MapActivity", "Loaded " + newDevices.size() + " devices for new viewport");
+                    
+                    // Daten an WebView senden
+                    if (!newDevices.isEmpty()) {
+                        injectDeviceData();
+                    } else {
+                        // Auch leere Liste senden, damit UI aktualisiert wird
+                        injectDeviceData();
+                    }
+                }
+            });
+        }
+        
+        // NEUE METHODE: Gesamtanzahl der Geräte in DB abfragen
+        @JavascriptInterface
+        public String getTotalDeviceCount() {
+            try {
+                Cursor cursor = database.rawQuery(
+                    "SELECT COUNT(*) as total_devices, " +
+                    "SUM(CASE WHEN device_type = 'WIFI' THEN 1 ELSE 0 END) as wifi_count, " +
+                    "SUM(CASE WHEN device_type != 'WIFI' THEN 1 ELSE 0 END) as bt_count " +
+                    "FROM device_data WHERE latitude != 0 AND longitude != 0", null);
+                
+                if (cursor.moveToFirst()) {
+                    int total = cursor.getInt(0);
+                    int wifi = cursor.getInt(1);
+                    int bt = cursor.getInt(2);
+                    cursor.close();
+                    return String.format("Gesamt: %d (%d WiFi, %d BT)", total, wifi, bt);
+                }
+                cursor.close();
+            } catch (Exception e) {
+                Log.e("MapActivity", "Error getting total device count: " + e.getMessage());
+            }
+            return "Gesamt: Unbekannt";
+        }
+    }
+    
+    private void requestLocationAndCenterMap() {
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
+            return;
+        }
+
+        fusedLocationClient.getLastLocation()
+                .addOnSuccessListener(this, location -> {
+                    if (location != null) {
+                        mapWebView.evaluateJavascript("javascript:centerOnUserLocation(" + location.getLatitude() + ", " + location.getLongitude() + ");", null);
+                        Toast.makeText(MapActivity.this, "Zentriere auf deinen Standort", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(MapActivity.this, "Standort nicht verfügbar. Aktiviere GPS.", Toast.LENGTH_LONG).show();
+                    }
+                });
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                requestLocationAndCenterMap();
+            } else {
+                Toast.makeText(this, "Standortberechtigung verweigert.", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+    
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (database != null) {
+            database.close();
+        }
+        
+        // Temporäre externe DB löschen
+        String extDbPath = getIntent().getStringExtra("external_db_path");
+        if (extDbPath != null) {
+            java.io.File tempFile = new java.io.File(extDbPath);
+            if (tempFile.exists() && tempFile.getAbsolutePath().contains("cache")) {
+                tempFile.delete();
+                Log.d("MapActivity", "Temporary external database file deleted");
+            }
+        }
+    }
+}
