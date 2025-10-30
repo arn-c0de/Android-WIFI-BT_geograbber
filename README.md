@@ -108,8 +108,6 @@ GeoGrabber is ideal for network analysis, signal mapping, and understanding wire
 
 ## 📸 Screenshots
 
-Below is a real screenshot of the GeoGrabber app in action:
-
 <div align="center">
    <img src="images/screenshots/main_page_1.0.1.png" alt="GeoGrabber Main UI" width="300" />
 </div>
