@@ -2,6 +2,10 @@
   <h1>📡 WiFi & Bluetooth GeoGrabber</h1>
 </div>
 
+<div align="left">
+   <b>Current Version: v1.0.1</b>
+</div>
+
 ![Android](https://img.shields.io/badge/Android-6.0%2B-green)
 ![Platform](https://img.shields.io/badge/platform-Android-lightblue)
 ![Language](https://img.shields.io/badge/language-Java-orange)
