@@ -2,7 +2,7 @@
 ![Android](https://img.shields.io/badge/Android-6.0%2B-green)
 ![Platform](https://img.shields.io/badge/platform-Android-lightblue)
 ![Language](https://img.shields.io/badge/language-Java-orange)
-![License](https://img.shields.io/badge/license-Open%20Source-blue)
+![License](https://img.shields.io/badge/license-Non--Commercial-orange)
 ![Status](https://img.shields.io/badge/status-Active-success)
 
 📚 **[Documentation](docs/)** · 🚀 **[Database Combiner Guide](docs/quickstart/database_combiner_quickstart.md)** · 🗺️ **[Map Viewer Guide](docs/quickstart/map_viewer_quickstart.md)** · 📁 **[Project Structure](PROJECT_STRUCTURE.md)** · 📂 **[Detailed Structure](docs/project-structure/PROJECT_STRUCTURE.md)** · � **[Changelog](CHANGELOG.md)** · 🤝 **[Contributing](CONTRIBUTING.md)** · 🔒 **[Security](SECURITY.md)** · 📜 **[Code of Conduct](CODE_OF_CONDUCT.md)**

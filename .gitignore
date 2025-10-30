@@ -1,0 +1,48 @@
+# Project-wide gitignore
+
+# Database files (exported from app)
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Backup files
+*~
+*.swp
+*.bak
+*.tmp
+*.orig
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log
+
+# Sensitive data
+secrets.xml
+api-keys.properties
+credentials.json
+*.key
+*.pem
+*.jks
+*.keystore
