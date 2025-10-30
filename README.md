@@ -502,15 +502,14 @@ When reporting bugs, please include:
 
 ---
 
+
 ## 📄 License
 
-[Specify your license here]
+This project is licensed under the **GeoGrabber License (Non-Commercial)**.
 
-**Suggested Options:**
-- MIT License (permissive)
-- Apache License 2.0 (permissive with patent grant)
-- GPL v3 (copyleft)
-- Proprietary (all rights reserved)
+You are free to use, modify, and share this software for **personal, educational, and research purposes only**. Commercial use, resale, or distribution for profit is **strictly prohibited** without explicit written permission from the project maintainer.
+
+See the [LICENSE](LICENSE) file for full terms and conditions.
 
 ---
 
