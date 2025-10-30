@@ -10,7 +10,6 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.0] – 2025-06-01
 ### Added
-- Initial public release of WiFi & Bluetooth GeoGrabber
 - Android app: WiFi and Bluetooth scanning, GPS integration, live map view
 - SQLite database storage and export/import
 - Python tools: database combiner and map viewer
