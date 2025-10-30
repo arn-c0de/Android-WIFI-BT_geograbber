@@ -171,7 +171,7 @@ The screenshot above demonstrates the main scanning interface, live network list
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/yourusername/Android_WIFI_BT_GEOGRABBER.git
+git clone https://github.com/arn-c0de/Android_WIFI_BT_GEOGRABBER.git
 cd Android_WIFI_BT_GEOGRABBER
 
 # 2. Open in Android Studio
@@ -189,7 +189,7 @@ cd Android_WIFI_BT_GEOGRABBER
 
 ### Option 2: Install APK
 
-1. Download the latest APK from the [Releases](https://github.com/yourusername/Android_WIFI_BT_GEOGRABBER/releases) page
+1. Download the latest APK from the [Releases](https://github.com/arn-c0de/Android_WIFI_BT_GEOGRABBER/releases) page
 2. Enable "Install from Unknown Sources" in your Android settings:
    - **Settings → Security → Unknown Sources** (Android 7 and below)
    - **Settings → Apps → Special Access → Install Unknown Apps** (Android 8+)
@@ -465,7 +465,7 @@ We welcome contributions from the community! Here's how you can help:
 1. **Fork the Repository**
    ```bash
    # Click 'Fork' on GitHub
-   git clone https://github.com/yourusername/Android_WIFI_BT_GEOGRABBER.git
+   git clone https://github.com/arn-c0de/Android_WIFI_BT_GEOGRABBER.git
    cd Android_WIFI_BT_GEOGRABBER
    ```
 
