@@ -27,6 +27,7 @@ First steps with GeoGrabber:
 - **[CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)** – Community code of conduct
 - **[SECURITY.md](../SECURITY.md)** – Report vulnerabilities
 - **[LICENSE](../LICENSE)** – License information
+- **[Detailed Project Structure](project-structure/PROJECT_STRUCTURE.md)** – Full directory and technical overview
 
 ---
 

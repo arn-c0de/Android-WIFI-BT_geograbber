@@ -8,7 +8,7 @@
 ![License](https://img.shields.io/badge/license-Open%20Source-blue)
 ![Status](https://img.shields.io/badge/status-Active-success)
 
-📚 **[Documentation](docs/)** | 🚀 **[Database Combiner Guide](docs/quickstart/database_combiner_quickstart.md)** | 🗺️ **[Map Viewer Guide](docs/quickstart/map_viewer_quickstart.md)** | 📝 **[Changelog](CHANGELOG.md)** | 🤝 **[Contributing](CONTRIBUTING.md)** | 🔒 **[Security](SECURITY.md)** | 📜 **[Code of Conduct](CODE_OF_CONDUCT.md)**
+📚 **[Documentation](docs/)** · 🚀 **[Database Combiner Guide](docs/quickstart/database_combiner_quickstart.md)** · 🗺️ **[Map Viewer Guide](docs/quickstart/map_viewer_quickstart.md)** · 📁 **[Project Structure](PROJECT_STRUCTURE.md)** · 📂 **[Detailed Structure](docs/project-structure/PROJECT_STRUCTURE.md)** · � **[Changelog](CHANGELOG.md)** · 🤝 **[Contributing](CONTRIBUTING.md)** · 🔒 **[Security](SECURITY.md)** · 📜 **[Code of Conduct](CODE_OF_CONDUCT.md)**
 
 **Professional Android Geolocation Tool for Network Analysis & Signal Mapping**
 
@@ -420,44 +420,8 @@ CREATE TABLE device_data (
 - Background scanning may stop on low battery
 - Network density affects scan speed
 
----
 
-## 📁 Project Structure
-
-```
-Android_WIFI_BT_GEOGRABBER/
-├── 📄 README.md                          # This file
-├── 📁 docs/                               # Documentation
-│   └── 📁 quickstart/
-│       ├── database_combiner_quickstart.md
-│       └── map_viewer_quickstart.md
-├── 🐍 Python/                            # Python analysis tools
-│   ├── start_combine_dbs.py             # Database merger
-│   └── start_plot_gui.py                # Map visualization GUI
-└── 📱 WIFIGEOGRABBER/                    # Android project
-    ├── build.gradle.kts                  # Project build config
-    ├── settings.gradle.kts               # Gradle settings
-    ├── gradlew                           # Gradle wrapper (Unix)
-    ├── gradlew.bat                       # Gradle wrapper (Windows)
-    ├── 📁 gradle/                        # Gradle configuration
-    │   ├── libs.versions.toml           # Dependency versions
-    │   └── wrapper/
-    └── 📁 app/                           # Main application
-        ├── build.gradle.kts              # App build config
-        ├── proguard-rules.pro            # ProGuard rules
-        └── 📁 src/
-            ├── 📁 main/
-            │   ├── AndroidManifest.xml   # App manifest
-            │   ├── 📁 java/              # Java source files
-            │   │   └── [Package structure]
-            │   └── 📁 res/               # Resources
-            │       ├── layout/           # UI layouts
-            │       ├── values/           # Strings, colors, etc.
-            │       ├── drawable/         # Images
-            │       └── raw/              # Raw assets
-            ├── 📁 androidTest/           # Instrumentation tests
-            └── 📁 test/                  # Unit tests
-```
+📘 **[View Detailed Structure](PROJECT_STRUCTURE.md)** – Complete file tree, database schema, and technical details
 
 ---
 
@@ -600,17 +564,8 @@ This project is built with the help of:
 
 ---
 
-## 📊 Statistics
-
-![GitHub stars](https://img.shields.io/github/stars/arn-c0de/Android_WIFI_BT_GEOGRABBER?style=social)
-![GitHub forks](https://img.shields.io/github/forks/arn-c0de/Android_WIFI_BT_GEOGRABBER?style=social)
-![GitHub issues](https://img.shields.io/github/issues/arn-c0de/Android_WIFI_BT_GEOGRABBER)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/arn-c0de/Android_WIFI_BT_GEOGRABBER)
-
----
 
 <div align="center">
-  <p>Made with ❤️ for the Android development community</p>
   <p>⭐ Star this repo if you find it useful!</p>
   <p><i>Last Updated: October 30, 2025</i></p>
 </div>
