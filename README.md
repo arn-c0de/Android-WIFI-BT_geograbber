@@ -602,10 +602,10 @@ This project is built with the help of:
 
 ## 📊 Statistics
 
-![GitHub stars](https://img.shields.io/github/stars/yourusername/Android_WIFI_BT_GEOGRABBER?style=social)
-![GitHub forks](https://img.shields.io/github/forks/yourusername/Android_WIFI_BT_GEOGRABBER?style=social)
-![GitHub issues](https://img.shields.io/github/issues/yourusername/Android_WIFI_BT_GEOGRABBER)
-![GitHub pull requests](https://img.shields.io/github/issues-pr/yourusername/Android_WIFI_BT_GEOGRABBER)
+![GitHub stars](https://img.shields.io/github/stars/arn-c0de/Android_WIFI_BT_GEOGRABBER?style=social)
+![GitHub forks](https://img.shields.io/github/forks/arn-c0de/Android_WIFI_BT_GEOGRABBER?style=social)
+![GitHub issues](https://img.shields.io/github/issues/arn-c0de/Android_WIFI_BT_GEOGRABBER)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/arn-c0de/Android_WIFI_BT_GEOGRABBER)
 
 ---
 
