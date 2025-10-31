@@ -1264,11 +1264,43 @@ public class MainActivity extends AppCompatActivity {
 
     // Select external database
     private void selectExternalDatabase() {
-        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("*/*");
-        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/octet-stream", "application/x-sqlite3", "*/*"});
-        startActivityForResult(intent, IMPORT_DB_REQUEST_CODE);
+        // Show lighter security warning for read-only preview
+        showReadOnlyImportSecurityWarning();
+    }
+
+    // Show security warning dialog for read-only database preview
+    private void showReadOnlyImportSecurityWarning() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("⚠️ Security Notice");
+
+        String warningMessage = "You are about to preview an external database file.\n\n" +
+                "SECURITY VALIDATIONS APPLIED:\n" +
+                "✓ Read-only access (no modifications)\n" +
+                "✓ Temporary cache storage\n" +
+                "✓ File size and schema validation\n" +
+                "✓ Malicious content detection\n\n" +
+                "RECOMMENDATION:\n" +
+                "Only open databases from trusted sources.\n\n" +
+                "Continue with preview?";
+
+        builder.setMessage(warningMessage);
+
+        builder.setPositiveButton("Continue", (dialog, which) -> {
+            // User acknowledged, proceed with file picker
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("*/*");
+            intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/octet-stream", "application/x-sqlite3", "*/*"});
+            startActivityForResult(intent, IMPORT_DB_REQUEST_CODE);
+            addLogMessage("User acknowledged security notice for read-only preview");
+        });
+
+        builder.setNegativeButton("Cancel", (dialog, which) -> {
+            dialog.dismiss();
+        });
+
+        builder.setCancelable(true);
+        builder.show();
     }
 
     // Select external database as active DB
@@ -1277,12 +1309,65 @@ public class MainActivity extends AppCompatActivity {
               Toast.makeText(this, "Please stop scanning first!", Toast.LENGTH_LONG).show();
             return;
         }
-        
+
+        // Show security warning before allowing import
+        showImportSecurityWarning();
+    }
+
+    // Show security warning dialog before database import
+    private void showImportSecurityWarning() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("⚠️ Security Warning");
+
+        String warningMessage = "Importing external database files may pose security risks:\n\n" +
+                "POTENTIAL RISKS:\n" +
+                "• Malicious or corrupted data\n" +
+                "• Data loss or corruption\n" +
+                "• Unexpected app behavior\n" +
+                "• Privacy concerns from untrusted sources\n\n" +
+                "SECURITY VALIDATIONS:\n" +
+                "✓ File size limit (max 100MB)\n" +
+                "✓ SQL injection detection\n" +
+                "✓ Malicious trigger/view blocking\n" +
+                "✓ Schema validation\n" +
+                "✓ Data sanitization\n" +
+                "✓ Range validation\n\n" +
+                "RECOMMENDATIONS:\n" +
+                "• Only import databases from trusted sources\n" +
+                "• Verify file integrity before importing\n" +
+                "• Backup your current data regularly\n\n" +
+                "Do you understand the risks and wish to proceed?";
+
+        builder.setMessage(warningMessage);
+
+        builder.setPositiveButton("Yes, I Understand - Proceed", (dialog, which) -> {
+            // User acknowledged the risks, proceed with file picker
+            proceedWithDatabaseImport();
+        });
+
+        builder.setNegativeButton("Cancel", (dialog, which) -> {
+            dialog.dismiss();
+            Toast.makeText(this, "Import cancelled", Toast.LENGTH_SHORT).show();
+        });
+
+        builder.setCancelable(false); // Require explicit choice
+
+        android.app.AlertDialog dialog = builder.create();
+        dialog.show();
+
+        // Log security warning display
+        addLogMessage("Security warning displayed for database import");
+    }
+
+    // Proceed with database import after security warning acknowledged
+    private void proceedWithDatabaseImport() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("*/*");
         intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/octet-stream", "application/x-sqlite3", "*/*"});
         startActivityForResult(intent, IMPORT_ACTIVE_DB_REQUEST_CODE);
+
+        addLogMessage("User acknowledged security risks, file picker opened");
     }
 
     // Load external database and display map

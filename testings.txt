@@ -1,0 +1,36 @@
+  ⚠️ Security Gaps to Address
+
+● 1. No checksum/signature verification - Can't verify file hasn't been tampered with
+  2. No explicit security warning - Users not warned about potential risks
+  3. No backup before active import - Could lose data if import fails
+  4. No SQLite header validation - Doesn't verify file is actually a SQLite database
+  5. Generic error messages - Could be more informative
+
+   📋 Recommended Improvements
+
+  I can implement the following security enhancements:
+
+  1. Explicit Security Warning Dialog (High Priority)
+  - Add clear warning before import explaining risks
+  - Require user acknowledgment
+
+  2. SHA-256 Checksum Verification (High Priority)
+  - Generate checksums for exported databases
+  - Verify checksums on import (optional, for trusted sources)
+  - Store checksums in metadata file
+
+  3. Automatic Backup Before Import (High Priority)
+  - Auto-backup current database before activating external DB
+  - Allow rollback if import fails
+
+  4. SQLite File Header Validation (Medium Priority)
+  - Verify file starts with SQLite magic bytes
+  - Check database format version
+
+  5. Enhanced SQL Injection Prevention (Medium Priority)
+  - Use parameterized queries throughout
+  - Add additional content validation
+
+  6. Improved Error Messages (Low Priority)
+  - More specific validation failure messages
+  - Suggest corrective actions
