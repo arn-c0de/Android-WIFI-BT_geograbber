@@ -48,6 +48,8 @@
             android:layout_weight="1"
             android:text="@string/wifi_start"
             android:textSize="10sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#0A0A2A"
             android:layout_margin="2dp" />
 
         <Button
@@ -57,6 +59,8 @@
             android:layout_weight="1"
             android:text="@string/bt_off"
             android:textSize="10sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#0A0A2A"
             android:layout_margin="2dp"/>
 
         <Button
@@ -66,6 +70,8 @@
             android:layout_weight="1"
             android:text="@string/show_data"
             android:textSize="10sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#0A0A2A"
             android:layout_margin="2dp"/>
 
         <Button
@@ -75,6 +81,8 @@
             android:layout_weight="1"
             android:text="@string/more"
             android:textSize="10sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#0A0A2A"
             android:layout_margin="2dp"/>
 
     </LinearLayout>
@@ -94,7 +102,7 @@
             android:layout_weight="1"
             android:text="@string/show_map"
             android:textSize="12sp"
-            android:background="#FF6B35"
+            android:backgroundTint="#0A0A2A"
             android:textColor="#FFFFFF"
             android:layout_margin="2dp"/>
 
@@ -122,7 +130,7 @@
         android:textSize="14sp"
         android:paddingTop="8dp"
         android:paddingBottom="4dp"
-        android:background="#E0E0E0"/>
+        android:backgroundTint="#E0E0E0"/>
 
     <ScrollView
         android:id="@+id/logcat_scrollview"

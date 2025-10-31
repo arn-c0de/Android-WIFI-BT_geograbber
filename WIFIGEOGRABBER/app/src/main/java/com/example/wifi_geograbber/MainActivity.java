@@ -1703,9 +1703,9 @@ public class MainActivity extends AppCompatActivity {
         private void updateToggleScanButton() {
             if (toggleScanButton != null) {
                 if (isScanning) {
-                    toggleScanButton.setText("Stop WiFi scanning");
+                    toggleScanButton.setText("Stop WiFi_scan");
                 } else {
-                    toggleScanButton.setText("Start WiFi scanning");
+                    toggleScanButton.setText("Start WiFi_scan");
                 }
             }
         }

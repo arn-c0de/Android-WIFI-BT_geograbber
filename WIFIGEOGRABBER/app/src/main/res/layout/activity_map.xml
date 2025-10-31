@@ -32,7 +32,7 @@
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:orientation="horizontal"
-        android:background="#CC000000"
+        android:background="#AA000000"
         android:padding="8dp"
         android:gravity="center">
 
@@ -45,8 +45,8 @@
             android:layout_marginEnd="8dp"
             android:text="@string/back"
             android:textColor="#FFFFFF"
-            android:background="#FF4444"
-            android:textSize="14sp" />
+            android:backgroundTint="#0A0A2A"
+            android:textSize="12sp" />
 
         <!-- Refresh Button -->
         <Button
@@ -58,20 +58,20 @@
             android:layout_marginEnd="4dp"
             android:text="@string/refresh"
             android:textColor="#FFFFFF"
-            android:background="#4488FF"
-            android:textSize="14sp" />
+            android:backgroundTint="#0A0A2A"
+            android:textSize="12sp" />
 
         <!-- Live Location Button -->
         <Button
             android:id="@+id/location_button"
             android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
+            android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:backgroundTint="#0A0A2A"
             android:text="@string/location"
             android:textColor="#FFFFFF"
-            android:background="#4CAF50"
-            android:textSize="14sp" />
+            android:textSize="12sp" />
 
 
     </LinearLayout>

@@ -446,7 +446,7 @@ public class MapActivity extends AppCompatActivity {
             "            position: absolute;\n" +
             "            top: 10px;\n" +
             "            right: 10px;\n" +
-            "            background: " + (isExternalDb ? "rgba(255, 140, 0, 0.9)" : "rgba(0, 100, 200, 0.9)") + ";\n" +
+                "        background: " + (isExternalDb ? "rgba(255, 140, 0, 0.9)" : "#0A0A2A") + ";\n" +
             "            color: white;\n" +
             "            padding: 6px 10px;\n" +
             "            border-radius: 5px;\n" +
