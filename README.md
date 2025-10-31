@@ -14,6 +14,11 @@
    <div style="display:flex;flex-direction:column;justify-content:center;">
       <h1 style="margin:0; padding:0; font-size:2em; line-height:1.1;">📡 WiFi & Bluetooth GeoGrabber</h1>
       <span style="font-size:1.1em; color:#555; font-weight:bold;">Professional Geolocation & Signal Mapping</span>
+      
+<div align="left">
+  <b>Scan, Map, and Analyze WiFi Networks & Bluetooth Devices with GPS Precision</b>
+</div>
+
    </div>
 </div>
 
@@ -30,11 +35,6 @@
 
   ---
 
-## Professional Android Geolocation Tool for Network Analysis & Signal Mapping
-
-<div align="left">
-  <b>Scan, Map, and Analyze WiFi Networks & Bluetooth Devices with GPS Precision</b>
-</div>
 
 
 
