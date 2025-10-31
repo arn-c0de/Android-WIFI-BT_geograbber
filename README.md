@@ -28,7 +28,7 @@
    > This is a very early stage of the program. While it is already functional, it is based on an older project that I have recently resumed. Therefore, extensive refactoring and further development are still required. Expect ongoing changes and improvements as work continues.
 
 
-
+  ---
 
 ## Professional Android Geolocation Tool for Network Analysis & Signal Mapping
 
@@ -36,7 +36,7 @@
   <b>Scan, Map, and Analyze WiFi Networks & Bluetooth Devices with GPS Precision</b>
 </div>
 
-  ---
+
 
 ## 🤝 Contribute to GeoGrabber!
 
