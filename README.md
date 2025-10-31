@@ -350,17 +350,17 @@ python start_plot_gui.py
 │  ├─ Map Viewer (WebView + Leaflet.js)                   │
 │  └─ Settings & Data Management                          │
 ├─────────────────────────────────────────────────────────┤
-│  Business Logic                                          │
+│  Business Logic                                         │
 │  ├─ WiFi Scanner Service                                │
 │  ├─ Bluetooth Scanner Service                           │
 │  ├─ Location Manager                                    │
 │  └─ Background Service (Foreground)                     │
 ├─────────────────────────────────────────────────────────┤
-│  Data Layer                                              │
+│  Data Layer                                             │
 │  ├─ SQLite Database                                     │
 │  ├─ Database Helper                                     │
-│  └─ Data Models   
-                                      │
+│  └─ Data Models                                         │      
+│                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
 - 🔒 **[SHA-256 Checksum Verification](docs/security/SHA256_CHECKSUM_VERIFICATION.md)** – Database integrity & security
