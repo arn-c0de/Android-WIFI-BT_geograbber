@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 ---
 
 ## [1.0.1] – 2025-10-30 [LATEST]
+- **Internationalization**: Translated all German log messages, Toasts, button texts, and code comments to English for better accessibility and localization. Thanks to **@elsakarvouni** for the contribution. **(Issues #3, #14)**
+
 - Remove clear-text logging of sensitive device data; redact address and coordinates from log output in location update process.
 - Disabled automatic application backup by setting android:allowBackup="false" in the manifest to protect sensitive user data.
 - Sanitized user input before logging in MapActivity to prevent log injection vulnerabilities.
