@@ -414,8 +414,9 @@ public class MapActivity extends AppCompatActivity {
             "            position: absolute;\n" +
             "            top: 10px;\n" +
             "            left: 10px;\n" +
-            "            background: white;\n" +
-            "            border: 2px solid rgba(0,0,0,0.2);\n" +
+            "            background: #222;\n" +
+            "            color: #fff;\n" +
+            "            border: 2px solid rgba(255,255,255,0.2);\n" +
             "            border-radius: 5px;\n" +
             "            padding: 10px;\n" +
             "            z-index: 10000;\n" +
@@ -461,12 +462,24 @@ public class MapActivity extends AppCompatActivity {
             "        .filter-toggle-btn {\n" +
             "            display: block;\n" +
             "            width: 100%;\n" +
-            "            background: #e0e0e0;\n" +
+            "            background: #333;\n" +
+            "            color: #fff;\n" +
             "            border: none;\n" +
             "            border-radius: 4px;\n" +
             "            padding: 6px 0;\n" +
             "            margin-bottom: 8px;\n" +
             "            font-size: 13px;\n" +
+            "            cursor: pointer;\n" +
+            "        }\n" +
+            "        .filter-action-btn {\n" +
+            "            background: #333;\n" +
+            "            color: #fff;\n" +
+            "            border: none;\n" +
+            "            border-radius: 4px;\n" +
+            "            padding: 6px 0;\n" +
+            "            margin: 2px 0;\n" +
+            "            font-size: 13px;\n" +
+            "            width: 100%;\n" +
             "            cursor: pointer;\n" +
             "        }\n" +
             "        .filter-content-collapsed { display: none; }\n" +
@@ -513,10 +526,10 @@ public class MapActivity extends AppCompatActivity {
             "            Signal Weak (<-70 dBm)\n" +
             "        </label>\n" +
             "        <hr style='margin: 10px 0;'>\n" +
-            "        <button onclick='toggleAllFilters(true)' style='margin: 2px; padding: 4px 8px; font-size: 11px;'>All On</button>\n" +
-            "        <button onclick='toggleAllFilters(false)' style='margin: 2px; padding: 4px 8px; font-size: 11px;'>All Off</button>\n" +
+            "        <button class='filter-action-btn' onclick='toggleAllFilters(true)'>All On</button>\n" +
+            "        <button class='filter-action-btn' onclick='toggleAllFilters(false)'>All Off</button>\n" +
             "        <hr style='margin: 10px 0;'>\n" +
-            "        <button onclick='requestCenterOnUser()' style='margin: 2px; padding: 4px 8px; font-size: 11px; width: 100%;'>Live Location</button>\n" +
+            "        <button class='filter-action-btn' onclick='requestCenterOnUser()'>Live Location</button>\n" +
             "        </div>\n" +
             "    </div>\n" +
             "    \n" +
