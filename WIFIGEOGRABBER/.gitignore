@@ -48,6 +48,10 @@ captures/
 .idea/dictionaries
 .idea/libraries
 .idea/caches
+
+# Android build intermediates and outputs
+app/build/
+build/
 .idea/modules.xml
 .idea/navEditor.xml
 

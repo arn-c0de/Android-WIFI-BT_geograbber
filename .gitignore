@@ -48,6 +48,25 @@ api-keys.properties
 credentials.json
 *.key
 *.pem
+
+# Additional Android/IDE artifacts and sensitive files
+.gradle/
+captures/
+*.keystore
+*.jks
+*.properties
+*.ipr
+*.iws
+*.cxx/
+*.tmp
+*.temp
+*.apk
+*.ap_
+*.aab
+
+# Android build intermediates and outputs
+WIFIGEOGRABBER/app/build/
+WIFIGEOGRABBER/build/
 *.jks
 *.keystore
 

@@ -3,3 +3,6 @@
 .env
 .env.*
 local.properties
+
+# Android build intermediates and outputs
+build/
