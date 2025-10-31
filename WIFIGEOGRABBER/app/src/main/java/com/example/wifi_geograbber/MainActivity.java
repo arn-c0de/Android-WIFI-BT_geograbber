@@ -1364,7 +1364,7 @@ public class MainActivity extends AppCompatActivity {
                 
             } catch (Exception e) {
                 if (testDb != null) testDb.close();
-                    Toast.makeText(this, "Invalid database file: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Invalid database file: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 tempFile.delete();
             }
             
