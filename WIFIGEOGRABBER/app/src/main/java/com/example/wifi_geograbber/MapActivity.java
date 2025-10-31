@@ -563,17 +563,18 @@ public class MapActivity extends AppCompatActivity {
             "        function initializeMap(devices) {\n" +
             "            deviceData = devices;\n" +
             "            console.log('Initializing map with', devices.length, 'devices');\n" +
-            "            if (devices.length === 0) {\n" +
-            "                document.getElementById('info-panel').textContent = 'Keine Geräte gefunden';\n" +
-            "                return;\n" +
-            "            }\n" +
+            "            \n" +
+            "            // Karte immer initialisieren, auch wenn keine Geräte vorhanden sind\n" +
             "            if (savedCenter && savedCenter.lat !== 0 && savedCenter.lon !== 0) {\n" +
             "                currentCenter = [savedCenter.lat, savedCenter.lon];\n" +
             "                currentZoom = savedCenter.zoom;\n" +
-            "            } else {\n" +
+            "            } else if (devices.length > 0) {\n" +
             "                let avgLat = devices.reduce((sum, d) => sum + d.lat, 0) / devices.length;\n" +
             "                let avgLon = devices.reduce((sum, d) => sum + d.lon, 0) / devices.length;\n" +
             "                currentCenter = [avgLat, avgLon];\n" +
+            "            } else {\n" +
+            "                // Standardposition wenn keine Geräte und keine gespeicherte Position\n" +
+            "                currentCenter = [51.1657, 10.4515]; // Deutschland Zentrum\n" +
             "            }\n" +
             "            map = L.map('map').setView(currentCenter, currentZoom);\n" +
             "            \n" +
@@ -593,7 +594,11 @@ public class MapActivity extends AppCompatActivity {
             "                attribution: '© OpenStreetMap contributors'\n" +
             "            }).addTo(map);\n" +
             "            \n" +
-            "            addMarkers();\n" +
+            "            // Marker nur hinzufügen wenn Geräte vorhanden sind\n" +
+            "            if (devices.length > 0) {\n" +
+            "                addMarkers();\n" +
+            "            }\n" +
+            "            \n" +
             "            if (Array.isArray(savedFilters)) {\n" +
             "                savedFilters.forEach(f => {\n" +
             "                    const cb = document.getElementById(f);\n" +
