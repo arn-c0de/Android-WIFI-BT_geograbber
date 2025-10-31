@@ -115,9 +115,9 @@ GeoGrabber is ideal for network analysis, signal mapping, and understanding wire
 
 
 <div align="center">
-   <img src="images/screenshots/main_page_1.0.2.png" alt="GeoGrabber Main UI v1.0.2" width="300" />
+   <img src="images/screenshots/Screenshot_main.png" alt="GeoGrabber Main UI v1.0.1" width="300" />
    <br />
-   <img src="images/screenshots/map_view_1.0.2.png" alt="GeoGrabber Map View v1.0.2" width="300" />
+   <img src="images/screenshots/Screenshot_map.png" alt="GeoGrabber Map View v1.0.1" width="300" />
 </div>
 
 **Screenshot Description:**
