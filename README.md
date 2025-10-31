@@ -113,22 +113,19 @@ GeoGrabber is ideal for network analysis, signal mapping, and understanding wire
 
 ## 📸 Screenshots
 
+
 <div align="center">
-   <img src="images/screenshots/main_page_1.0.1.png" alt="GeoGrabber Main UI" width="300" />
+   <img src="images/screenshots/main_page_1.0.2.png" alt="GeoGrabber Main UI v1.0.2" width="300" />
+   <br />
+   <img src="images/screenshots/map_view_1.0.2.png" alt="GeoGrabber Map View v1.0.2" width="300" />
 </div>
 
 **Screenshot Description:**
 
-- **Header:** Displays the time and summary of saved WiFi networks.
-- **Found Networks:** Shows the number of active WiFi and Bluetooth devices, plus totals.
-- **Control Buttons:**
    - *WiFi Scanning Starten*: Start WiFi scanning
    - *BT AUS*: Bluetooth scanning off
    - *Show Data*: View all scanned data
    - *More*: Access advanced features
-- **Show Map:** Opens the interactive map view
-- **Network Details:** Shows SSID, BSSID, signal strength, frequency, channel, standard, speed, vendor, channel width, and GPS coordinates for each detected network
-- **Debug Log:** Displays real-time log messages for app events and actions
 
 The screenshot above demonstrates the main scanning interface, live network list, and debug log. The app provides real-time updates and easy access to mapping and data management features.
 
