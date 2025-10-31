@@ -6,8 +6,10 @@
 
 📚 **[Documentation](docs/)** · 🚀 **[Database Combiner Guide](docs/quickstart/database_combiner_quickstart.md)** · 🗺️ **[Map Viewer Guide](docs/quickstart/map_viewer_quickstart.md)** · 📁 **[Project Structure](PROJECT_STRUCTURE.md)** · 📂 **[Detailed Structure](docs/project-structure/PROJECT_STRUCTURE.md)** · � **[Changelog](CHANGELOG.md)** · 🤝 **[Contributing](CONTRIBUTING.md)** · 🔒 **[Security](SECURITY.md)** · 📜 **[Code of Conduct](CODE_OF_CONDUCT.md)**
 
-<div align="left">
-  <h1>📡 WiFi & Bluetooth GeoGrabber</h1>
+
+<div align="left" style="display:flex;align-items:center;gap:16px;">
+   <img src="images/screenshots/logo.png" alt="GeoGrabber Logo" width="48" height="48" style="vertical-align:middle; margin-right:12px;" />
+   <h1 style="display:inline-block;vertical-align:middle;">📡 WiFi & Bluetooth GeoGrabber</h1>
 </div>
 
 <div align="left">

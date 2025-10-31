@@ -36,6 +36,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
+    /**
+     * =============================
+     *   CODE VERSION MARKER
+     *   APP_VERSION: 1.0.1
+     * =============================
+     * Use this variable to visually distinguish code versions.
+     */
+    public static final String APP_VERSION = "1.0.1";
     private WifiManager wifiManager;
     private LocationManager locationManager;
     private BluetoothAdapter bluetoothAdapter;
@@ -209,8 +217,10 @@ public class MainActivity extends AppCompatActivity {
         updateInfoSummary(0, 0);
 
         // LogCat initialisieren
-    addLogMessage("App started - LogCat ready");
-    addLogMessage("Fullscreen mode enabled - navigation bar hidden");
+        String appName = getString(getApplicationInfo().labelRes);
+        addLogMessage("==== " + appName + " v" + APP_VERSION + " ====");
+        addLogMessage("App started - LogCat ready");
+        addLogMessage("Fullscreen mode enabled - navigation bar hidden");
 
         // Periodischer Scan
         scanRunnable = new Runnable() {
@@ -231,9 +241,15 @@ public class MainActivity extends AppCompatActivity {
     private void addLogMessage(String message) {
         String timestamp = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date());
         String logEntry = timestamp + ": " + message + "\n";
-        
+
+        // Falls Log leer, Versionsinfo und App-Namen einfügen
+        if (logBuffer.length() == 0) {
+            String appName = getString(getApplicationInfo().labelRes);
+            logBuffer.append("==== " + appName + " v" + APP_VERSION + " ====" + "\n");
+        }
+
         logBuffer.append(logEntry);
-        
+
         // Begrenzen auf letzte 50 Zeilen
         String[] lines = logBuffer.toString().split("\n");
         if (lines.length > 50) {
@@ -244,7 +260,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
-        
+
         // UI Update
         runOnUiThread(() -> {
             logcatText.setText(logBuffer.toString());
