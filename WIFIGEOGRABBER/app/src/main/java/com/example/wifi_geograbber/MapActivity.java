@@ -39,11 +39,11 @@ public class MapActivity extends AppCompatActivity {
     private List<DeviceData> deviceList;
     private boolean isMapInitialized = false;
     
-    // Bounding Box für Performance-Optimierung (nur sichtbare Marker laden)
+    // Bounding box for performance optimization (only load visible markers)
     private double bboxMinLat = -90, bboxMinLon = -180, bboxMaxLat = 90, bboxMaxLon = 180;
-    private static final int MAX_MARKERS_PER_LOAD = 500; // Maximale Anzahl Marker pro Ladung
-    
-    // Vollbild-Flags für System UI
+    private static final int MAX_MARKERS_PER_LOAD = 500; // Maximum number of markers per load
+
+    // Fullscreen flags for System UI
     private final int FULLSCREEN_FLAGS = View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
             | View.SYSTEM_UI_FLAG_FULLSCREEN
             | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
@@ -51,7 +51,7 @@ public class MapActivity extends AppCompatActivity {
             | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
             | View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
     
-    // Datenklasse für Geräte
+    // Data class for devices
     public static class DeviceData {
         public String name;
         public String address;
@@ -67,7 +67,7 @@ public class MapActivity extends AppCompatActivity {
         public String standard;
         public int channelWidth;
         public int maxSpeed;
-        // Bewegungsanalyse-Felder
+        // Movement analysis fields
         public double lastSeenLat;
         public double lastSeenLon;
         public long lastSeenTimestamp;
@@ -91,7 +91,7 @@ public class MapActivity extends AppCompatActivity {
             json.put("standard", standard != null ? standard : "");
             json.put("channel_width", channelWidth);
             json.put("max_speed", maxSpeed);
-            // Bewegungsanalyse-Felder
+            // Movement analysis fields
             json.put("last_seen_lat", lastSeenLat);
             json.put("last_seen_lon", lastSeenLon);
             json.put("last_seen_timestamp", lastSeenTimestamp);
@@ -105,10 +105,10 @@ public class MapActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_map);
 
-        // System UI für Vollbild ausblenden (Statusleiste, Navigation, Homebutton)
+        // Hide System UI for fullscreen (status bar, navigation, home button)
         hideSystemUI();
-        
-        // Views initialisieren
+
+        // Initialize views
         mapWebView = findViewById(R.id.map_webview);
         backButton = findViewById(R.id.back_button);
         refreshButton = findViewById(R.id.refresh_button);
@@ -116,29 +116,29 @@ public class MapActivity extends AppCompatActivity {
         dbStatusText = findViewById(R.id.db_status_text);
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-        
-        // Datenbank initialisieren - verwende immer interne DB
-        // (alle externen Daten wurden bereits importiert)
+
+        // Initialize database - always use internal DB
+        // (all external data has already been imported)
         MainActivity.DatabaseHelper dbHelper = new MainActivity.DatabaseHelper(this);
         database = dbHelper.getReadableDatabase();
         
         Toast.makeText(this, R.string.internal_database_loaded, Toast.LENGTH_SHORT).show();
         dbStatusText.setText(R.string.internal_app_database);
         dbStatusText.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
-        
-        // Button-Listener
+
+        // Button listeners
         backButton.setOnClickListener(v -> finish());
         refreshButton.setOnClickListener(v -> refreshMap());
         locationButton.setOnClickListener(v -> requestLocationAndCenterMap());
-        
-        // WebView konfigurieren
+
+        // Configure WebView
         setupWebView();
-        
-        // Daten laden und Karte anzeigen
+
+        // Load data and show map
         loadDataAndShowMap();
     }
 
-    // Methode zum Ausblenden der System UI (Vollbild, Homebutton, Navigation)
+    // Method to hide System UI (fullscreen, home button, navigation)
     private void hideSystemUI() {
         View decorView = getWindow().getDecorView();
         decorView.setSystemUiVisibility(FULLSCREEN_FLAGS);
@@ -159,15 +159,15 @@ public class MapActivity extends AppCompatActivity {
         webSettings.setAllowFileAccess(true);
         webSettings.setAllowContentAccess(true);
         webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        
-        // JavaScript Interface hinzufügen
+
+        // Add JavaScript interface
         mapWebView.addJavascriptInterface(new WebAppInterface(), "Android");
         
         mapWebView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                // Daten an JavaScript übergeben wenn Seite geladen ist (auch bei leerer Liste)
+                // Pass data to JavaScript when page is loaded (even with empty list)
                 if (deviceList != null) {
                     injectDeviceData();
                 }
@@ -176,27 +176,27 @@ public class MapActivity extends AppCompatActivity {
     }
     
     private void loadDataAndShowMap() {
-        // Initial mit Standard-Bounding Box laden (wird später durch Kartenbewegung aktualisiert)
+        // Initially load with default bounding box (will be updated later by map movement)
         deviceList = getDevicesInBoundingBox(bboxMinLat, bboxMinLon, bboxMaxLat, bboxMaxLon);
         
         Log.d("MapActivity", "Initial loaded " + deviceList.size() + " devices in viewport");
-        
-        // HTML-Karte nur beim ersten Mal laden
+
+        // Load HTML map only the first time
         if (!isMapInitialized) {
             loadMapHTML();
         } else {
-            // Bei nachfolgenden Aufrufen nur Daten aktualisieren (auch bei leerer Liste)
+            // On subsequent calls only update data (even with empty list)
             if (deviceList != null) {
                 injectDeviceData();
             }
         }
     }
     
-    // Lädt nur Geräte im sichtbaren Bereich der Karte (Performance-Optimierung)
+    // Loads only devices in the visible area of the map (performance optimization)
     private List<DeviceData> getDevicesInBoundingBox(double minLat, double minLon, double maxLat, double maxLon) {
         List<DeviceData> filtered = new ArrayList<>();
         try {
-            // SQL-Abfrage ohne LIMIT, alle Geräte im Bereich laden
+            // SQL query without LIMIT, load all devices in area
             String sql = "SELECT device_name, device_address, device_type, signal_strength, " +
                 "encryption_info, latitude, longitude, timestamp, frequency, channel, " +
                 "wifi_standard, vendor_info, channel_width, max_connection_speed, " +
@@ -234,7 +234,7 @@ public class MapActivity extends AppCompatActivity {
                 device.lastSeenTimestamp = deviceCursor.getLong(16);
                 device.movementDistance = deviceCursor.getDouble(17);
 
-                // Vendor aus OUI ableiten falls nicht vorhanden
+                // Derive vendor from OUI if not present
                 if (device.vendor == null || device.vendor.equals("Unknown")) {
                     device.vendor = getVendorFromOUI(device.address);
                 }
@@ -243,7 +243,7 @@ public class MapActivity extends AppCompatActivity {
             }
             deviceCursor.close();
 
-            // Zusätzlich WiFi-Daten aus alter Tabelle laden (nur im sichtbaren Bereich, ohne LIMIT)
+            // Additionally load WiFi data from old table (only in visible area, without LIMIT)
             Cursor wifiCursor = database.rawQuery(
                 "SELECT ssid, bssid, signal_strength, verschluesselung, " +
                 "latitude, longitude, timestamp " +
@@ -287,8 +287,8 @@ public class MapActivity extends AppCompatActivity {
         if (oui.length() < 6) {
             return "Unknown";
         }
-        
-        // Bekannte Hersteller-OUIs (Auswahl)
+
+        // Known vendor OUIs (selection)
         String ouiKey = oui.substring(0, 6);
         switch (ouiKey) {
             case "F01898":
@@ -341,7 +341,7 @@ public class MapActivity extends AppCompatActivity {
     }
     
     private void loadMapHTML() {
-        // Lade gespeicherte Filter und Kartenposition
+        // Load saved filters and map position
         android.content.SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         String savedFilters = prefs.getString(PREF_FILTERS, null);
         double centerLat = Double.longBitsToDouble(prefs.getLong(PREF_CENTER_LAT, Double.doubleToLongBits(0)));
@@ -361,10 +361,10 @@ public class MapActivity extends AppCompatActivity {
             
             String jsCode;
             if (isMapInitialized) {
-                // Wenn Karte bereits initialisiert ist, nur Daten aktualisieren ohne Zentrierung zu ändern
+                // If map is already initialized, only update data without changing centering
                 jsCode = "updateMapData(" + deviceArray.toString() + ");";
             } else {
-                // Erste Initialisierung
+                // First initialization
                 jsCode = "initializeMap(" + deviceArray.toString() + ");";
                 isMapInitialized = true;
             }
@@ -378,24 +378,24 @@ public class MapActivity extends AppCompatActivity {
     private void refreshMap() {
         Toast.makeText(this, R.string.map_updating, Toast.LENGTH_SHORT).show();
         
-        // Nur Daten im aktuellen Viewport neu laden
+        // Only reload data in current viewport
         deviceList = getDevicesInBoundingBox(bboxMinLat, bboxMinLon, bboxMaxLat, bboxMaxLon);
         
         Log.d("MapActivity", "Refreshed " + deviceList.size() + " devices in current viewport");
-        
-        // Nur Daten injizieren, nicht HTML neu laden
+
+        // Only inject data, don't reload HTML
         if (deviceList != null && !deviceList.isEmpty()) {
             injectDeviceData();
         }
     }
     
-    // Überladene Methode für MapHTML mit Filter und Center
+    // Overloaded method for MapHTML with filter and center
     private String generateMapHTML(String savedFilters, double centerLat, double centerLon, int zoomLevel) {
-        // Prüfe ob externe DB verwendet wird
+        // Check if external DB is used
         String externalDbPath = getIntent().getStringExtra("external_db_path");
         boolean isExternalDb = (externalDbPath != null);
-        String dbInfo = isExternalDb ? "Externe DB" : "Interne DB";
-        // Filter- und Kartenstatus als JSON für JS
+        String dbInfo = isExternalDb ? "External DB" : "Internal DB";
+        // Filter and map status as JSON for JS
         String filterJson = savedFilters != null ? savedFilters : "[]";
         String centerJson = "{" +
             "\"lat\":" + centerLat + ",\"lon\":" + centerLon + ",\"zoom\":" + zoomLevel + "}";
@@ -486,15 +486,15 @@ public class MapActivity extends AppCompatActivity {
             "        <h4 style='margin: 0 0 10px 0; font-size: 14px;'>Filter</h4>\n" +
             "        <label class='filter-checkbox'>\n" +
             "            <input type='checkbox' id='wifi_open' onchange='toggleFilter(\"wifi_open\")'>\n" +
-            "            WiFi Offen\n" +
+            "            WiFi Open\n" +
             "        </label>\n" +
             "        <label class='filter-checkbox'>\n" +
             "            <input type='checkbox' id='wifi_open_no_vodafone' onchange='toggleFilter(\"wifi_open_no_vodafone\")'>\n" +
-            "            WiFi Offen ohne Vodafone\n" +
+            "            WiFi Open without Vodafone\n" +
             "        </label>\n" +
             "        <label class='filter-checkbox'>\n" +
             "            <input type='checkbox' id='wifi_encrypted' onchange='toggleFilter(\"wifi_encrypted\")'>\n" +
-            "            WiFi Verschlüsselt\n" +
+            "            WiFi Encrypted\n" +
             "        </label>\n" +
             "        <label class='filter-checkbox'>\n" +
             "            <input type='checkbox' id='bluetooth' onchange='toggleFilter(\"bluetooth\")'>\n" +
@@ -502,26 +502,26 @@ public class MapActivity extends AppCompatActivity {
             "        </label>\n" +
             "        <label class='filter-checkbox'>\n" +
             "            <input type='checkbox' id='bluetooth_known' onchange='toggleFilter(\"bluetooth_known\")'>\n" +
-            "            Bluetooth ohne Unknown\n" +
+            "            Bluetooth without Unknown\n" +
             "        </label>\n" +
             "        <label class='filter-checkbox'>\n" +
             "            <input type='checkbox' id='signal_strong' onchange='toggleFilter(\"signal_strong\")'>\n" +
-            "            Signal Stark (≥-70 dBm)\n" +
+            "            Signal Strong (≥-70 dBm)\n" +
             "        </label>\n" +
             "        <label class='filter-checkbox'>\n" +
             "            <input type='checkbox' id='signal_weak' onchange='toggleFilter(\"signal_weak\")'>\n" +
-            "            Signal Schwach (<-70 dBm)\n" +
+            "            Signal Weak (<-70 dBm)\n" +
             "        </label>\n" +
             "        <hr style='margin: 10px 0;'>\n" +
-            "        <button onclick='toggleAllFilters(true)' style='margin: 2px; padding: 4px 8px; font-size: 11px;'>Alle Ein</button>\n" +
-            "        <button onclick='toggleAllFilters(false)' style='margin: 2px; padding: 4px 8px; font-size: 11px;'>Alle Aus</button>\n" +
+            "        <button onclick='toggleAllFilters(true)' style='margin: 2px; padding: 4px 8px; font-size: 11px;'>All On</button>\n" +
+            "        <button onclick='toggleAllFilters(false)' style='margin: 2px; padding: 4px 8px; font-size: 11px;'>All Off</button>\n" +
             "        <hr style='margin: 10px 0;'>\n" +
-            "        <button onclick='requestCenterOnUser()' style='margin: 2px; padding: 4px 8px; font-size: 11px; width: 100%;'>Live Standort</button>\n" +
+            "        <button onclick='requestCenterOnUser()' style='margin: 2px; padding: 4px 8px; font-size: 11px; width: 100%;'>Live Location</button>\n" +
             "        </div>\n" +
             "    </div>\n" +
             "    \n" +
             "    <div class='info-panel' id='info-panel'>\n" +
-            "        Laden...\n" +
+            "        Loading...\n" +
             "    </div>\n" +
             "    \n" +
             "    <script src='https://unpkg.com/leaflet@1.7.1/dist/leaflet.js'></script>\n" +
@@ -564,7 +564,7 @@ public class MapActivity extends AppCompatActivity {
             "            deviceData = devices;\n" +
             "            console.log('Initializing map with', devices.length, 'devices');\n" +
             "            \n" +
-            "            // Karte immer initialisieren, auch wenn keine Geräte vorhanden sind\n" +
+            "            // Always initialize map, even if no devices are present\n" +
             "            if (savedCenter && savedCenter.lat !== 0 && savedCenter.lon !== 0) {\n" +
             "                currentCenter = [savedCenter.lat, savedCenter.lon];\n" +
             "                currentZoom = savedCenter.zoom;\n" +
@@ -573,20 +573,20 @@ public class MapActivity extends AppCompatActivity {
             "                let avgLon = devices.reduce((sum, d) => sum + d.lon, 0) / devices.length;\n" +
             "                currentCenter = [avgLat, avgLon];\n" +
             "            } else {\n" +
-            "                // Standardposition wenn keine Geräte und keine gespeicherte Position\n" +
-            "                currentCenter = [51.1657, 10.4515]; // Deutschland Zentrum\n" +
+            "                // Default position if no devices and no saved position\n" +
+            "                currentCenter = [51.1657, 10.4515]; // Germany center\n" +
             "            }\n" +
             "            map = L.map('map').setView(currentCenter, currentZoom);\n" +
             "            \n" +
             "            map.on('moveend', function() {\n" +
             "                currentCenter = map.getCenter();\n" +
-            "                // Performance-Optimierung: Bounding Box an Android senden\n" +
+            "                // Performance optimization: Send bounding box to Android\n" +
             "                setTimeout(notifyAndroidOfViewportChange, 200); // Debounce\n" +
             "            });\n" +
             "            \n" +
             "            map.on('zoomend', function() {\n" +
             "                currentZoom = map.getZoom();\n" +
-            "                // Performance-Optimierung: Bounding Box an Android senden\n" +
+            "                // Performance optimization: Send bounding box to Android\n" +
             "                setTimeout(notifyAndroidOfViewportChange, 200); // Debounce\n" +
             "            });\n" +
             "            \n" +
@@ -594,7 +594,7 @@ public class MapActivity extends AppCompatActivity {
             "                attribution: '© OpenStreetMap contributors'\n" +
             "            }).addTo(map);\n" +
             "            \n" +
-            "            // Marker nur hinzufügen wenn Geräte vorhanden sind\n" +
+            "            // Only add markers if devices are present\n" +
             "            if (devices.length > 0) {\n" +
             "                addMarkers();\n" +
             "            }\n" +
@@ -608,11 +608,11 @@ public class MapActivity extends AppCompatActivity {
             "            }\n" +
             "            updateInfoPanel();\n" +
             "            \n" +
-            "            // Initial Viewport an Android senden\n" +
+            "            // Send initial viewport to Android\n" +
             "            setTimeout(notifyAndroidOfViewportChange, 1000);\n" +
             "        }\n" +
             "        \n" +
-            "        // NEUE FUNKTION: Sendet aktuellen Viewport an Android für Performance-Optimierung\n" +
+            "        // NEW FUNCTION: Sends current viewport to Android for performance optimization\n" +
             "        function notifyAndroidOfViewportChange() {\n" +
             "            if (map && typeof Android !== 'undefined' && Android.onMapViewportChanged) {\n" +
             "                const bounds = map.getBounds();\n" +
@@ -628,8 +628,8 @@ public class MapActivity extends AppCompatActivity {
             "            console.log('Updating map with', devices.length, 'devices');\n" +
             "            \n" +
             "            if (devices.length === 0) {\n" +
-            "                document.getElementById('info-panel').textContent = 'Keine Geräte im sichtbaren Bereich';\n" +
-            "                // Alle vorhandenen Marker entfernen\n" +
+            "                document.getElementById('info-panel').textContent = 'No devices in visible area';\n" +
+            "                // Remove all existing markers\n" +
             "                allMarkers.forEach(marker => map.removeLayer(marker));\n" +
             "                allCircles.forEach(circle => map.removeLayer(circle));\n" +
             "                allMarkers = [];\n" +
@@ -652,16 +652,16 @@ public class MapActivity extends AppCompatActivity {
             "        \n" +
             "        function addMarkers() {\n" +
             "            deviceData.forEach((device, index) => {\n" +
-            "                // Wenn Filter wifi_open_no_vodafone aktiv ist und device.name === '[Hidden/Unknown]', dann überspringen\n" +
+            "                // If filter wifi_open_no_vodafone is active and device.name === '[Hidden/Unknown]', then skip\n" +
             "                if (activeFilters.has('wifi_open_no_vodafone') && device.type === 'WIFI' && device.name === '[Hidden/Unknown]') {\n" +
             "                    return;\n" +
             "                }\n" +
             "                let filterClasses = [];\n" +
-            "                // Filter-Klassen bestimmen\n" +
+            "                // Determine filter classes\n" +
             "                if (device.type === 'WIFI') {\n" +
             "                    if (device.encryption === 'offen') {\n" +
             "                        filterClasses.push('wifi_open');\n" +
-            "                        // WiFi Offen ohne Vodafone: SSID darf nicht 'Vodafone Homespot' oder 'Vodafone Hotspot' enthalten\n" +
+            "                        // WiFi Open without Vodafone: SSID must not contain 'Vodafone Homespot' or 'Vodafone Hotspot'\n" +
             "                        if (typeof device.name === 'string' && device.name.toLowerCase().indexOf('vodafone') === -1 && device.name !== '[Hidden/Unknown]') {\n" +
             "                            filterClasses.push('wifi_open_no_vodafone');\n" +
             "                        }\n" +
@@ -670,7 +670,7 @@ public class MapActivity extends AppCompatActivity {
             "                    }\n" +
             "                } else {\n" +
             "                    filterClasses.push('bluetooth');\n" +
-            "                    // Bluetooth ohne Unknown: Gerätename darf nicht 'Unknown device' sein\n" +
+            "                    // Bluetooth without Unknown: Device name must not be 'Unknown device'\n" +
             "                    if (device.name && device.name.trim() !== '' && \n" +
             "                        !device.name.toLowerCase().includes('unknown device') &&\n" +
             "                        device.name !== '[Hidden/Unknown]') {\n" +
@@ -684,7 +684,7 @@ public class MapActivity extends AppCompatActivity {
             "                }\n" +
             "                deviceFilterMap.set(device.address, filterClasses);\n" +
             "                \n" +
-            "                // Icon und Farbe\n" +
+            "                // Icon and color\n" +
             "                let iconColor, iconName;\n" +
             "                if (device.type === 'WIFI') {\n" +
             "                    if (device.encryption === 'offen') {\n" +
@@ -696,29 +696,29 @@ public class MapActivity extends AppCompatActivity {
             "                    iconColor = 'blue';\n" +
             "                }\n" +
             "                \n" +
-            "                // Marker erstellen\n" +
+            "                // Create marker\n" +
             "                let marker = L.marker([device.lat, device.lon]).addTo(map);\n" +
             "                \n" +
-            "                // Popup-Inhalt\n" +
+            "                // Popup content\n" +
             "                let popupContent = `\n" +
-            "                    <b>${device.type === 'WIFI' ? 'SSID' : 'Gerät'}:</b> ${device.name || '[Hidden/Unknown]'}<br>\n" +
+            "                    <b>${device.type === 'WIFI' ? 'SSID' : 'Device'}:</b> ${device.name || '[Hidden/Unknown]'}<br>\n" +
             "                    <b>${device.type === 'WIFI' ? 'BSSID' : 'MAC'}:</b> ${device.address}<br>\n" +
             "                    <b>Signal:</b> ${device.signal} dBm<br>\n" +
-            "                    <b>${device.type === 'WIFI' ? 'Verschlüsselung' : 'Klasse'}:</b> ${device.encryption}<br>\n" +
-            "                    <b>Hersteller:</b> ${device.vendor}<br>\n" +
-            "                    <b>Koordinaten:</b> ${device.lat.toFixed(6)}, ${device.lon.toFixed(6)}\n" +
+            "                    <b>${device.type === 'WIFI' ? 'Encryption' : 'Class'}:</b> ${device.encryption}<br>\n" +
+            "                    <b>Manufacturer:</b> ${device.vendor}<br>\n" +
+            "                    <b>Coordinates:</b> ${device.lat.toFixed(6)}, ${device.lon.toFixed(6)}\n" +
             "                `;\n" +
             "                \n" +
             "                if (device.type === 'WIFI' && device.frequency) {\n" +
-            "                    popupContent += `<br><b>Frequenz:</b> ${device.frequency} MHz`;\n" +
+            "                    popupContent += `<br><b>Frequency:</b> ${device.frequency} MHz`;\n" +
             "                }\n" +
             "                if (device.channel) {\n" +
-            "                    popupContent += `<br><b>Kanal:</b> ${device.channel}`;\n" +
+            "                    popupContent += `<br><b>Channel:</b> ${device.channel}`;\n" +
             "                }\n" +
             "                \n" +
             "                marker.bindPopup(popupContent);\n" +
             "                \n" +
-            "                // Kreis um Marker\n" +
+            "                // Circle around marker\n" +
             "                let radius = device.signal >= -50 ? 10 : device.signal >= -70 ? 20 : 30;\n" +
             "                let circle = L.circle([device.lat, device.lon], {\n" +
             "                    color: iconColor,\n" +
@@ -732,7 +732,7 @@ public class MapActivity extends AppCompatActivity {
             "                allCircles.push(circle);\n" +
             "            });\n" +
             "            \n" +
-            "            // Initial alle verstecken\n" +
+            "            // Initially hide all\n" +
             "            updateMarkerVisibility();\n" +
             "        }\n" +
             "        \n" +
@@ -798,7 +798,7 @@ public class MapActivity extends AppCompatActivity {
             "                    wifiCount++;\n" +
             "                } else {\n" +
             "                    bluetoothCount++;\n" +
-            "                    // Bluetooth ohne Unknown zählen\n" +
+            "                    // Count Bluetooth without Unknown\n" +
             "                    if (device.name && device.name.trim() !== '' && \n" +
             "                        !device.name.toLowerCase().includes('unknown device') &&\n" +
             "                        device.name !== '[Hidden/Unknown]') {\n" +
@@ -812,21 +812,21 @@ public class MapActivity extends AppCompatActivity {
             "                }\n" +
             "            });\n" +
             "            \n" +
-            "            // Gesamtstatistik von Android abrufen\n" +
+            "            // Retrieve total statistics from Android\n" +
             "            let totalStats = '';\n" +
             "            if (typeof Android !== 'undefined' && Android.getTotalDeviceCount) {\n" +
             "                totalStats = Android.getTotalDeviceCount();\n" +
             "            }\n" +
             "            \n" +
             "            document.getElementById('info-panel').innerHTML = \n" +
-            "                `Sichtbar: ${visibleCount} | WiFi: ${wifiCount} | BT: ${bluetoothCount} (${bluetoothKnownCount} bekannt)<br><small>Nur im aktuellen Bereich | ${totalStats}</small>`;\n" +
+            "                `Visible: ${visibleCount} | WiFi: ${wifiCount} | BT: ${bluetoothCount} (${bluetoothKnownCount} known)<br><small>Only in current area | ${totalStats}</small>`;\n" +
             "        }\n" +
             "        \n" +
             "        function requestCenterOnUser() {\n" +
             "            if (typeof Android !== 'undefined' && Android.requestDeviceLocation) {\n" +
             "                Android.requestDeviceLocation();\n" +
             "            } else {\n" +
-            "                alert('Standortfunktion nicht verfügbar.');\n" +
+            "                alert('Location feature not available.');\n" +
             "            }\n" +
             "        }\n" +
             "\n" +
@@ -842,7 +842,7 @@ public class MapActivity extends AppCompatActivity {
             "                    iconSize: [20, 20]\n" +
             "                });\n" +
             "                userMarker = L.marker(userLatLng, { icon: userIcon, zIndexOffset: 1000 }).addTo(map);\n" +
-            "                userMarker.bindPopup('<b>Dein Standort</b>');\n" +
+            "                userMarker.bindPopup('<b>Your Location</b>');\n" +
             "            }\n" +
             "            map.setView(userLatLng, 15);\n" +
             "        }\n" +
@@ -869,20 +869,20 @@ public class MapActivity extends AppCompatActivity {
             "</body>\n" +
             "</html>";
     }
-    // Für Kompatibilität, falls alte Methode aufgerufen wird
+    // For compatibility, in case old method is called
     private String generateMapHTML() {
         return generateMapHTML(null, 0, 0, 15);
     }
     
-    // JavaScript Interface für Kommunikation zwischen WebView und Android
+    // JavaScript interface for communication between WebView and Android
     public class WebAppInterface {
         @JavascriptInterface
         public void updateDeviceLocation(String deviceAddress, String deviceType, double newLat, double newLon) {
             runOnUiThread(() -> {
-                // Hier könnte die Datenbank aktualisiert werden
-                Toast.makeText(MapActivity.this, 
-                    "Position aktualisiert für " + deviceAddress + " -> " + 
-                    String.format("%.6f, %.6f", newLat, newLon), 
+                // Database could be updated here
+                Toast.makeText(MapActivity.this,
+                    "Position updated for " + deviceAddress + " -> " +
+                    String.format("%.6f, %.6f", newLat, newLon),
                     Toast.LENGTH_SHORT).show();
                 Log.d("MapActivity", String.format("Device %s (%s) moved to: %.6f, %.6f", 
                     deviceAddress, deviceType, newLat, newLon));
@@ -894,7 +894,7 @@ public class MapActivity extends AppCompatActivity {
             runOnUiThread(() -> Toast.makeText(MapActivity.this, message, Toast.LENGTH_SHORT).show());
         }
 
-        // Speichere Filter und Kartenstatus
+        // Save filters and map status
         @JavascriptInterface
         public void saveMapState(String filters, double lat, double lon, int zoom) {
             getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
@@ -909,42 +909,42 @@ public class MapActivity extends AppCompatActivity {
         public void requestDeviceLocation() {
             runOnUiThread(() -> requestLocationAndCenterMap());
         }
-        
-        // NEUE METHODE: Bounding Box Update für Performance-Optimierung
+
+        // NEW METHOD: Bounding box update for performance optimization
         @JavascriptInterface
         public void onMapViewportChanged(double minLat, double minLon, double maxLat, double maxLon) {
             runOnUiThread(() -> {
-                Log.d("MapActivity", String.format("Viewport changed: %.6f,%.6f to %.6f,%.6f", 
+                Log.d("MapActivity", String.format("Viewport changed: %.6f,%.6f to %.6f,%.6f",
                     minLat, minLon, maxLat, maxLon));
-                
-                // Nur neu laden wenn sich der Viewport erheblich geändert hat
+
+                // Only reload if viewport has changed significantly
                 double latDiff = Math.abs(bboxMinLat - minLat) + Math.abs(bboxMaxLat - maxLat);
                 double lonDiff = Math.abs(bboxMinLon - minLon) + Math.abs(bboxMaxLon - maxLon);
-                
-                if (latDiff > 0.001 || lonDiff > 0.001) { // Schwellenwert für Aktualisierung
+
+                if (latDiff > 0.001 || lonDiff > 0.001) { // Threshold for update
                     bboxMinLat = minLat;
                     bboxMinLon = minLon;
                     bboxMaxLat = maxLat;
                     bboxMaxLon = maxLon;
-                    
-                    // Neue Marker für den sichtbaren Bereich laden
+
+                    // Load new markers for the visible area
                     List<DeviceData> newDevices = getDevicesInBoundingBox(minLat, minLon, maxLat, maxLon);
                     deviceList = newDevices;
-                    
+
                     Log.d("MapActivity", "Loaded " + newDevices.size() + " devices for new viewport");
-                    
-                    // Daten an WebView senden
+
+                    // Send data to WebView
                     if (!newDevices.isEmpty()) {
                         injectDeviceData();
                     } else {
-                        // Auch leere Liste senden, damit UI aktualisiert wird
+                        // Also send empty list so UI gets updated
                         injectDeviceData();
                     }
                 }
             });
         }
-        
-        // NEUE METHODE: Gesamtanzahl der Geräte in DB abfragen
+
+        // NEW METHOD: Query total number of devices in DB
         @JavascriptInterface
         public String getTotalDeviceCount() {
             try {
@@ -993,19 +993,19 @@ public class MapActivity extends AppCompatActivity {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 requestLocationAndCenterMap();
             } else {
-                Toast.makeText(this, "Standortberechtigung verweigert.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Location permission denied.", Toast.LENGTH_SHORT).show();
             }
         }
     }
-    
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
         if (database != null) {
             database.close();
         }
-        
-        // Temporäre externe DB löschen
+
+        // Delete temporary external DB
         String extDbPath = getIntent().getStringExtra("external_db_path");
         if (extDbPath != null) {
             java.io.File tempFile = new java.io.File(extDbPath);
