@@ -68,8 +68,10 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 5. Push to your branch & open a Pull Request
 
 ### 📖 Documentation
-- Improve `README.md`, `docs/`, docstrings, and inline comments
-- Add examples, tutorials, or translation updates
+ - Improve `README.md`, `docs/`, docstrings, and inline comments
+ - Add examples, tutorials, or translation updates
+
+**Note:** If you change any text or documentation, please add a short entry to `CHANGELOG.md` before uploading your changes. This helps keep the history clear and ensures both files are updated together.
 
 ---
 
