@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ---
 
 ## [1.0.1] – 2025-10-30 [LATEST]
+- Remove clear-text logging of sensitive device data; redact address and coordinates from log output in location update process.
 
 
 

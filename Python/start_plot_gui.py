@@ -1839,11 +1839,11 @@ def process_pending_location_updates(db_path):
                 )
                 if success:
                     successful_updates += 1
-                    print(f"✅ Updated {update['address']} -> {update['latitude']:.6f}, {update['longitude']:.6f}")
+                    print("✅ Updated device location.")
                 else:
-                    print(f"❌ Failed to update {update['address']}")
+                    print("❌ Failed to update device location.")
             except Exception as e:
-                print(f"❌ Error updating {update['address']}: {str(e)}")
+                print(f"❌ Error updating device location: {str(e)}")
         print(f"Successfully updated: {successful_updates}/{len(pending_updates)} devices")
         os.remove(found_file)
         if successful_updates > 0:
