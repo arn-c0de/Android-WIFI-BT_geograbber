@@ -23,7 +23,7 @@
 </div>
 
 <div align="left">
-   <b>Current Version: v1.0.1</b>
+   <b>Current Version: v1.0.2</b>
 </div>
 
    ---

@@ -39,11 +39,11 @@ public class MainActivity extends AppCompatActivity {
     /**
      * =============================
      *   CODE VERSION MARKER
-     *   APP_VERSION: 1.0.1
+     *   APP_VERSION: 1.0.2
      * =============================
      * Use this variable to visually distinguish code versions.
      */
-    public static final String APP_VERSION = "1.0.1";
+    public static final String APP_VERSION = "1.0.2";
     private WifiManager wifiManager;
     private LocationManager locationManager;
     private BluetoothAdapter bluetoothAdapter;
@@ -1290,11 +1290,11 @@ public class MainActivity extends AppCompatActivity {
         try {
             // Create temporary file
             java.io.File tempFile = new java.io.File(getCacheDir(), "temp_external.db");
-            
+
             // Copy database
             java.io.InputStream inStream = getContentResolver().openInputStream(uri);
             java.io.FileOutputStream outStream = new java.io.FileOutputStream(tempFile);
-            
+
             byte[] buffer = new byte[1024];
             int length;
             while ((length = inStream.read(buffer)) > 0) {
@@ -1302,7 +1302,15 @@ public class MainActivity extends AppCompatActivity {
             }
             inStream.close();
             outStream.close();
-            
+
+            // Security validation: Check database integrity and structure
+            if (!validateExternalDatabase(tempFile)) {
+                Toast.makeText(this, "Security error: Invalid or malicious database file!", Toast.LENGTH_LONG).show();
+                addLogMessage("ERROR: Database validation failed - possible malicious content");
+                tempFile.delete();
+                return;
+            }
+
             // Check if it is a valid SQLite database.
             SQLiteDatabase testDb = null;
             try {
@@ -1383,21 +1391,144 @@ public class MainActivity extends AppCompatActivity {
         return exists;
     }
 
+    // Security validation for external databases
+    private boolean validateExternalDatabase(java.io.File dbFile) {
+        SQLiteDatabase db = null;
+        try {
+            // Check file size (max 100MB to prevent DoS)
+            long maxSize = 100 * 1024 * 1024; // 100MB
+            if (dbFile.length() > maxSize) {
+                addLogMessage("ERROR: Database file too large (" + (dbFile.length() / 1024 / 1024) + " MB)");
+                return false;
+            }
+
+            // Open database in read-only mode
+            db = SQLiteDatabase.openDatabase(dbFile.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
+
+            // Check for malicious triggers (SQL injection vectors)
+            Cursor triggerCursor = db.rawQuery("SELECT name FROM sqlite_master WHERE type='trigger'", null);
+            if (triggerCursor.getCount() > 0) {
+                addLogMessage("ERROR: Database contains triggers (potential security risk)");
+                triggerCursor.close();
+                return false;
+            }
+            triggerCursor.close();
+
+            // Check for malicious views (SQL injection vectors)
+            Cursor viewCursor = db.rawQuery("SELECT name FROM sqlite_master WHERE type='view'", null);
+            if (viewCursor.getCount() > 0) {
+                addLogMessage("ERROR: Database contains views (potential security risk)");
+                viewCursor.close();
+                return false;
+            }
+            viewCursor.close();
+
+            // Verify expected tables exist
+            boolean hasWifiData = hasTable(db, "wifi_data");
+            boolean hasDeviceData = hasTable(db, "device_data");
+
+            if (!hasWifiData && !hasDeviceData) {
+                addLogMessage("ERROR: No valid data tables found");
+                return false;
+            }
+
+            // Check for excessive number of tables (potential abuse)
+            Cursor tableCursor = db.rawQuery("SELECT COUNT(*) FROM sqlite_master WHERE type='table'", null);
+            if (tableCursor.moveToFirst()) {
+                int tableCount = tableCursor.getInt(0);
+                if (tableCount > 10) {
+                    addLogMessage("ERROR: Too many tables in database (" + tableCount + ")");
+                    tableCursor.close();
+                    return false;
+                }
+            }
+            tableCursor.close();
+
+            // Validate table schema for expected tables
+            if (hasDeviceData) {
+                if (!validateTableSchema(db, "device_data")) {
+                    return false;
+                }
+            }
+            if (hasWifiData) {
+                if (!validateTableSchema(db, "wifi_data")) {
+                    return false;
+                }
+            }
+
+            addLogMessage("Database validation passed");
+            return true;
+
+        } catch (Exception e) {
+            addLogMessage("ERROR: Database validation failed: " + e.getMessage());
+            return false;
+        } finally {
+            if (db != null) {
+                db.close();
+            }
+        }
+    }
+
+    // Validate table schema to prevent malicious schema structures
+    private boolean validateTableSchema(SQLiteDatabase db, String tableName) {
+        try {
+            // Whitelist table names to prevent SQL injection via table name
+            if (!tableName.equals("wifi_data") && !tableName.equals("device_data")) {
+                addLogMessage("ERROR: Invalid table name: " + tableName);
+                return false;
+            }
+
+            // PRAGMA commands don't support parameterized queries, so we validate the input first
+            Cursor cursor = db.rawQuery("PRAGMA table_info(" + tableName + ")", null);
+            int columnCount = cursor.getCount();
+            cursor.close();
+
+            // Check for reasonable number of columns
+            if (columnCount > 50) {
+                addLogMessage("ERROR: Table " + tableName + " has too many columns (" + columnCount + ")");
+                return false;
+            }
+
+            if (columnCount == 0) {
+                addLogMessage("ERROR: Table " + tableName + " has no columns");
+                return false;
+            }
+
+            return true;
+        } catch (Exception e) {
+            addLogMessage("ERROR: Schema validation failed for " + tableName + ": " + e.getMessage());
+            return false;
+        }
+    }
+
+    // Sanitize string input to prevent SQL injection
+    private String sanitizeString(String input) {
+        if (input == null) {
+            return null;
+        }
+        // Remove potentially dangerous characters and limit length
+        if (input.length() > 1000) {
+            input = input.substring(0, 1000);
+        }
+        // Remove null bytes and control characters that could cause issues
+        return input.replaceAll("[\\x00\\x08\\x0B\\x0C\\x0E-\\x1F]", "");
+    }
+
     // Load external database as active database
     private void loadExternalDatabaseAsActive(android.net.Uri uri) {
         try {
             // Create a permanent file in the app directory
             java.io.File externalDbFile = new java.io.File(getFilesDir(), "external_active.db");
-            
+
             // Delete old external databases if present.
             if (externalDbFile.exists()) {
                 externalDbFile.delete();
             }
-            
+
             // Copy database
             java.io.InputStream inStream = getContentResolver().openInputStream(uri);
             java.io.FileOutputStream outStream = new java.io.FileOutputStream(externalDbFile);
-            
+
             byte[] buffer = new byte[1024];
             int length;
             while ((length = inStream.read(buffer)) > 0) {
@@ -1405,26 +1536,30 @@ public class MainActivity extends AppCompatActivity {
             }
             inStream.close();
             outStream.close();
-            
+
+            // Security validation: Check database integrity and structure
+            if (!validateExternalDatabase(externalDbFile)) {
+                Toast.makeText(this, "Security error: Invalid or malicious database file!", Toast.LENGTH_LONG).show();
+                addLogMessage("ERROR: Database validation failed - possible malicious content");
+                externalDbFile.delete();
+                return;
+            }
+
             // Check if it is a valid SQLite database.
             SQLiteDatabase testDb = null;
             try {
-                testDb = SQLiteDatabase.openDatabase(externalDbFile.getAbsolutePath(), null, SQLiteDatabase.OPEN_READWRITE);
+                // Open in read-only mode for security
+                testDb = SQLiteDatabase.openDatabase(externalDbFile.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
                 
-                // Check and create missing tables
+                // Check for required tables (read-only, no table creation)
                 boolean hasWifiData = hasTable(testDb, "wifi_data");
                 boolean hasDeviceData = hasTable(testDb, "device_data");
-                
-                if (!hasWifiData) {
-                    // Create wifi_data table
-                    testDb.execSQL(DatabaseHelper.CREATE_WIFI_TABLE);
-                    addLogMessage("wifi_data table created in external database");
-                }
-                
-                if (!hasDeviceData) {
-                    // Create device_data table
-                    testDb.execSQL(DatabaseHelper.CREATE_DEVICE_TABLE);
-                    addLogMessage("device_data table created in external database");
+
+                if (!hasWifiData && !hasDeviceData) {
+                    testDb.close();
+                    Toast.makeText(this, "Invalid database: No WiFi or Bluetooth data tables found!", Toast.LENGTH_LONG).show();
+                    externalDbFile.delete();
+                    return;
                 }
                 
                 // Count available data
@@ -1532,22 +1667,42 @@ public class MainActivity extends AppCompatActivity {
         int copiedWifi = 0;
         int copiedBluetooth = 0;
         int copiedLegacyWifi = 0;
-        
+
         try {
+            // Use transaction for atomicity and better error handling
+            database.beginTransaction();
+
             //1. Copy device_data (WiFi and Bluetooth)
-            android.database.Cursor deviceCursor = externalDb.rawQuery("SELECT * FROM device_data", null);
+            android.database.Cursor deviceCursor = externalDb.rawQuery("SELECT * FROM device_data LIMIT 50000", null);
             if (deviceCursor.moveToFirst()) {
                 do {
-                    String deviceName = deviceCursor.getString(deviceCursor.getColumnIndexOrThrow("device_name"));
-                    String deviceAddress = deviceCursor.getString(deviceCursor.getColumnIndexOrThrow("device_address"));
-                    String deviceType = deviceCursor.getString(deviceCursor.getColumnIndexOrThrow("device_type"));
+                    // Sanitize all string inputs
+                    String deviceName = sanitizeString(deviceCursor.getString(deviceCursor.getColumnIndexOrThrow("device_name")));
+                    String deviceAddress = sanitizeString(deviceCursor.getString(deviceCursor.getColumnIndexOrThrow("device_address")));
+                    String deviceType = sanitizeString(deviceCursor.getString(deviceCursor.getColumnIndexOrThrow("device_type")));
                     int signalStrength = deviceCursor.getInt(deviceCursor.getColumnIndexOrThrow("signal_strength"));
-                    String encryptionInfo = deviceCursor.getString(deviceCursor.getColumnIndexOrThrow("encryption_info"));
+                    String encryptionInfo = sanitizeString(deviceCursor.getString(deviceCursor.getColumnIndexOrThrow("encryption_info")));
                     double latitude = deviceCursor.getDouble(deviceCursor.getColumnIndexOrThrow("latitude"));
                     double longitude = deviceCursor.getDouble(deviceCursor.getColumnIndexOrThrow("longitude"));
                     long timestamp = deviceCursor.getLong(deviceCursor.getColumnIndexOrThrow("timestamp"));
 
-                    // Extended fields (if available)
+                    // Validate numeric ranges
+                    if (signalStrength < -150 || signalStrength > 0) {
+                        continue; // Skip invalid signal strength
+                    }
+                    if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+                        continue; // Skip invalid coordinates
+                    }
+                    if (timestamp < 0 || timestamp > System.currentTimeMillis() + 86400000) {
+                        continue; // Skip invalid timestamps (future dates not allowed)
+                    }
+
+                    // Validate device type
+                    if (deviceType != null && !deviceType.equals("WIFI") && !deviceType.equals("BLUETOOTH")) {
+                        continue; // Skip invalid device types
+                    }
+
+                    // Extended fields (if available) - sanitize all strings
                     int frequencyIdx = deviceCursor.getColumnIndex("frequency");
                     int channelIdx = deviceCursor.getColumnIndex("channel");
                     int channelWidthIdx = deviceCursor.getColumnIndex("channel_width");
@@ -1557,15 +1712,15 @@ public class MainActivity extends AppCompatActivity {
                     int wifiStandardIdx = deviceCursor.getColumnIndex("wifi_standard");
                     int vendorInfoIdx = deviceCursor.getColumnIndex("vendor_info");
                     int maxSpeedIdx = deviceCursor.getColumnIndex("max_connection_speed");
-                    
+
                     int frequency = frequencyIdx >= 0 ? deviceCursor.getInt(frequencyIdx) : 0;
                     int channel = channelIdx >= 0 ? deviceCursor.getInt(channelIdx) : 0;
-                    String channelWidth = channelWidthIdx >= 0 ? deviceCursor.getString(channelWidthIdx) : null;
-                    String capabilities = capabilitiesIdx >= 0 ? deviceCursor.getString(capabilitiesIdx) : null;
+                    String channelWidth = channelWidthIdx >= 0 ? sanitizeString(deviceCursor.getString(channelWidthIdx)) : null;
+                    String capabilities = capabilitiesIdx >= 0 ? sanitizeString(deviceCursor.getString(capabilitiesIdx)) : null;
                     int centerFreq0 = centerFreq0Idx >= 0 ? deviceCursor.getInt(centerFreq0Idx) : 0;
                     int centerFreq1 = centerFreq1Idx >= 0 ? deviceCursor.getInt(centerFreq1Idx) : 0;
-                    String wifiStandard = wifiStandardIdx >= 0 ? deviceCursor.getString(wifiStandardIdx) : null;
-                    String vendorInfo = vendorInfoIdx >= 0 ? deviceCursor.getString(vendorInfoIdx) : null;
+                    String wifiStandard = wifiStandardIdx >= 0 ? sanitizeString(deviceCursor.getString(wifiStandardIdx)) : null;
+                    String vendorInfo = vendorInfoIdx >= 0 ? sanitizeString(deviceCursor.getString(vendorInfoIdx)) : null;
                     int maxSpeed = maxSpeedIdx >= 0 ? deviceCursor.getInt(maxSpeedIdx) : 0;
                     
                     // Check if the device already exists
@@ -1586,18 +1741,30 @@ public class MainActivity extends AppCompatActivity {
             
             // 2. Copy legacy wifi_data (if it exists)
             if (hasTable(externalDb, "wifi_data")) {
-                android.database.Cursor wifiCursor = externalDb.rawQuery("SELECT * FROM wifi_data", null);
+                android.database.Cursor wifiCursor = externalDb.rawQuery("SELECT * FROM wifi_data LIMIT 50000", null);
                 if (wifiCursor.moveToFirst()) {
                     do {
-                        String ssid = wifiCursor.getString(wifiCursor.getColumnIndexOrThrow("ssid"));
-                        String bssid = wifiCursor.getString(wifiCursor.getColumnIndexOrThrow("bssid"));
+                        // Sanitize all string inputs
+                        String ssid = sanitizeString(wifiCursor.getString(wifiCursor.getColumnIndexOrThrow("ssid")));
+                        String bssid = sanitizeString(wifiCursor.getString(wifiCursor.getColumnIndexOrThrow("bssid")));
                         int signalStrength = wifiCursor.getInt(wifiCursor.getColumnIndexOrThrow("signal_strength"));
-                        String encryption = wifiCursor.getString(wifiCursor.getColumnIndexOrThrow("encryption"));
+                        String encryption = sanitizeString(wifiCursor.getString(wifiCursor.getColumnIndexOrThrow("encryption")));
                         double latitude = wifiCursor.getDouble(wifiCursor.getColumnIndexOrThrow("latitude"));
                         double longitude = wifiCursor.getDouble(wifiCursor.getColumnIndexOrThrow("longitude"));
                         long timestamp = wifiCursor.getLong(wifiCursor.getColumnIndexOrThrow("timestamp"));
-                        
-                        // Extended fields (if available)
+
+                        // Validate numeric ranges
+                        if (signalStrength < -150 || signalStrength > 0) {
+                            continue; // Skip invalid signal strength
+                        }
+                        if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+                            continue; // Skip invalid coordinates
+                        }
+                        if (timestamp < 0 || timestamp > System.currentTimeMillis() + 86400000) {
+                            continue; // Skip invalid timestamps
+                        }
+
+                        // Extended fields (if available) - sanitize all strings
                         int frequencyIdx = wifiCursor.getColumnIndex("frequency");
                         int channelIdx = wifiCursor.getColumnIndex("channel");
                         int capabilitiesIdx = wifiCursor.getColumnIndex("capabilities");
@@ -1607,13 +1774,13 @@ public class MainActivity extends AppCompatActivity {
                         int centerFreq0Idx = wifiCursor.getColumnIndex("center_freq0");
                         int centerFreq1Idx = wifiCursor.getColumnIndex("center_freq1");
                         int maxSpeedIdx = wifiCursor.getColumnIndex("max_connection_speed");
-                        
+
                         int frequency = frequencyIdx >= 0 ? wifiCursor.getInt(frequencyIdx) : 0;
                         int channel = channelIdx >= 0 ? wifiCursor.getInt(channelIdx) : 0;
-                        String capabilities = capabilitiesIdx >= 0 ? wifiCursor.getString(capabilitiesIdx) : null;
-                        String wifiStandard = wifiStandardIdx >= 0 ? wifiCursor.getString(wifiStandardIdx) : null;
-                        String vendorInfo = vendorInfoIdx >= 0 ? wifiCursor.getString(vendorInfoIdx) : null;
-                        String channelWidth = channelWidthIdx >= 0 ? wifiCursor.getString(channelWidthIdx) : null;
+                        String capabilities = capabilitiesIdx >= 0 ? sanitizeString(wifiCursor.getString(capabilitiesIdx)) : null;
+                        String wifiStandard = wifiStandardIdx >= 0 ? sanitizeString(wifiCursor.getString(wifiStandardIdx)) : null;
+                        String vendorInfo = vendorInfoIdx >= 0 ? sanitizeString(wifiCursor.getString(vendorInfoIdx)) : null;
+                        String channelWidth = channelWidthIdx >= 0 ? sanitizeString(wifiCursor.getString(channelWidthIdx)) : null;
                         int centerFreq0 = centerFreq0Idx >= 0 ? wifiCursor.getInt(centerFreq0Idx) : 0;
                         int centerFreq1 = centerFreq1Idx >= 0 ? wifiCursor.getInt(centerFreq1Idx) : 0;
                         int maxSpeed = maxSpeedIdx >= 0 ? wifiCursor.getInt(maxSpeedIdx) : 0;
@@ -1630,11 +1797,19 @@ public class MainActivity extends AppCompatActivity {
                 wifiCursor.close();
             }
             
+            // Commit transaction if successful
+            database.setTransactionSuccessful();
+            database.endTransaction();
+
             addLogMessage("Data transfer completed:");
             addLogMessage("• " + copiedWifi + " WiFi devices (device_data)");
             addLogMessage("• " + copiedBluetooth + " Bluetooth devices");
             addLogMessage("• " + copiedLegacyWifi + " Legacy WiFi entries");
         } catch (Exception e) {
+            // Rollback transaction on error
+            if (database.inTransaction()) {
+                database.endTransaction();
+            }
             addLogMessage("Error while copying data: " + e.getMessage());
             throw e;
         }
@@ -1727,7 +1902,7 @@ public class MainActivity extends AppCompatActivity {
     // Database Helper Class
     public static class DatabaseHelper extends SQLiteOpenHelper {
         private static final String DATABASE_NAME = "wifi_scanner.db";
-        private static final int DATABASE_VERSION = 6; // Increased for motion analysis fields
+        private static final int DATABASE_VERSION = 6; // Motion analysis fields
         private static final String CREATE_WIFI_TABLE = "CREATE TABLE wifi_data (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "ssid TEXT, " +
@@ -1798,7 +1973,7 @@ public class MainActivity extends AppCompatActivity {
                         "latitude REAL, " +
                         "longitude REAL, " +
                         "timestamp INTEGER)");
-                
+
                 // Copy existing WiFi data to device_data table
                 db.execSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp) " +
                         "SELECT ssid, bssid, 'WIFI', signal_strength, encryption, latitude, longitude, timestamp FROM wifi_data");
