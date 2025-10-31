@@ -1,83 +1,98 @@
-# Project-wide gitignore
+# === Project-wide gitignore ===
 
-# Database files (exported from app)
+# --- Datenbanken ---
 *.db
 *.db-shm
 *.db-wal
 *.sqlite
 *.sqlite3
 
-# Backup files
+# --- Backups & temporäre Editor-Dateien ---
 *~
 *.swp
 *.bak
 *.tmp
 *.orig
+*.temp
 
-# OS files
+# --- Betriebssystem ---
 .DS_Store
 Thumbs.db
 desktop.ini
+ehthumbs.db
+._*
 
-# IDE files
+# --- IDEs & Editoren ---
 .vscode/
 .idea/
+*.iml
+*.ipr
+*.iws
+*.sublime-*
 
-# Python
+# --- Python ---
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
-venv/
 *.egg-info/
 dist/
 build/
-# Temporary files and folders
-tmp/
-temp/
-*.tmp
-*.temp
+pip-log.txt
+pip-delete-this-directory.txt
 
-# Android build outputs
+# --- Python Virtual Environments ---
+env/
+venv/
+ENV/
+env*/
+venv*/
+.venv/
+
+# --- Android Build & Artifacts ---
+# Gradle
+.gradle/
+local.properties
+captures/
+
+# Build outputs
+build/
+*/build/
 outputs/
+*.apk
+*.ap_
+*.aab
 
-# Logs
+# Keystores & Zertifikate
+*.jks
+*.keystore
+
+# Android Studio / IntelliJ
+.cxx/
+*.hprof
+
+# --- Logs ---
 *.log
-# Sensitive/secret files
+logs/
+log/
+
+# --- Secrets & Konfiguration ---
 .env
 .env.*
-local.properties
-
-# Sensitive data
+.env.local
+.env.development
+.env.production
 secrets.xml
 api-keys.properties
 credentials.json
 *.key
 *.pem
+*.crt
+*.cer
 
-# Additional Android/IDE artifacts and sensitive files
-.gradle/
-captures/
-*.keystore
-*.jks
-*.properties
-*.ipr
-*.iws
-*.cxx/
+# --- Sonstiges ---
+tmp/
+temp/
 *.tmp
 *.temp
-*.apk
-*.ap_
-*.aab
-
-# Android build intermediates and outputs
-WIFIGEOGRABBER/app/build/
-WIFIGEOGRABBER/build/
-*.jks
-*.keystore
-
-# Ignore Python virtual environment
-venv/
-venv/*
