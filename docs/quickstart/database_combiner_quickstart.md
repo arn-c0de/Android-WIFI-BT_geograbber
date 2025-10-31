@@ -152,7 +152,7 @@ Stores all WiFi networks with the following fields:
 - `ssid`: Network name
 - `bssid`: MAC address (unique identifier)
 - `signal_strength`: Signal strength in dBm
-- `verschluesselung`: Encryption type (open, WPA2, etc.)
+- `encryption`: Encryption type (open, WPA2, etc.)
 - `latitude`, `longitude`: GPS coordinates
 - `timestamp`: Scan timestamp
 - `frequency`, `channel`, `wifi_standard`: WiFi details

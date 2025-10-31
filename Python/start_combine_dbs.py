@@ -354,7 +354,7 @@ class DatabaseCombiner:
                 
                 if has_extended:
                     cursor.execute("""
-                        SELECT ssid, bssid, signal_strength, verschluesselung, 
+                        SELECT ssid, bssid, signal_strength, encryption, 
                                latitude, longitude, timestamp, frequency, channel, 
                                wifi_standard, vendor_info, channel_width, max_connection_speed
                         FROM wifi_data 
@@ -362,7 +362,7 @@ class DatabaseCombiner:
                     """)
                 else:
                     cursor.execute("""
-                        SELECT ssid, bssid, signal_strength, verschluesselung, 
+                        SELECT ssid, bssid, signal_strength, encryption, 
                                latitude, longitude, timestamp
                         FROM wifi_data 
                         WHERE latitude != 0 AND longitude != 0
@@ -370,9 +370,9 @@ class DatabaseCombiner:
                 
                 for row in cursor.fetchall():
                     if has_extended and len(row) >= 13:
-                        ssid, bssid, signal_strength, verschluesselung, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed = row[:13]
+                        ssid, bssid, signal_strength, encryption, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed = row[:13]
                     else:
-                        ssid, bssid, signal_strength, verschluesselung, lat, lon, timestamp = row[:7]
+                        ssid, bssid, signal_strength, encryption, lat, lon, timestamp = row[:7]
                         frequency = channel = wifi_standard = vendor_info = channel_width = max_speed = None
                     
                     devices.append({
@@ -381,7 +381,7 @@ class DatabaseCombiner:
                         'address': bssid,
                         'type': 'WIFI',
                         'signal': signal_strength,
-                        'encryption': verschluesselung,
+                        'encryption': encryption,
                         'lat': lat,
                         'lon': lon,
                         'timestamp': timestamp,
@@ -521,7 +521,7 @@ class DatabaseCombiner:
             elif device['source'] == 'wifi_data':
                 cursor.execute("""
                     INSERT INTO wifi_data 
-                    (ssid, bssid, signal_strength, verschluesselung, latitude, longitude, timestamp,
+                    (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp,
                      frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (device['name'], device['address'], device['signal'], device['encryption'],
@@ -943,7 +943,7 @@ class DatabaseCombiner:
                 ssid TEXT,
                 bssid TEXT NOT NULL,
                 signal_strength INTEGER,
-                verschluesselung TEXT,
+                encryption TEXT,
                 latitude REAL NOT NULL,
                 longitude REAL NOT NULL,
                 timestamp INTEGER,
@@ -1111,7 +1111,7 @@ class DatabaseCombiner:
             
             if len(columns) >= 7:
                 cursor.execute("""
-                    SELECT ssid, bssid, signal_strength, verschluesselung,
+                    SELECT ssid, bssid, signal_strength, encryption,
                            latitude, longitude, timestamp,
                            COALESCE(frequency, NULL), COALESCE(channel, NULL),
                            COALESCE(wifi_standard, NULL), COALESCE(vendor_info, NULL),
@@ -1242,7 +1242,7 @@ class DatabaseCombiner:
                         'ssid': item['name'] or '',
                         'bssid': key,
                         'signal_strength': item['signal'] or -100,
-                        'verschluesselung': item['encryption'] or '',
+                        'encryption': item['encryption'] or '',
                         'latitude': item['lat'],
                         'longitude': item['lon'],
                         'timestamp': item['timestamp'] or 0,
@@ -1307,10 +1307,10 @@ class DatabaseCombiner:
             try:
                 cursor.execute("""
                     INSERT OR IGNORE INTO wifi_data
-                    (ssid, bssid, signal_strength, verschluesselung, latitude, longitude, timestamp,
+                    (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp,
                      frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """, (wifi['ssid'], wifi['bssid'], wifi['signal_strength'], wifi['verschluesselung'],
+                """, (wifi['ssid'], wifi['bssid'], wifi['signal_strength'], wifi['encryption'],
                       wifi['latitude'], wifi['longitude'], wifi['timestamp'], wifi['frequency'],
                       wifi['channel'], wifi['wifi_standard'], wifi['vendor_info'],
                       wifi['channel_width'], wifi['max_connection_speed']))
@@ -1394,7 +1394,7 @@ class DatabaseCombiner:
                         # Better signal in device_data - update wifi_data
                         cursor.execute("""
                             UPDATE wifi_data
-                            SET ssid = ?, signal_strength = ?, verschluesselung = ?,
+                            SET ssid = ?, signal_strength = ?, encryption = ?,
                                 latitude = ?, longitude = ?, timestamp = ?,
                                 frequency = ?, channel = ?, wifi_standard = ?,
                                 vendor_info = ?, channel_width = ?, max_connection_speed = ?
@@ -1410,7 +1410,7 @@ class DatabaseCombiner:
                     # Not in wifi_data - add it
                     cursor.execute("""
                         INSERT INTO wifi_data
-                        (ssid, bssid, signal_strength, verschluesselung, latitude, longitude, timestamp,
+                        (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp,
                          frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (device_name, bssid, signal_strength, encryption_info, lat, lon, timestamp,
@@ -1446,7 +1446,7 @@ class DatabaseCombiner:
             # Move WiFi data to wifi_data
             cursor.execute("""
                 INSERT OR IGNORE INTO wifi_data
-                (ssid, bssid, signal_strength, verschluesselung, latitude, longitude, timestamp,
+                (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp,
                  frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed)
                 SELECT device_name, device_address, signal_strength, encryption_info, latitude, longitude, timestamp,
                        frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed

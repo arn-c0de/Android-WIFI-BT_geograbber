@@ -65,18 +65,18 @@ public class MainActivity extends AppCompatActivity {
     private static final int EXPORT_DB_REQUEST_CODE = 101;
     private static final int IMPORT_DB_REQUEST_CODE = 102;
     private static final int IMPORT_ACTIVE_DB_REQUEST_CODE = 103;
-    private static final long SCAN_INTERVAL = 5000; // 5 Sekunden - sehr häufig
-    private static final long MIN_SCAN_INTERVAL = 3000; // Minimum 3 Sekunden zwischen Scans
+    private static final long SCAN_INTERVAL = 5000; // 5 seconds - very frequently
+    private static final long MIN_SCAN_INTERVAL = 3000; // Minimum 3 seconds between scans
     private long lastScanTime = 0;
     private StringBuilder logBuffer = new StringBuilder();
 
 
         
 
-    // System-UI (Navigationsleiste) ausblenden
+    // Hide system UI (navigation bar)
     private void hideSystemUI() {
         try {
-            // Für Android 11+ (API 30+)
+            // For Android 11+ (API 30+)
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                 getWindow().setDecorFitsSystemWindows(false);
                 if (getWindow().getInsetsController() != null) {
@@ -86,7 +86,7 @@ public class MainActivity extends AppCompatActivity {
                     );
                 }
             } else {
-                // Für ältere Android-Versionen
+                // For older Android-Versionen
                 View decorView = getWindow().getDecorView();
                 int uiOptions = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                         | View.SYSTEM_UI_FLAG_FULLSCREEN
@@ -97,7 +97,7 @@ public class MainActivity extends AppCompatActivity {
                 decorView.setSystemUiVisibility(uiOptions);
             }
             
-            // Bildschirm immer an lassen
+            // Always leave the screen on
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         } catch (Exception e) {
             Log.e("MainActivity", "Error hiding system UI: " + e.getMessage());
@@ -117,10 +117,10 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         
-        // Vollbildmodus aktivieren - Navigationsleiste ausblenden (nach setContentView!)
+        // Activate full-screen mode - hide the navigation bar (after setContentView!)
         hideSystemUI();
 
-        // Initialisierung
+        // initialization
         statusText = findViewById(R.id.status_text);
         infoSummary = findViewById(R.id.info_summary);
         logcatText = findViewById(R.id.logcat_text);
@@ -134,15 +134,15 @@ public class MainActivity extends AppCompatActivity {
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         handler = new Handler();
 
-        // Bluetooth initialisieren
+        // Bluetooth initialization
         BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         bluetoothAdapter = bluetoothManager.getAdapter();
 
-        // Neuer Button für weitere Aktionen
+        // New button for further actions
         moreButton = findViewById(R.id.more_button);
         moreButton.setOnClickListener(v -> showMoreDialog());
 
-        // Umschalt-Button für aktives Scanning
+        // Toggle button for active scanning
         toggleScanButton.setOnClickListener(v -> {
             if (isScanning) {
                 stopScanning();
@@ -165,42 +165,42 @@ public class MainActivity extends AppCompatActivity {
         });
         updateBluetoothToggleButton();
 
-        // Standortdienste prüfen und ggf. Dialog anzeigen
+        // Check location services and display dialog if necessary.
         checkLocationServicesEnabled();
 
-        // Datenbank initialisieren
+        // Initialize database
         DatabaseHelper dbHelper = new DatabaseHelper(this);
         database = dbHelper.getWritableDatabase();
 
-        // Berechtigungen prüfen
+        // Check permissions
         checkPermissions();
 
         // Button-Listener
         showButton.setOnClickListener(v -> {
             if (isShowingStoredData) {
-                // Zurück zur Live-Ansicht
+                // // Back to live view
                 isShowingStoredData = false;
                 loadAndDisplayAvailableNetworks();
                 showButton.setText("Show Data");
             } else {
-                // Zeige gespeicherte Daten
+                // Show saved data
                 isShowingStoredData = true;
                 showData();
                 showButton.setText("Live View");
             }
         });
 
-        // Karten-Button
+        // Map button
         mapButton.setOnClickListener(v -> {
             Intent mapIntent = new Intent(MainActivity.this, MapActivity.class);
             
-            // Wir verwenden jetzt immer die interne Datenbank für die Karte
-            // da alle externen Daten bereits in die interne DB übertragen wurden
+            // We now always use the internal database for the map
+            // since all external data has already been transferred to the internal database
             
             startActivity(mapIntent);
         });
 
-        // WLAN-Scan Receiver
+        // WiFi Scan receiver
         IntentFilter intentFilter = new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
         registerReceiver(wifiScanReceiver, intentFilter);
 
@@ -210,19 +210,19 @@ public class MainActivity extends AppCompatActivity {
         bluetoothFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED); 
         registerReceiver(bluetoothScanReceiver, bluetoothFilter);
 
-        // Sofort beim Start alle verfügbaren Netzwerke laden und anzeigen
+        // Load and display all available networks immediately upon startup.
         loadAndDisplayAvailableNetworks();
 
-        // Initiale Info-Zusammenfassung
+        // Initial information summary
         updateInfoSummary(0, 0);
 
-        // LogCat initialisieren
+        // Initialize LogCat
         String appName = getString(getApplicationInfo().labelRes);
         addLogMessage("==== " + appName + " v" + APP_VERSION + " ====");
         addLogMessage("App started - LogCat ready");
         addLogMessage("Fullscreen mode enabled - navigation bar hidden");
 
-        // Periodischer Scan
+        // Periodic scan
         scanRunnable = new Runnable() {
             @Override
             public void run() {
@@ -237,12 +237,12 @@ public class MainActivity extends AppCompatActivity {
         };
     }
 
-    // LogCat-Funktionen
+    // LogCat functions
     private void addLogMessage(String message) {
         String timestamp = new java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date());
         String logEntry = timestamp + ": " + message + "\n";
 
-        // Falls Log leer, Versionsinfo und App-Namen einfügen
+        // If the log is empty, insert version information and app name.
         if (logBuffer.length() == 0) {
             String appName = getString(getApplicationInfo().labelRes);
             logBuffer.append("==== " + appName + " v" + APP_VERSION + " ====" + "\n");
@@ -250,7 +250,7 @@ public class MainActivity extends AppCompatActivity {
 
         logBuffer.append(logEntry);
 
-        // Begrenzen auf letzte 50 Zeilen
+        // Limit to last 50 lines
         String[] lines = logBuffer.toString().split("\n");
         if (lines.length > 50) {
             logBuffer = new StringBuilder();
@@ -264,14 +264,14 @@ public class MainActivity extends AppCompatActivity {
         // UI Update
         runOnUiThread(() -> {
             logcatText.setText(logBuffer.toString());
-            // Auto-scroll zum Ende
+            // Auto-scroll to the end
             logcatScrollView.post(() -> logcatScrollView.fullScroll(ScrollView.FOCUS_DOWN));
         });
     }
     
-    // Hilfsfunktionen für erweiterte WiFi-Datenextraktion
+    // Auxiliary functions for advanced WiFi data extraction
     private String getWiFiStandard(ScanResult result) {
-        // Bestimme WiFi-Standard basierend auf Frequenz und Capabilities
+        // Determine WiFi standard based on frequency and capabilities
         String capabilities = result.capabilities;
         int frequency = result.frequency;
         
@@ -306,7 +306,7 @@ public class MainActivity extends AppCompatActivity {
     private String getVendorOUI(String bssid) {
         if (bssid != null && bssid.length() >= 8) {
             String oui = bssid.substring(0, 8).toUpperCase();
-            return "OUI-" + oui.substring(0, 6); // Vereinfachte OUI-Ausgabe für DB
+            return "OUI-" + oui.substring(0, 6); // Simplified OUI output for DB
         }
         return "Unknown";
     }
@@ -333,7 +333,7 @@ public class MainActivity extends AppCompatActivity {
         String standard = getWiFiStandard(result);
         int channelWidth = getChannelWidth(result);
         
-        // Geschätzter maximaler Durchsatz basierend auf Standard und Kanalbreite
+        // Estimated maximum throughput based on standard and channel width
         if (standard.contains("802.11ax")) {
             if (channelWidth == 160) return 2400; // Mbps
             if (channelWidth == 80) return 1200;
@@ -357,9 +357,9 @@ public class MainActivity extends AppCompatActivity {
         return 0;
     }
     
-    // Berechnet die Distanz zwischen zwei GPS-Koordinaten in Metern (Haversine-Formel)
+    // Calculates the distance between two GPS coordinates in meters (Haversine formula)
     private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371; // Erdradius in Kilometern
+        final int R = 6371; // Earth's radius in kilometers
         
         double latDistance = Math.toRadians(lat2 - lat1);
         double lonDistance = Math.toRadians(lon2 - lon1);
@@ -367,9 +367,9 @@ public class MainActivity extends AppCompatActivity {
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
                 * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        double distance = R * c; // Distanz in Kilometern
+        double distance = R * c; // Distance in kilometers
         
-        return distance * 1000; // Rückgabe in Metern
+        return distance * 1000; // Return in meters
     }
 
     private void loadAndDisplayAvailableNetworks() {
@@ -379,14 +379,14 @@ public class MainActivity extends AppCompatActivity {
                 displayResults(availableNetworks);
                 statusText.setText("Auto-loaded " + availableNetworks.size() + " networks");
                 
-                // Sofort speichern
+                //Save immediately
                 Location location = getLocationForSaving();
                 saveData(availableNetworks, location);
             } else {
                 statusText.setText("No networks currently available");
-                // Aktualisiere Info-Zusammenfassung auch bei leeren Ergebnissen
+                // Update information summary even if results are empty.
                 updateInfoSummary(0, 0);
-                // Versuche einen ersten Scan zu starten
+                // Try starting an initial scan.
                 if (wifiManager.isWifiEnabled()) {
                     wifiManager.startScan();
                     statusText.setText("Searching for networks...");
@@ -453,7 +453,7 @@ public class MainActivity extends AppCompatActivity {
             }
             if (allGranted) {
                 statusText.setText("Permissions granted - ready to scan");
-                // Nach Berechtigung sofort Netzwerke laden
+                // Once authorized, immediately load networks.
                 loadAndDisplayAvailableNetworks();
             } else {
                 statusText.setText("Permissions denied - cannot scan");
@@ -490,11 +490,11 @@ public class MainActivity extends AppCompatActivity {
         
         loadAndDisplayAvailableNetworks();
         
-        // Starte Background Service für kontinuierliches Scanning
+        // Start Background Service for continuous scanning
         Intent serviceIntent = new Intent(this, ScanService.class);
         serviceIntent.putExtra("bluetooth_enabled", isBluetoothScanningEnabled);
         
-        // Datenbankpfad an Service weitergeban
+        // Database path passed on to service
         if (isUsingExternalDatabase && currentDatabasePath != null) {
             serviceIntent.putExtra("database_path", currentDatabasePath);
         }
@@ -502,7 +502,7 @@ public class MainActivity extends AppCompatActivity {
         startForegroundService(serviceIntent);
     addLogMessage("Background service started");
         
-        // Starte auch lokales Scanning für UI Updates
+        // Also start local scanning for UI updates
         handler.removeCallbacks(scanRunnable);
         handler.post(scanRunnable);
         startLocationUpdates();
@@ -532,7 +532,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void startWifiScan() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            // Immer zuerst vorhandene Ergebnisse abrufen und anzeigen
+            // Always retrieve and display existing results first.
             List<ScanResult> cachedResults = wifiManager.getScanResults();
             if (cachedResults != null && !cachedResults.isEmpty()) {
                 displayResults(cachedResults);
@@ -540,14 +540,14 @@ public class MainActivity extends AppCompatActivity {
                     statusText.setText(String.format(getString(R.string.current_networks_updating), cachedResults.size()));
                 }
                 
-                // Diese Ergebnisse auch speichern
+                // Also save these results
                 Location location = getLocationForSaving();
                 if (location != null) {
                     saveData(cachedResults, location);
                 }
             }
             
-            // Versuche neuen Scan nur wenn genug Zeit vergangen ist
+            // Only attempt a new scan if enough time has passed.
             long currentTime = System.currentTimeMillis();
             if (currentTime - lastScanTime >= MIN_SCAN_INTERVAL) {
                 lastScanTime = currentTime;
@@ -636,7 +636,7 @@ public class MainActivity extends AppCompatActivity {
     }
     
     private void displayResults(List<ScanResult> results) {
-        // Nur aktualisieren wenn nicht in "Show Data" Modus
+        // Only update when not in "Show Data" mode
         if (isShowingStoredData) {
             return;
         }
@@ -648,46 +648,46 @@ public class MainActivity extends AppCompatActivity {
                 ssid = "[Hidden Network]";
             }
             String capabilities = result.capabilities;
-            String verschluesselung = "offen";
+            String encrypted = "open";
             if (capabilities != null && !capabilities.isEmpty() && !capabilities.equals("[]")) {
                 if (capabilities.contains("WEP") || capabilities.contains("WPA") || capabilities.contains("EAP")) {
-                    verschluesselung = "verschlüsselt";
+                    encrypted = "encrypted";
                 }
             }
             String data = "SSID: " + ssid +
                     ", Signal: " + result.level + " dBm" +
                     ", Freq: " + result.frequency + " MHz" +
-                    ", Status: " + verschluesselung;
+                    ", Status: " + encrypted;
             dataList.add(data);
         }
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, dataList);
         dataListView.setAdapter(adapter);
         
-        // Aktualisiere Info-Zusammenfassung
-        updateInfoSummary(results.size(), 0); // WiFi aktiv, BT aktiv
+        // Update information summary
+        updateInfoSummary(results.size(), 0); // WiFi active, BT active
     }
 
-    // Info-Zusammenfassung aktualisieren
+    // Update information summary
     private void updateInfoSummary(int activeWifi, int activeBluetooth) {
-        // Hole Gesamtzahlen aus der Datenbank
+        // Retrieve total figures from the database
         int totalWifi = 0;
         int totalBluetooth = 0;
         
-        // Zähle WiFi-Geräte in DB
+        // Count WiFi devices in DB
         Cursor wifiCursor = database.rawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'WIFI'", null);
         if (wifiCursor.moveToFirst()) {
             totalWifi = wifiCursor.getInt(0);
         }
         wifiCursor.close();
         
-        // Zähle Bluetooth-Geräte in DB
+        // Count Bluetooth devices in DB
         Cursor bluetoothCursor = database.rawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'BLUETOOTH'", null);
         if (bluetoothCursor.moveToFirst()) {
             totalBluetooth = bluetoothCursor.getInt(0);
         }
         bluetoothCursor.close();
         
-        // Zähle alte WiFi-Daten falls vorhanden
+        // Count old WiFi data if available.
         Cursor oldWifiCursor = database.rawQuery("SELECT COUNT(*) FROM wifi_data", null);
         int oldWifiCount = 0;
         if (oldWifiCursor.moveToFirst()) {
@@ -723,7 +723,7 @@ public class MainActivity extends AppCompatActivity {
     private final LocationListener locationListener = new LocationListener() {
         @Override
         public void onLocationChanged(Location location) {
-            // Speichert die aktuelle Position in der Datenbank zusammen mit WLAN-Daten
+            // Saves the current position in the database along with Wi-Fi data.
         }
         @Override
         public void onStatusChanged(String provider, int status, Bundle extras) {}
@@ -747,7 +747,7 @@ public class MainActivity extends AppCompatActivity {
                         }
                         addLogMessage(String.format(getString(R.string.wifi_scan_successful), results.size()));
                         
-                        // Speichern der neuen Ergebnisse
+                        // Save the new results
                         Location location = getLocationForSaving();
                         saveData(results, location);
                     } else {
@@ -758,11 +758,11 @@ public class MainActivity extends AppCompatActivity {
                     }
                 } else {
                     if (!isShowingStoredData) {
-                        statusText.setText("Scan vollständig, aber keine Berechtigung");
+                        statusText.setText("Scan complete, but no authorization");
                     }
                 }
             } else {
-                // Scan fehlgeschlagen - trotzdem Cache verwenden
+                // Scan failed - use cache anyway
                 List<ScanResult> cachedResults = wifiManager.getScanResults();
                 if (cachedResults != null && !cachedResults.isEmpty()) {
                     displayResults(cachedResults);
@@ -770,20 +770,20 @@ public class MainActivity extends AppCompatActivity {
                         statusText.setText(String.format(getString(R.string.scan_update_failed), cachedResults.size()));
                     }
                     
-                    // Cache-Ergebnisse trotzdem speichern falls sie neu sind
+                    // Save cached results anyway if they are new
                     Location location = getLocationForSaving();
                     saveData(cachedResults, location);
                 } else {
                     if (!isShowingStoredData) {
-                        statusText.setText("Scan fehlgeschlagen - starte neuen Versuch...");
+                        statusText.setText("Scan failed - starting a new attempt...");
                     }
-                    // Versuche sofort einen neuen Scan
+                    // Try a new scan immediately
                     if (wifiManager.isWifiEnabled()) {
                         try {
                             wifiManager.startScan();
                         } catch (Exception e) {
                             if (!isShowingStoredData) {
-                                statusText.setText("WiFi-Scan blockiert - Android-Limitierung");
+                                statusText.setText("WiFi scan blocked - Android limitation");
                             }
                         }
                     }
@@ -810,9 +810,9 @@ public class MainActivity extends AppCompatActivity {
                                 deviceName = "Unknown Device";
                             }
                             
-                            addLogMessage("Bluetooth gefunden: " + deviceName + " (" + deviceAddress + ") RSSI: " + rssi);
+                            addLogMessage("Bluetooth found:" + deviceName + " (" + deviceAddress + ") RSSI: " + rssi);
                             
-                            // Speichere Bluetooth-Gerät in die Datenbank
+                            // Save Bluetooth device to database
                             Location location = getLocationForSaving();
                             if (location != null) {
                                 String deviceClass = "";
@@ -850,14 +850,14 @@ public class MainActivity extends AppCompatActivity {
         List<String> dataList = new ArrayList<>();
         for (ScanResult result : results) {
             String capabilities = result.capabilities;
-            String verschluesselung = "offen";
+            String encryption = "open";
             if (capabilities != null && !capabilities.equals("") && !capabilities.equals("[]")) {
                 if (capabilities.contains("WEP") || capabilities.contains("WPA") || capabilities.contains("EAP")) {
-                    verschluesselung = "verschlüsselt";
+                    encryption = "encrypted";
                 }
             }
             
-            // Erweiterte WiFi-Daten extrahieren
+            // Extract extended WiFi data
             int frequency = result.frequency;
             int channel = getWiFiChannel(frequency);
             String wifiStandard = getWiFiStandard(result);
@@ -871,7 +871,7 @@ public class MainActivity extends AppCompatActivity {
             }
             int maxSpeed = estimateMaxSpeed(result);
             
-            // Prüfe nur in wifi_data Tabelle, ob BSSID schon existiert
+            // Only check the wifi_data table to see if the BSSID already exists.
             Cursor cursor = database.rawQuery("SELECT signal_strength FROM wifi_data WHERE bssid = ?", new String[]{result.BSSID});
             boolean update = false;
             if (cursor.moveToFirst()) {
@@ -882,17 +882,17 @@ public class MainActivity extends AppCompatActivity {
             }
             cursor.close();
             
-            // WiFi nur in wifi_data Tabelle speichern
+            // Store WiFi data only in the wifi_data table
             if (update) {
-                database.execSQL("UPDATE wifi_data SET ssid=?, signal_strength=?, verschluesselung=?, latitude=?, longitude=?, timestamp=?, frequency=?, channel=?, capabilities=?, wifi_standard=?, vendor_info=?, channel_width=?, center_freq0=?, center_freq1=?, max_connection_speed=? WHERE bssid=?",
-                        new Object[]{result.SSID, result.level, verschluesselung, location.getLatitude(), location.getLongitude(), System.currentTimeMillis(), frequency, channel, capabilities, wifiStandard, vendorInfo, channelWidth, centerFreq0, centerFreq1, maxSpeed, result.BSSID});
+                database.execSQL("UPDATE wifi_data SET ssid=?, signal_strength=?, encryption=?, latitude=?, longitude=?, timestamp=?, frequency=?, channel=?, capabilities=?, wifi_standard=?, vendor_info=?, channel_width=?, center_freq0=?, center_freq1=?, max_connection_speed=? WHERE bssid=?",
+                        new Object[]{result.SSID, result.level, encryption, location.getLatitude(), location.getLongitude(), System.currentTimeMillis(), frequency, channel, capabilities, wifiStandard, vendorInfo, channelWidth, centerFreq0, centerFreq1, maxSpeed, result.BSSID});
             } else if (!existsInDb(result.BSSID)) {
-                database.execSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, verschluesselung, latitude, longitude, timestamp, frequency, channel, capabilities, wifi_standard, vendor_info, channel_width, center_freq0, center_freq1, max_connection_speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        new Object[]{result.SSID, result.BSSID, result.level, verschluesselung, location.getLatitude(), location.getLongitude(), System.currentTimeMillis(), frequency, channel, capabilities, wifiStandard, vendorInfo, channelWidth, centerFreq0, centerFreq1, maxSpeed});
+                database.execSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp, frequency, channel, capabilities, wifi_standard, vendor_info, channel_width, center_freq0, center_freq1, max_connection_speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        new Object[]{result.SSID, result.BSSID, result.level, encryption, location.getLatitude(), location.getLongitude(), System.currentTimeMillis(), frequency, channel, capabilities, wifiStandard, vendorInfo, channelWidth, centerFreq0, centerFreq1, maxSpeed});
             }
             
-            // Zusätzlich WiFi-Gerät auch in device_data speichern für Bewegungsanalyse
-            saveWifiDeviceForMovementTracking(result.SSID, result.BSSID, result.level, verschluesselung, location, frequency, channel, wifiStandard, vendorInfo, channelWidth, maxSpeed);
+            // Additionally, store the WiFi device information in device_data for motion analysis.
+            saveWifiDeviceForMovementTracking(result.SSID, result.BSSID, result.level, encryption, location, frequency, channel, wifiStandard, vendorInfo, channelWidth, maxSpeed);
             
             String data = "SSID: " + result.SSID +
                     ", BSSID: " + result.BSSID +
@@ -900,7 +900,7 @@ public class MainActivity extends AppCompatActivity {
                     ", Freq: " + frequency + " MHz" +
                     ", Ch: " + channel +
                     ", Standard: " + wifiStandard +
-                    ", " + verschluesselung +
+                    ", " + encryption +
                     ", Speed: " + maxSpeed + " Mbps" +
                     ", Vendor: " + vendorInfo +
                     ", ChWidth: " + channelWidth + " MHz" +
@@ -910,7 +910,7 @@ public class MainActivity extends AppCompatActivity {
         }
         statusText.setText(String.format(getString(R.string.data_saved), results.size()));
         addLogMessage(String.format(getString(R.string.data_saved), results.size()));
-        // Zeige aktuelle Netzwerke direkt an - nur wenn nicht in Show Data Modus
+        // Display current networks directly - only when not in Show Data mode
         if (!isShowingStoredData) {
             ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, dataList);
             dataListView.setAdapter(adapter);
@@ -919,7 +919,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveBluetoothDevice(String deviceName, String deviceAddress, int rssi, String deviceClass, Location location) {
-        // Prüfe, ob Bluetooth-Gerät schon existiert und bessere Signalstärke hat
+        // Check if a Bluetooth device already exists and has a better signal strength.
         Cursor cursor = database.rawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'BLUETOOTH'", new String[]{deviceAddress});
         boolean update = false;
         boolean exists = false;
@@ -944,14 +944,14 @@ public class MainActivity extends AppCompatActivity {
             double currentLon = location.getLongitude();
             long currentTimestamp = System.currentTimeMillis();
             
-            // Berechne Bewegungsdistanz falls vorherige Position vorhanden
+            // Calculate movement distance if previous position exists
             Double movementDistance = null;
             if (exists && lastLat != 0 && lastLon != 0) {
                 movementDistance = calculateDistance(lastLat, lastLon, currentLat, currentLon);
             }
             
             if (update) {
-                // Update mit Bewegungsdaten
+                // Update with movement data
                 if (movementDistance != null) {
                     database.execSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
                             "last_seen_latitude=latitude, last_seen_longitude=longitude, last_seen_timestamp=timestamp, " +
@@ -963,17 +963,17 @@ public class MainActivity extends AppCompatActivity {
                             new Object[]{deviceName, rssi, deviceClass, currentLat, currentLon, currentTimestamp, deviceAddress});
                 }
             } else {
-                // Neuer Eintrag
+                // New entry
                 database.execSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                         new Object[]{deviceName, deviceAddress, "BLUETOOTH", rssi, deviceClass, currentLat, currentLon, currentTimestamp});
             }
         }
     }
     
-    // WiFi-Gerät für Bewegungsanalyse in device_data Tabelle speichern/aktualisieren
+    // Save/update WiFi device for motion analysis in the device_data table
     private void saveWifiDeviceForMovementTracking(String ssid, String bssid, int signal, String encryption, Location location, 
                                                   int frequency, int channel, String standard, String vendor, int channelWidth, int maxSpeed) {
-        // Prüfe, ob WiFi-Gerät in device_data schon existiert
+        // Check if the WiFi device already exists in device_data.
         Cursor cursor = database.rawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'WIFI'", new String[]{bssid});
         boolean update = false;
         boolean exists = false;
@@ -998,14 +998,14 @@ public class MainActivity extends AppCompatActivity {
             double currentLon = location.getLongitude();
             long currentTimestamp = System.currentTimeMillis();
             
-            // Berechne Bewegungsdistanz falls vorherige Position vorhanden
+            // Calculate movement distance if previous position exists
             Double movementDistance = null;
             if (exists && lastLat != 0 && lastLon != 0) {
                 movementDistance = calculateDistance(lastLat, lastLon, currentLat, currentLon);
             }
             
             if (update) {
-                // Update mit Bewegungsdaten
+                // Update with movement data
                 if (movementDistance != null) {
                     database.execSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
                             "frequency=?, channel=?, wifi_standard=?, vendor_info=?, channel_width=?, max_connection_speed=?, " +
@@ -1023,7 +1023,7 @@ public class MainActivity extends AppCompatActivity {
                                        currentLat, currentLon, currentTimestamp, bssid});
                 }
             } else {
-                // Neuer Eintrag
+                // New entry
                 database.execSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, " +
                         "frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed, " +
                         "latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -1033,7 +1033,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // Hilfsfunktion: Prüft, ob BSSID schon in der DB ist
+    // Auxiliary function: Checks if BSSID is already in the database.
     private boolean existsInDb(String bssid) {
         Cursor cursor = database.rawQuery("SELECT 1 FROM wifi_data WHERE bssid = ? LIMIT 1", new String[]{bssid});
         boolean exists = cursor.moveToFirst();
@@ -1050,9 +1050,10 @@ public class MainActivity extends AppCompatActivity {
 
     private void showData() {
         List<String> dataList = new ArrayList<>();
-        
-        // Zeige sowohl alte WiFi-Daten als auch neue vereinheitlichte Daten
-        // Erst die neuen device_data Daten
+
+        // Show both old Wi-Fi data and new unified data
+        // Show new device_data data first
+
         Cursor deviceCursor = database.rawQuery("SELECT * FROM device_data ORDER BY device_type, device_name", null);
         if (deviceCursor.moveToFirst()) {
             int nameIdx = deviceCursor.getColumnIndexOrThrow("device_name");
@@ -1063,7 +1064,7 @@ public class MainActivity extends AppCompatActivity {
             int lonIdx = deviceCursor.getColumnIndexOrThrow("longitude");
             int timeIdx = deviceCursor.getColumnIndexOrThrow("timestamp");
             
-            // Erweiterte WiFi-Felder
+            // Extended WiFi fields
             int freqIdx = deviceCursor.getColumnIndex("frequency");
             int channelIdx = deviceCursor.getColumnIndex("channel");
             int wifiStandardIdx = deviceCursor.getColumnIndex("wifi_standard");
@@ -1076,7 +1077,7 @@ public class MainActivity extends AppCompatActivity {
                 String data;
                 
                 if ("WIFI".equals(type) && freqIdx >= 0) {
-                    // Erweiterte WiFi-Anzeige
+                    // Advanced WiFi display
                     int frequency = freqIdx >= 0 ? deviceCursor.getInt(freqIdx) : 0;
                     int channel = channelIdx >= 0 ? deviceCursor.getInt(channelIdx) : 0;
                     String wifiStandard = wifiStandardIdx >= 0 ? deviceCursor.getString(wifiStandardIdx) : "N/A";
@@ -1096,7 +1097,7 @@ public class MainActivity extends AppCompatActivity {
                             ", Lat: " + String.format("%.4f", deviceCursor.getDouble(latIdx)) +
                             ", Lon: " + String.format("%.4f", deviceCursor.getDouble(lonIdx));
                 } else {
-                    // Standard-Anzeige für Bluetooth und alte WiFi-Daten
+                    // Standard display for Bluetooth and old WiFi data
                     data = "[" + type + "] " + deviceCursor.getString(nameIdx) +
                             ", Addr: " + deviceCursor.getString(addressIdx) +
                             ", Signal: " + deviceCursor.getInt(signalIdx) +
@@ -1109,7 +1110,7 @@ public class MainActivity extends AppCompatActivity {
         }
         deviceCursor.close();
         
-        // Falls noch alte WiFi-Daten vorhanden sind, die nicht migriert wurden
+        // If there are still old WiFi data files that have not been migrated
         Cursor wifiCursor = database.rawQuery("SELECT * FROM wifi_data WHERE bssid NOT IN (SELECT device_address FROM device_data WHERE device_type = 'WIFI')", null);
         if (wifiCursor.moveToFirst()) {
             int ssidIdx = wifiCursor.getColumnIndexOrThrow("ssid");
@@ -1119,7 +1120,7 @@ public class MainActivity extends AppCompatActivity {
             int lonIdx = wifiCursor.getColumnIndexOrThrow("longitude");
             int timeIdx = wifiCursor.getColumnIndexOrThrow("timestamp");
             
-            // Prüfe ob erweiterte Felder verfügbar sind
+            // Check if extended fields are available.
             int freqIdx = wifiCursor.getColumnIndex("frequency");
             int channelIdx = wifiCursor.getColumnIndex("channel");
             int wifiStandardIdx = wifiCursor.getColumnIndex("wifi_standard");
@@ -1130,7 +1131,7 @@ public class MainActivity extends AppCompatActivity {
             do {
                 String data;
                 if (freqIdx >= 0) {
-                    // Erweiterte WiFi-Anzeige für migierte legacy Daten
+                    // Enhanced WiFi display for migrated legacy data
                     int frequency = wifiCursor.getInt(freqIdx);
                     int channel = channelIdx >= 0 ? wifiCursor.getInt(channelIdx) : 0;
                     String wifiStandard = wifiStandardIdx >= 0 ? wifiCursor.getString(wifiStandardIdx) : "N/A";
@@ -1150,7 +1151,7 @@ public class MainActivity extends AppCompatActivity {
                             ", Lat: " + String.format("%.4f", wifiCursor.getDouble(latIdx)) +
                             ", Lon: " + String.format("%.4f", wifiCursor.getDouble(lonIdx));
                 } else {
-                    // Alte Anzeige für wirklich alte Daten ohne erweiterte Felder
+                    // Old display for really old data without extended fields
                     data = "[WIFI-OLD] " + wifiCursor.getString(ssidIdx) +
                             ", BSSID: " + wifiCursor.getString(bssidIdx) +
                             ", Signal: " + wifiCursor.getInt(signalIdx) + " dBm" +
@@ -1166,16 +1167,16 @@ public class MainActivity extends AppCompatActivity {
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, dataList);
         dataListView.setAdapter(adapter);
         
-        // Info-Zusammenfassung für Show Data Modus aktualisieren
-        updateInfoSummary(0, 0); // Keine aktiven, nur Gesamt
+        // Update information summary for Show Data mode
+        updateInfoSummary(0, 0); // No active, only total
     }
 
-    // Popup mit weiteren Aktionen
+    // Popup with further actions
     private void showMoreDialog() {
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
         builder.setTitle(R.string.more_actions);
 
-        // Vereinfachte Liste da alle DBs in interne DB übertragen werden
+        // Simplified list because all databases are transferred to an internal database.
         String[] items = {
             getString(R.string.save_db_as_file),
             getString(R.string.delete_database),
@@ -1185,16 +1186,16 @@ public class MainActivity extends AppCompatActivity {
         
         builder.setItems(items, (dialog, which) -> {
             switch(which) {
-                case 0: // DB als Datei speichern
+                case 0: // Save DB as a file
                     exportDatabase();
                     break;
-                case 1: // Datenbank löschen
+                case 1: // Delete database
                     clearDatabase();
                     break;
-                case 2: // Anzahl Netzwerke anzeigen
+                case 2: // Show number of networks
                     showNetworkCount();
                     break;
-                case 3: // Externe DB importieren
+                case 3: // Import external DB
                     selectExternalDatabaseAsActive();
                     break;
             }
@@ -1202,15 +1203,15 @@ public class MainActivity extends AppCompatActivity {
         builder.show();
     }
 
-    // Nicht mehr benötigt - alle DBs werden in die interne DB übertragen
+    // No longer needed - all databases are transferred to the internal database.
 
-    // DB als Datei exportieren
+    // Export database as file
     private void exportDatabase() {
-        // Zeitstempel für eindeutigen Dateinamen
+        // Timestamp for unique file names
         String timestamp = String.valueOf(System.currentTimeMillis());
         String fileName = "wifiscannerexport_" + timestamp + ".db";
         
-        // Nutzer wählt Speicherort mit eindeutigem Dateinamen
+        // User selects storage location with unique file name
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType("application/octet-stream");
@@ -1235,9 +1236,9 @@ public class MainActivity extends AppCompatActivity {
                     }
                     inStream.close();
                     outStream.close();
-                    Toast.makeText(this, "DB exportiert!", Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "DB exported!", Toast.LENGTH_LONG).show();
                 } catch (Exception e) {
-                    Toast.makeText(this, "Export fehlgeschlagen: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Export failed:" + e.getMessage(), Toast.LENGTH_LONG).show();
                 }
             }
         } else if (requestCode == IMPORT_DB_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
@@ -1253,7 +1254,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // DB löschen
+    // Delete DB
     private void clearDatabase() {
         database.execSQL("DELETE FROM wifi_data");
         database.execSQL("DELETE FROM device_data");
@@ -1261,7 +1262,7 @@ public class MainActivity extends AppCompatActivity {
         showData();
     }
 
-    // Externe Datenbank auswählen
+    // Select external database
     private void selectExternalDatabase() {
         Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -1270,7 +1271,7 @@ public class MainActivity extends AppCompatActivity {
         startActivityForResult(intent, IMPORT_DB_REQUEST_CODE);
     }
 
-    // Externe Datenbank als aktive DB auswählen
+    // Select external database as active DB
     private void selectExternalDatabaseAsActive() {
         if (isScanning) {
               Toast.makeText(this, "Please stop scanning first!", Toast.LENGTH_LONG).show();
@@ -1284,13 +1285,13 @@ public class MainActivity extends AppCompatActivity {
         startActivityForResult(intent, IMPORT_ACTIVE_DB_REQUEST_CODE);
     }
 
-    // Externe Datenbank laden und Karte anzeigen
+    // Load external database and display map
     private void loadExternalDatabaseAndShowMap(android.net.Uri uri) {
         try {
-            // Temporäre Datei erstellen
+            // Create temporary file
             java.io.File tempFile = new java.io.File(getCacheDir(), "temp_external.db");
             
-            // Datenbank kopieren
+            // Copy database
             java.io.InputStream inStream = getContentResolver().openInputStream(uri);
             java.io.FileOutputStream outStream = new java.io.FileOutputStream(tempFile);
             
@@ -1302,17 +1303,17 @@ public class MainActivity extends AppCompatActivity {
             inStream.close();
             outStream.close();
             
-            // Prüfen ob es eine gültige SQLite-Datenbank ist
+            // Check if it is a valid SQLite database.
             SQLiteDatabase testDb = null;
             try {
                 testDb = SQLiteDatabase.openDatabase(tempFile.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
                 
-                // Prüfe ob relevante Tabellen vorhanden sind
+                // Check if relevant tables are available.
                 boolean hasWifiData = hasTable(testDb, "wifi_data");
                 boolean hasDeviceData = hasTable(testDb, "device_data");
                 
                 if (hasWifiData || hasDeviceData) {
-                    // Zähle verfügbare Daten
+                    // Count available data
                     int wifiCount = 0;
                     int bluetoothCount = 0;
                     
@@ -1334,7 +1335,7 @@ public class MainActivity extends AppCompatActivity {
                     
                     testDb.close();
                     
-                    // Bestätigung anzeigen
+                    // Show confirmation
                     String message = String.format(getString(R.string.external_db_loaded),
                                                  wifiCount, bluetoothCount);
 
@@ -1342,20 +1343,20 @@ public class MainActivity extends AppCompatActivity {
                     builder.setTitle(R.string.external_database)
                            .setMessage(message)
                            .setPositiveButton(R.string.open_map, (dialog, which) -> {
-                               // Karte mit externer DB öffnen
+                               // Open map with external database
                                Intent mapIntent = new Intent(MainActivity.this, MapActivity.class);
                                mapIntent.putExtra("external_db_path", tempFile.getAbsolutePath());
                                startActivity(mapIntent);
                            })
                            .setNegativeButton(R.string.cancel, (dialog, which) -> {
-                               // Temp-Datei löschen
+                               // Delete temp file
                                if (tempFile.exists()) {
                                    tempFile.delete();
                                }
                            })
                            .show();
                            
-                    addLogMessage("Externe DB geladen: " + wifiCount + " WiFi, " + bluetoothCount + " BT");
+                    addLogMessage("External DB loaded: " + wifiCount + " WiFi, " + bluetoothCount + " BT");
                     
                 } else {
                         Toast.makeText(this, "No WiFi/Bluetooth data found in the database!", Toast.LENGTH_LONG).show();
@@ -1374,7 +1375,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
     
-    // Hilfsmethode: Prüft ob Tabelle existiert
+    // Auxiliary method: Checks if table exists
     private boolean hasTable(SQLiteDatabase db, String tableName) {
         android.database.Cursor cursor = db.rawQuery("SELECT name FROM sqlite_master WHERE type='table' AND name=?", new String[]{tableName});
         boolean exists = cursor.moveToFirst();
@@ -1382,18 +1383,18 @@ public class MainActivity extends AppCompatActivity {
         return exists;
     }
 
-    // Externe Datenbank als aktive Datenbank laden
+    // Load external database as active database
     private void loadExternalDatabaseAsActive(android.net.Uri uri) {
         try {
-            // Permanente Datei im App-Verzeichnis erstellen
+            // Create a permanent file in the app directory
             java.io.File externalDbFile = new java.io.File(getFilesDir(), "external_active.db");
             
-            // Alte externe DB löschen falls vorhanden
+            // Delete old external databases if present.
             if (externalDbFile.exists()) {
                 externalDbFile.delete();
             }
             
-            // Datenbank kopieren
+            // Copy database
             java.io.InputStream inStream = getContentResolver().openInputStream(uri);
             java.io.FileOutputStream outStream = new java.io.FileOutputStream(externalDbFile);
             
@@ -1405,28 +1406,28 @@ public class MainActivity extends AppCompatActivity {
             inStream.close();
             outStream.close();
             
-            // Prüfen ob es eine gültige SQLite-Datenbank ist
+            // Check if it is a valid SQLite database.
             SQLiteDatabase testDb = null;
             try {
                 testDb = SQLiteDatabase.openDatabase(externalDbFile.getAbsolutePath(), null, SQLiteDatabase.OPEN_READWRITE);
                 
-                // Prüfe und erstelle fehlende Tabellen
+                // Check and create missing tables
                 boolean hasWifiData = hasTable(testDb, "wifi_data");
                 boolean hasDeviceData = hasTable(testDb, "device_data");
                 
                 if (!hasWifiData) {
-                    // wifi_data Tabelle erstellen
+                    // Create wifi_data table
                     testDb.execSQL(DatabaseHelper.CREATE_WIFI_TABLE);
-                    addLogMessage("wifi_data Tabelle in externer DB erstellt");
+                    addLogMessage("wifi_data table created in external database");
                 }
                 
                 if (!hasDeviceData) {
-                    // device_data Tabelle erstellen
+                    // Create device_data table
                     testDb.execSQL(DatabaseHelper.CREATE_DEVICE_TABLE);
-                    addLogMessage("device_data Tabelle in externer DB erstellt");
+                    addLogMessage("device_data table created in external database");
                 }
                 
-                // Zähle verfügbare Daten
+                // Count available data
                 int wifiCountTemp = 0;
                 int bluetoothCountTemp = 0;
                 
@@ -1444,11 +1445,11 @@ public class MainActivity extends AppCompatActivity {
                 
                 testDb.close();
                 
-                // Final Variablen für Lambda
+                //Final variables for Lambda
                 final int wifiCount = wifiCountTemp;
                 final int bluetoothCount = bluetoothCountTemp;
                 
-                // Bestätigung anzeigen
+                // Show confirmation
                 String message = String.format(getString(R.string.load_external_db),
                                              wifiCount, bluetoothCount);
 
@@ -1456,11 +1457,11 @@ public class MainActivity extends AppCompatActivity {
                 builder.setTitle(R.string.external_db_as_active)
                        .setMessage(message)
                        .setPositiveButton(R.string.yes_activate, (dialog, which) -> {
-                           // Wechsle zur externen Datenbank
+                           // Switch to the external database
                            switchToExternalDatabase(externalDbFile.getAbsolutePath(), wifiCount, bluetoothCount);
                        })
                        .setNegativeButton(R.string.cancel, (dialog, which) -> {
-                           // Externe Datei löschen
+                           // Delete external file
                            if (externalDbFile.exists()) {
                                externalDbFile.delete();
                            }
@@ -1479,19 +1480,19 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // Wechselt zur externen Datenbank als aktive Datenbank
+    // Switches to the external database as the active database
     private void switchToExternalDatabase(String dbPath, int wifiCount, int bluetoothCount) {
         try {
-            // Externe Datenbank öffnen (nur zum Lesen)
+            // Open external database (read-only)
             SQLiteDatabase externalDb = SQLiteDatabase.openDatabase(dbPath, null, SQLiteDatabase.OPEN_READONLY);
             
-            // Alle Daten aus der externen DB in die interne DB kopieren
+            // Copy all data from the external database to the internal database
             copyDataFromExternalToInternal(externalDb);
             
-            // Externe DB schließen
+            // Close external DB
             externalDb.close();
             
-            // Status zurücksetzen - wir verwenden weiterhin die interne DB
+            // Reset status - we will continue to use the internal database
             isUsingExternalDatabase = false;
             currentDatabasePath = null;
             
@@ -1526,14 +1527,14 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // Kopiert alle Daten aus der externen DB in die interne DB
+    // Copies all data from the external database to the internal database.
     private void copyDataFromExternalToInternal(SQLiteDatabase externalDb) {
         int copiedWifi = 0;
         int copiedBluetooth = 0;
         int copiedLegacyWifi = 0;
         
         try {
-            // 1. Kopiere device_data (WiFi und Bluetooth)
+            //1. Copy device_data (WiFi and Bluetooth)
             android.database.Cursor deviceCursor = externalDb.rawQuery("SELECT * FROM device_data", null);
             if (deviceCursor.moveToFirst()) {
                 do {
@@ -1545,8 +1546,8 @@ public class MainActivity extends AppCompatActivity {
                     double latitude = deviceCursor.getDouble(deviceCursor.getColumnIndexOrThrow("latitude"));
                     double longitude = deviceCursor.getDouble(deviceCursor.getColumnIndexOrThrow("longitude"));
                     long timestamp = deviceCursor.getLong(deviceCursor.getColumnIndexOrThrow("timestamp"));
-                    
-                    // Erweiterte Felder (falls vorhanden)
+
+                    // Extended fields (if available)
                     int frequencyIdx = deviceCursor.getColumnIndex("frequency");
                     int channelIdx = deviceCursor.getColumnIndex("channel");
                     int channelWidthIdx = deviceCursor.getColumnIndex("channel_width");
@@ -1567,9 +1568,9 @@ public class MainActivity extends AppCompatActivity {
                     String vendorInfo = vendorInfoIdx >= 0 ? deviceCursor.getString(vendorInfoIdx) : null;
                     int maxSpeed = maxSpeedIdx >= 0 ? deviceCursor.getInt(maxSpeedIdx) : 0;
                     
-                    // Prüfe ob Gerät bereits existiert
+                    // Check if the device already exists
                     if (!existsInDeviceDb(deviceAddress, deviceType)) {
-                        // Füge Gerät zur internen DB hinzu
+                        // Add device to internal database
                         database.execSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, frequency, channel, channel_width, capabilities, center_freq0, center_freq1, wifi_standard, vendor_info, max_connection_speed, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                                 new Object[]{deviceName, deviceAddress, deviceType, signalStrength, encryptionInfo, frequency, channel, channelWidth, capabilities, centerFreq0, centerFreq1, wifiStandard, vendorInfo, maxSpeed, latitude, longitude, timestamp});
                         
@@ -1583,7 +1584,7 @@ public class MainActivity extends AppCompatActivity {
             }
             deviceCursor.close();
             
-            // 2. Kopiere legacy wifi_data (falls vorhanden)
+            // 2. Copy legacy wifi_data (if it exists)
             if (hasTable(externalDb, "wifi_data")) {
                 android.database.Cursor wifiCursor = externalDb.rawQuery("SELECT * FROM wifi_data", null);
                 if (wifiCursor.moveToFirst()) {
@@ -1591,12 +1592,12 @@ public class MainActivity extends AppCompatActivity {
                         String ssid = wifiCursor.getString(wifiCursor.getColumnIndexOrThrow("ssid"));
                         String bssid = wifiCursor.getString(wifiCursor.getColumnIndexOrThrow("bssid"));
                         int signalStrength = wifiCursor.getInt(wifiCursor.getColumnIndexOrThrow("signal_strength"));
-                        String verschluesselung = wifiCursor.getString(wifiCursor.getColumnIndexOrThrow("verschluesselung"));
+                        String encryption = wifiCursor.getString(wifiCursor.getColumnIndexOrThrow("encryption"));
                         double latitude = wifiCursor.getDouble(wifiCursor.getColumnIndexOrThrow("latitude"));
                         double longitude = wifiCursor.getDouble(wifiCursor.getColumnIndexOrThrow("longitude"));
                         long timestamp = wifiCursor.getLong(wifiCursor.getColumnIndexOrThrow("timestamp"));
                         
-                        // Erweiterte Felder (falls vorhanden)
+                        // Extended fields (if available)
                         int frequencyIdx = wifiCursor.getColumnIndex("frequency");
                         int channelIdx = wifiCursor.getColumnIndex("channel");
                         int capabilitiesIdx = wifiCursor.getColumnIndex("capabilities");
@@ -1617,11 +1618,11 @@ public class MainActivity extends AppCompatActivity {
                         int centerFreq1 = centerFreq1Idx >= 0 ? wifiCursor.getInt(centerFreq1Idx) : 0;
                         int maxSpeed = maxSpeedIdx >= 0 ? wifiCursor.getInt(maxSpeedIdx) : 0;
                         
-                        // Prüfe ob BSSID bereits existiert (in wifi_data oder device_data)
+                        // Check if the BSSID already exists (in wifi_data or device_data)
                         if (!existsInDb(bssid) && !existsInDeviceDb(bssid, "WIFI")) {
-                            // Füge zur wifi_data Tabelle hinzu
-                            database.execSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, verschluesselung, latitude, longitude, timestamp, frequency, channel, capabilities, wifi_standard, vendor_info, channel_width, center_freq0, center_freq1, max_connection_speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                                    new Object[]{ssid, bssid, signalStrength, verschluesselung, latitude, longitude, timestamp, frequency, channel, capabilities, wifiStandard, vendorInfo, channelWidth, centerFreq0, centerFreq1, maxSpeed});
+                            // Add to the wifi_data table
+                            database.execSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp, frequency, channel, capabilities, wifi_standard, vendor_info, channel_width, center_freq0, center_freq1, max_connection_speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                                    new Object[]{ssid, bssid, signalStrength, encryption, latitude, longitude, timestamp, frequency, channel, capabilities, wifiStandard, vendorInfo, channelWidth, centerFreq0, centerFreq1, maxSpeed});
                             copiedLegacyWifi++;
                         }
                     } while (wifiCursor.moveToNext());
@@ -1640,11 +1641,11 @@ public class MainActivity extends AppCompatActivity {
 
         }
 
-    // Hilfsmethoden für Datenbank-Transfer
+    // Auxiliary methods for database transfer
 
-    // Anzahl Netzwerke anzeigen
+    // Show number of networks
     private void showNetworkCount() {
-        // Zähle Geräte aus der neuen device_data Tabelle
+        // Count devices from the new device_data table
         Cursor deviceCursor = database.rawQuery("SELECT COUNT(*) FROM device_data", null);
         int deviceCount = 0;
         if (deviceCursor.moveToFirst()) {
@@ -1652,7 +1653,7 @@ public class MainActivity extends AppCompatActivity {
         }
         deviceCursor.close();
         
-        // Zähle WiFi-Geräte
+        // Count WiFi devices
         Cursor wifiCursor = database.rawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'WIFI'", null);
         int wifiCount = 0;
         if (wifiCursor.moveToFirst()) {
@@ -1660,7 +1661,7 @@ public class MainActivity extends AppCompatActivity {
         }
         wifiCursor.close();
         
-        // Zähle Bluetooth-Geräte
+        // Count Bluetooth devices
         Cursor bluetoothCursor = database.rawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'BLUETOOTH'", null);
         int bluetoothCount = 0;
         if (bluetoothCursor.moveToFirst()) {
@@ -1668,7 +1669,7 @@ public class MainActivity extends AppCompatActivity {
         }
         bluetoothCursor.close();
         
-        // Zähle alte WiFi-Daten
+        // Count old WiFi data
         Cursor oldWifiCursor = database.rawQuery("SELECT COUNT(*) FROM wifi_data", null);
         int oldWifiCount = 0;
         if (oldWifiCursor.moveToFirst()) {
@@ -1689,7 +1690,7 @@ public class MainActivity extends AppCompatActivity {
         unregisterReceiver(wifiScanReceiver);
         unregisterReceiver(bluetoothScanReceiver);
         
-        // Stoppe Background Service nur wenn scanning aktiv war
+        // Stop background service only if scanning was active.
         if (isScanning) {
             Intent serviceIntent = new Intent(this, ScanService.class);
             stopService(serviceIntent);
@@ -1723,25 +1724,25 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // Datenbank-Helferklasse
+    // Database Helper Class
     public static class DatabaseHelper extends SQLiteOpenHelper {
         private static final String DATABASE_NAME = "wifi_scanner.db";
-        private static final int DATABASE_VERSION = 6; // Erhöht für Bewegungsanalyse-Felder
+        private static final int DATABASE_VERSION = 6; // Increased for motion analysis fields
         private static final String CREATE_WIFI_TABLE = "CREATE TABLE wifi_data (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "ssid TEXT, " +
                 "bssid TEXT, " +
                 "signal_strength INTEGER, " +
-                "verschluesselung TEXT, " +
-                "frequency INTEGER, " +     // Frequenz in MHz
-                "channel INTEGER, " +       // WiFi Kanal
-                "capabilities TEXT, " +     // Vollständige Capabilities
+                "encryption TEXT, " +
+                "frequency INTEGER, " +     // Frequency in MHz
+                "channel INTEGER, " +       // WiFi channel
+                "capabilities TEXT, " +     // Full Capabilities
                 "wifi_standard TEXT, " +    // 802.11a/b/g/n/ac/ax
-                "vendor_info TEXT, " +      // Hersteller-Info
-                "channel_width TEXT, " +    // Kanalbreite
+                "vendor_info TEXT, " +      // Manufacturer information
+                "channel_width TEXT, " +    // Channel width
                 "center_freq0 INTEGER, " +  // Center Frequency 0
                 "center_freq1 INTEGER, " +  // Center Frequency 1
-                "max_connection_speed INTEGER, " + // Max Verbindungsgeschwindigkeit
+                "max_connection_speed INTEGER, " + // Max connection speed
                 "latitude REAL, " +
                 "longitude REAL, " +
                 "timestamp INTEGER)";
@@ -1753,14 +1754,14 @@ public class MainActivity extends AppCompatActivity {
                 "device_type TEXT, " +  // 'WIFI' or 'BLUETOOTH'
                 "signal_strength INTEGER, " +
                 "encryption_info TEXT, " +  // WiFi encryption or Bluetooth device class
-                "frequency INTEGER, " +     // WiFi: Frequenz in MHz
-                "channel INTEGER, " +       // WiFi: Kanal
-                "channel_width TEXT, " +    // WiFi: Kanalbreite (20MHz, 40MHz, 80MHz, 160MHz)
-                "capabilities TEXT, " +     // WiFi: Vollständige Capabilities
+                "frequency INTEGER, " +     // WiFi: Frequency in MHz
+                "channel INTEGER, " +       // WiFi: Channel
+                "channel_width TEXT, " +    // WiFi: Channel width (20MHz, 40MHz, 80MHz, 160MHz)
+                "capabilities TEXT, " +     // WiFi: Full Capabilities
                 "center_freq0 INTEGER, " +  // WiFi: Center Frequency 0
                 "center_freq1 INTEGER, " +  // WiFi: Center Frequency 1
                 "wifi_standard TEXT, " +    // WiFi: Standard (802.11a/b/g/n/ac/ax)
-                "vendor_info TEXT, " +       // WiFi: Vendor OUI (erste 3 Bytes der MAC)
+                "vendor_info TEXT, " +       // WiFi: Vendor OUI (first 3 bytes of MAC)
                 "is_passpoint_network INTEGER, " + // WiFi: Hotspot 2.0 Support
                 "operator_friendly_name TEXT, " +  // WiFi: Operator Name
                 "venue_name TEXT, " +       // WiFi: Venue Name
@@ -1768,10 +1769,10 @@ public class MainActivity extends AppCompatActivity {
                 "latitude REAL, " +
                 "longitude REAL, " +
                 "timestamp INTEGER, " +
-                "last_seen_latitude REAL, " +      // Bewegungsanalyse: Letzte bekannte Position
-                "last_seen_longitude REAL, " +     // Bewegungsanalyse: Letzte bekannte Position
-                "last_seen_timestamp INTEGER, " +  // Bewegungsanalyse: Zeitstempel der letzten Sichtung
-                "movement_distance REAL)";          // Bewegungsanalyse: Distanz zwischen erster und letzter Position
+                "last_seen_latitude REAL, " +      // Motion analysis: Last known position
+                "last_seen_longitude REAL, " +     // Motion analysis: Last known position
+                "last_seen_timestamp INTEGER, " +  // Motion analysis: Timestamp of the last sighting
+                "movement_distance REAL)";          // Motion analysis: Distance between first and last position
 
         DatabaseHelper(Context context) {
             super(context, DATABASE_NAME, null, DATABASE_VERSION);
@@ -1800,13 +1801,13 @@ public class MainActivity extends AppCompatActivity {
                 
                 // Copy existing WiFi data to device_data table
                 db.execSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp) " +
-                        "SELECT ssid, bssid, 'WIFI', signal_strength, verschluesselung, latitude, longitude, timestamp FROM wifi_data");
+                        "SELECT ssid, bssid, 'WIFI', signal_strength, encryption, latitude, longitude, timestamp FROM wifi_data");
             }
             
             if (oldVersion < 4) {
-                // Erweitere Tabellen um neue WiFi-Felder
+                // Expand tables to include new WiFi fields.
                 try {
-                    // Erweitere wifi_data Tabelle
+                    // Extend wifi_data table
                     db.execSQL("ALTER TABLE wifi_data ADD COLUMN frequency INTEGER");
                     db.execSQL("ALTER TABLE wifi_data ADD COLUMN channel INTEGER");
                     db.execSQL("ALTER TABLE wifi_data ADD COLUMN capabilities TEXT");
@@ -1817,7 +1818,7 @@ public class MainActivity extends AppCompatActivity {
                     db.execSQL("ALTER TABLE wifi_data ADD COLUMN center_freq1 INTEGER");
                     db.execSQL("ALTER TABLE wifi_data ADD COLUMN max_connection_speed INTEGER");
                     
-                    // Erweitere device_data Tabelle
+                    // Extend device_data table
                     db.execSQL("ALTER TABLE device_data ADD COLUMN frequency INTEGER");
                     db.execSQL("ALTER TABLE device_data ADD COLUMN channel INTEGER");
                     db.execSQL("ALTER TABLE device_data ADD COLUMN channel_width TEXT");
@@ -1831,7 +1832,7 @@ public class MainActivity extends AppCompatActivity {
                     db.execSQL("ALTER TABLE device_data ADD COLUMN venue_name TEXT");
                     db.execSQL("ALTER TABLE device_data ADD COLUMN max_connection_speed INTEGER");
                 } catch (Exception e) {
-                    // Felder existieren bereits oder anderer Fehler
+                    // Fields already exist or other errors
                 }
             }
             
@@ -1847,7 +1848,7 @@ public class MainActivity extends AppCompatActivity {
             }
             
             if (oldVersion < 6) {
-                // Füge Bewegungsanalyse-Felder hinzu
+                // Add motion analysis fields
                 try {
                     db.execSQL("ALTER TABLE device_data ADD COLUMN last_seen_latitude REAL");
                     db.execSQL("ALTER TABLE device_data ADD COLUMN last_seen_longitude REAL");
