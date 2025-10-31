@@ -13,70 +13,108 @@ class DatabaseCombiner:
         self.setup_gui()
     
     def setup_gui(self):
-        """Erstellt die GUI für die Datenbankzusammenführung"""
+        """Creates the GUI for database merging"""
         self.root = tk.Tk()
-        self.root.title("WiFi/Bluetooth Datenbank Combiner")
+        self.root.title("WiFi/Bluetooth Database Combiner")
         self.root.geometry("800x600")
         self.root.resizable(True, True)
-        
-        # Hauptframe
+
+        # Dark Mode Colors
+        self.colors = {
+            'bg': '#1e1e1e',
+            'fg': '#e0e0e0',
+            'bg_dark': '#2b2b2b',
+            'bg_lighter': '#3c3c3c',
+            'accent': '#0d7377',
+            'accent_hover': '#14a098',
+            'text': '#ffffff',
+            'text_muted': '#a0a0a0',
+            'border': '#404040'
+        }
+
+        # Configure root background
+        self.root.configure(bg=self.colors['bg'])
+
+        # Configure ttk styles
+        style = ttk.Style()
+        style.theme_use('clam')
+
+        style.configure('TFrame', background=self.colors['bg'])
+        style.configure('TLabel', background=self.colors['bg'], foreground=self.colors['fg'])
+        style.configure('TButton', background=self.colors['accent'], foreground=self.colors['text'],
+                       borderwidth=1, focuscolor='none', relief='flat')
+        style.map('TButton', background=[('active', self.colors['accent_hover'])])
+        style.configure('TCheckbutton', background=self.colors['bg'], foreground=self.colors['fg'])
+        style.configure('TEntry', fieldbackground=self.colors['bg_lighter'], foreground=self.colors['text'],
+                       bordercolor=self.colors['border'])
+        style.configure('TLabelframe', background=self.colors['bg'], foreground=self.colors['fg'],
+                       bordercolor=self.colors['border'])
+        style.configure('TLabelframe.Label', background=self.colors['bg'], foreground=self.colors['fg'])
+        style.configure('TProgressbar', background=self.colors['accent'], troughcolor=self.colors['bg_dark'])
+
+        # Main frame
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # Titel
-        title_label = ttk.Label(main_frame, text="Datenbank Zusammenführung", 
+        # Title
+        title_label = ttk.Label(main_frame, text="Database Merge",
                                font=("Arial", 16, "bold"))
         title_label.grid(row=0, column=0, columnspan=3, pady=(0, 20))
         
-        # Main Database Sektion
-        ttk.Label(main_frame, text="Haupt-Datenbank (Ziel):", 
+        # Main Database Section
+        ttk.Label(main_frame, text="Main Database (Target):",
                  font=("Arial", 12, "bold")).grid(row=1, column=0, sticky=tk.W, pady=(0, 5))
         
         self.main_db_var = tk.StringVar()
         main_db_entry = ttk.Entry(main_frame, textvariable=self.main_db_var, width=60)
         main_db_entry.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
         
-        ttk.Button(main_frame, text="Auswählen", 
+        ttk.Button(main_frame, text="Select",
                   command=self.select_main_db).grid(row=2, column=2, padx=(5, 0), pady=(0, 5))
         
-        # Source Databases Sektion
-        ttk.Label(main_frame, text="Quell-Datenbanken (hinzufügen):", 
+        # Source Databases Section
+        ttk.Label(main_frame, text="Source Databases (add):",
                  font=("Arial", 12, "bold")).grid(row=3, column=0, sticky=tk.W, pady=(20, 5))
         
-        # Listbox für Quell-DBs
-        self.source_listbox = tk.Listbox(main_frame, height=6, width=80)
+        # Listbox for Source DBs
+        self.source_listbox = tk.Listbox(main_frame, height=6, width=80,
+                                         bg=self.colors['bg_lighter'], fg=self.colors['text'],
+                                         selectbackground=self.colors['accent'],
+                                         selectforeground=self.colors['text'],
+                                         highlightthickness=1, highlightbackground=self.colors['border'],
+                                         borderwidth=0)
         self.source_listbox.grid(row=4, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 5))
-        
-        # Scrollbar für Listbox
+
+        # Scrollbar for Listbox
         scrollbar = ttk.Scrollbar(main_frame, orient=tk.VERTICAL, command=self.source_listbox.yview)
         scrollbar.grid(row=4, column=2, sticky=(tk.N, tk.S), pady=(0, 5))
         self.source_listbox.config(yscrollcommand=scrollbar.set)
         
-        # Buttons für Quell-DBs
+        # Buttons for Source DBs
         source_buttons_frame = ttk.Frame(main_frame)
         source_buttons_frame.grid(row=5, column=0, columnspan=3, pady=(5, 0))
-        
-        ttk.Button(source_buttons_frame, text="DB hinzufügen", 
+
+        ttk.Button(source_buttons_frame, text="Add DB",
                   command=self.add_source_db).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(source_buttons_frame, text="Ausgewählte entfernen", 
+        ttk.Button(source_buttons_frame, text="Remove Selected",
                   command=self.remove_source_db).pack(side=tk.LEFT, padx=(0, 5))
-        ttk.Button(source_buttons_frame, text="Alle entfernen", 
+        ttk.Button(source_buttons_frame, text="Remove All",
                   command=self.clear_source_dbs).pack(side=tk.LEFT)
         
-        # Optionen
-        options_frame = ttk.LabelFrame(main_frame, text="Zusammenführungs-Optionen", padding="10")
+        # Options
+        options_frame = ttk.LabelFrame(main_frame, text="Merge Options", padding="10")
         options_frame.grid(row=6, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(20, 0))
-        
+
         self.backup_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(options_frame, text="Backup der Haupt-DB erstellen", 
+        ttk.Checkbutton(options_frame, text="Create backup of Main DB",
                        variable=self.backup_var).grid(row=0, column=0, sticky=tk.W, pady=(0, 5))
-        
+
         self.signal_priority_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(options_frame, text="Bessere Signalstärke bevorzugen", 
+        ttk.Checkbutton(options_frame, text="Prefer better signal strength",
                        variable=self.signal_priority_var).grid(row=1, column=0, sticky=tk.W, pady=(0, 5))
-        
+
         self.coordinate_update_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(options_frame, text="Koordinaten aktualisieren bei besserem Signal", 
+        ttk.Checkbutton(options_frame, text="Update coordinates with better signal",
                        variable=self.coordinate_update_var).grid(row=2, column=0, sticky=tk.W, pady=(0, 5))
         
         # Progress Bar
@@ -86,7 +124,7 @@ class DatabaseCombiner:
         self.progress_bar.grid(row=7, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=(20, 5))
         
         # Status Label
-        self.status_var = tk.StringVar(value="Bereit zum Start...")
+        self.status_var = tk.StringVar(value="Ready to start...")
         self.status_label = ttk.Label(main_frame, textvariable=self.status_var)
         self.status_label.grid(row=8, column=0, columnspan=3, pady=(0, 10))
         
@@ -94,24 +132,30 @@ class DatabaseCombiner:
         action_frame = ttk.Frame(main_frame)
         action_frame.grid(row=9, column=0, columnspan=3, pady=(10, 0))
         
-        ttk.Button(action_frame, text="🔍 Analyse starten", 
+        ttk.Button(action_frame, text="🔍 Start Analysis",
                   command=self.analyze_databases).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(action_frame, text="🧹 DB bereinigen", 
+        ttk.Button(action_frame, text="🧹 Clean DB",
                   command=self.clean_database).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(action_frame, text="� Repair DB", 
+        ttk.Button(action_frame, text="🔧 Repair DB",
                   command=self.repair_database).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(action_frame, text="�🚀 Zusammenführen", 
+        ttk.Button(action_frame, text="🚀 Merge",
                   command=self.combine_databases).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(action_frame, text="❌ Beenden", 
+        ttk.Button(action_frame, text="❌ Exit",
                   command=self.root.quit).pack(side=tk.LEFT)
         
         # Log Text Area
         log_frame = ttk.LabelFrame(main_frame, text="Log", padding="5")
         log_frame.grid(row=10, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(20, 0))
-        
-        self.log_text = tk.Text(log_frame, height=8, width=80)
+
+        self.log_text = tk.Text(log_frame, height=8, width=80,
+                               bg=self.colors['bg_dark'], fg=self.colors['text'],
+                               insertbackground=self.colors['text'],
+                               selectbackground=self.colors['accent'],
+                               selectforeground=self.colors['text'],
+                               highlightthickness=1, highlightbackground=self.colors['border'],
+                               borderwidth=0)
         self.log_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        
+
         log_scrollbar = ttk.Scrollbar(log_frame, orient=tk.VERTICAL, command=self.log_text.yview)
         log_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
         self.log_text.config(yscrollcommand=log_scrollbar.set)
@@ -125,144 +169,144 @@ class DatabaseCombiner:
         log_frame.rowconfigure(0, weight=1)
     
     def log(self, message):
-        """Fügt eine Nachricht zum Log hinzu"""
+        """Adds a message to the log"""
         timestamp = datetime.now().strftime("%H:%M:%S")
         self.log_text.insert(tk.END, f"[{timestamp}] {message}\n")
         self.log_text.see(tk.END)
         self.root.update()
     
     def select_main_db(self):
-        """Wählt die Haupt-Datenbank aus"""
+        """Selects the Main Database"""
         initial_dir = os.path.dirname(os.path.abspath(__file__))
         file_path = filedialog.askopenfilename(
-            title="Haupt-Datenbank auswählen",
+            title="Select Main Database",
             initialdir=initial_dir,
             filetypes=[("Database files", "*.db"), ("All files", "*.*")]
         )
-        
+
         if file_path:
             self.main_db_path = file_path
             self.main_db_var.set(file_path)
-            self.log(f"Haupt-DB ausgewählt: {os.path.basename(file_path)}")
+            self.log(f"Main DB selected: {os.path.basename(file_path)}")
     
     def add_source_db(self):
-        """Fügt eine Quell-Datenbank hinzu"""
+        """Adds a Source Database"""
         initial_dir = os.path.dirname(os.path.abspath(__file__))
         file_paths = filedialog.askopenfilenames(
-            title="Quell-Datenbank(en) auswählen",
+            title="Select Source Database(s)",
             initialdir=initial_dir,
             filetypes=[("Database files", "*.db"), ("All files", "*.*")]
         )
-        
+
         for file_path in file_paths:
             if file_path not in self.source_db_paths and file_path != self.main_db_path:
                 self.source_db_paths.append(file_path)
                 self.source_listbox.insert(tk.END, file_path)
-                self.log(f"Quell-DB hinzugefügt: {os.path.basename(file_path)}")
+                self.log(f"Source DB added: {os.path.basename(file_path)}")
             elif file_path == self.main_db_path:
-                messagebox.showwarning("Warnung", "Die Haupt-DB kann nicht als Quell-DB verwendet werden!")
+                messagebox.showwarning("Warning", "The Main DB cannot be used as a Source DB!")
     
     def remove_source_db(self):
-        """Entfernt ausgewählte Quell-Datenbank"""
+        """Removes selected Source Database"""
         selection = self.source_listbox.curselection()
         if selection:
             index = selection[0]
             removed_path = self.source_db_paths.pop(index)
             self.source_listbox.delete(index)
-            self.log(f"Quell-DB entfernt: {os.path.basename(removed_path)}")
+            self.log(f"Source DB removed: {os.path.basename(removed_path)}")
     
     def clear_source_dbs(self):
-        """Entfernt alle Quell-Datenbanken"""
+        """Removes all Source Databases"""
         self.source_db_paths.clear()
         self.source_listbox.delete(0, tk.END)
-        self.log("Alle Quell-DBs entfernt")
+        self.log("All Source DBs removed")
     
     def get_table_info(self, db_path):
-        """Ermittelt Informationen über die Tabellen in der Datenbank"""
+        """Gets information about the tables in the database"""
         try:
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
-            
-            # Prüfe verfügbare Tabellen
+
+            # Check available tables
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = [row[0] for row in cursor.fetchall()]
-            
+
             info = {
                 'has_device_data': 'device_data' in tables,
                 'has_wifi_data': 'wifi_data' in tables,
                 'tables': tables
             }
-            
-            # Zähle Einträge
+
+            # Count entries
             if info['has_device_data']:
                 cursor.execute("SELECT COUNT(*) FROM device_data WHERE latitude != 0 AND longitude != 0 AND device_type = 'BLUETOOTH'")
                 info['device_count'] = cursor.fetchone()[0]
             else:
                 info['device_count'] = 0
-            
+
             if info['has_wifi_data']:
                 cursor.execute("SELECT COUNT(*) FROM wifi_data WHERE latitude != 0 AND longitude != 0")
                 info['wifi_count'] = cursor.fetchone()[0]
             else:
                 info['wifi_count'] = 0
-            
+
             conn.close()
             return info
-            
+
         except Exception as e:
-            self.log(f"Fehler beim Analysieren von {os.path.basename(db_path)}: {str(e)}")
+            self.log(f"Error analyzing {os.path.basename(db_path)}: {str(e)}")
             return None
     
     def analyze_databases(self):
-        """Analysiert alle ausgewählten Datenbanken"""
+        """Analyzes all selected databases"""
         if not self.main_db_path:
-            messagebox.showerror("Fehler", "Bitte wählen Sie zuerst eine Haupt-Datenbank aus!")
+            messagebox.showerror("Error", "Please select a Main Database first!")
             return
-        
+
         if not self.source_db_paths:
-            # Nur Haupt-DB analysieren
-            self.log("=== ANALYSE GESTARTET (nur Haupt-DB) ===")
+            # Only analyze Main DB
+            self.log("=== ANALYSIS STARTED (Main DB only) ===")
             main_info = self.get_table_info(self.main_db_path)
             if main_info:
-                self.log(f"Haupt-DB: {main_info['device_count']} Device-Einträge, {main_info['wifi_count']} WiFi-Einträge")
-                self.log(f"Tabellen: {', '.join(main_info['tables'])}")
-            self.log("=== ANALYSE ABGESCHLOSSEN ===")
-            self.status_var.set("Analyse abgeschlossen - Bereit zum Bereinigen")
+                self.log(f"Main DB: {main_info['device_count']} Device entries, {main_info['wifi_count']} WiFi entries")
+                self.log(f"Tables: {', '.join(main_info['tables'])}")
+            self.log("=== ANALYSIS COMPLETED ===")
+            self.status_var.set("Analysis completed - Ready for cleaning")
             return
-        
-        self.log("=== ANALYSE GESTARTET ===")
-        
-        # Analysiere Haupt-DB
-        self.log("Analysiere Haupt-Datenbank...")
+
+        self.log("=== ANALYSIS STARTED ===")
+
+        # Analyze Main DB
+        self.log("Analyzing Main Database...")
         main_info = self.get_table_info(self.main_db_path)
         if main_info:
-            self.log(f"Haupt-DB: {main_info['device_count']} Device-Einträge, {main_info['wifi_count']} WiFi-Einträge")
-            self.log(f"Tabellen: {', '.join(main_info['tables'])}")
-        
-        # Analysiere Quell-DBs
+            self.log(f"Main DB: {main_info['device_count']} Device entries, {main_info['wifi_count']} WiFi entries")
+            self.log(f"Tables: {', '.join(main_info['tables'])}")
+
+        # Analyze Source DBs
         total_source_devices = 0
         total_source_wifi = 0
-        
+
         for i, source_path in enumerate(self.source_db_paths):
-            self.log(f"Analysiere Quell-DB {i+1}/{len(self.source_db_paths)}...")
+            self.log(f"Analyzing Source DB {i+1}/{len(self.source_db_paths)}...")
             source_info = self.get_table_info(source_path)
             if source_info:
                 self.log(f"{os.path.basename(source_path)}: {source_info['device_count']} Device, {source_info['wifi_count']} WiFi")
                 total_source_devices += source_info['device_count']
                 total_source_wifi += source_info['wifi_count']
-        
-        self.log(f"=== ANALYSE ABGESCHLOSSEN ===")
-        self.log(f"Gesamt zu verarbeiten: {total_source_devices} Device-Einträge, {total_source_wifi} WiFi-Einträge")
-        self.status_var.set("Analyse abgeschlossen - Bereit zum Zusammenführen")
+
+        self.log(f"=== ANALYSIS COMPLETED ===")
+        self.log(f"Total to process: {total_source_devices} Device entries, {total_source_wifi} WiFi entries")
+        self.status_var.set("Analysis completed - Ready for merge")
     
     def load_devices_from_db(self, db_path):
-        """Lädt alle Geräte aus einer Datenbank"""
+        """Loads all devices from a database"""
         devices = []
         try:
             conn = sqlite3.connect(db_path)
             cursor = conn.cursor()
-            
-            # Lade aus device_data Tabelle - NUR BLUETOOTH, da WiFi in wifi_data ist
+
+            # Load from device_data table - ONLY BLUETOOTH, since WiFi is in wifi_data
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='device_data'")
             if cursor.fetchone():
                 cursor.execute("""
@@ -274,7 +318,7 @@ class DatabaseCombiner:
                 """)
                 
                 for row in cursor.fetchall():
-                    # Behandle verschiedene Anzahl von Spalten
+                    # Handle different number of columns
                     if len(row) >= 14:
                         device_name, device_address, device_type, signal_strength, encryption_info, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed = row
                     else:
@@ -299,11 +343,11 @@ class DatabaseCombiner:
                         'max_speed': max_speed,
                         'db_source': os.path.basename(db_path)
                     })
-            
-            # Lade aus wifi_data Tabelle
+
+            # Load from wifi_data table
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wifi_data'")
             if cursor.fetchone():
-                # Prüfe verfügbare Spalten
+                # Check available columns
                 cursor.execute("PRAGMA table_info(wifi_data)")
                 columns = [column[1] for column in cursor.fetchall()]
                 has_extended = 'frequency' in columns
@@ -352,38 +396,38 @@ class DatabaseCombiner:
             
             conn.close()
             return devices
-            
+
         except Exception as e:
-            self.log(f"Fehler beim Laden von {os.path.basename(db_path)}: {str(e)}")
+            self.log(f"Error loading from {os.path.basename(db_path)}: {str(e)}")
             return []
     
     def insert_or_update_device(self, cursor, device, existing_devices):
-        """Fügt ein Gerät hinzu oder aktualisiert es mit Bewegungsverfolgung"""
+        """Adds a device or updates it with movement tracking"""
         device_key = f"{device['address']}_{device['type']}"
-        
+
         if device_key in existing_devices:
             existing = existing_devices[device_key]
-            
-            # Berechne Entfernung zwischen alter und neuer Position
+
+            # Calculate distance between old and new position
             old_lat = existing.get('lat', 0)
             old_lon = existing.get('lon', 0)
             new_lat = device.get('lat', 0)
             new_lon = device.get('lon', 0)
-            
+
             if old_lat and old_lon and new_lat and new_lon:
                 distance = self.calculate_distance(old_lat, old_lon, new_lat, new_lon)
-                
-                # Wenn Entfernung < 100m, ignoriere den neuen Eintrag
+
+                # If distance < 100m, ignore the new entry
                 if distance < 100:
                     return 'skipped_too_close'
-                
-                # Vergleiche Signalstärke
+
+                # Compare signal strength
                 current_signal = existing.get('signal', -999)
                 new_signal = device.get('signal', -999)
                 current_timestamp = existing.get('timestamp', 0)
                 new_timestamp = device.get('timestamp', 0)
-                
-                # Entscheidung basierend auf Signal und Zeit
+
+                # Decision based on signal and time
                 should_update_primary = False
                 if new_signal > current_signal:
                     should_update_primary = True
@@ -391,10 +435,10 @@ class DatabaseCombiner:
                     should_update_primary = True
                 
                 if should_update_primary:
-                    # Aktualisiere Hauptposition und speichere alte als Last Seen
+                    # Update main position and save old as Last Seen
                     if device['source'] == 'device_data':
                         cursor.execute("""
-                            UPDATE device_data 
+                            UPDATE device_data
                             SET signal_strength = ?, latitude = ?, longitude = ?, timestamp = ?,
                                 last_seen_latitude = ?, last_seen_longitude = ?, last_seen_timestamp = ?,
                                 movement_distance = ?
@@ -404,7 +448,7 @@ class DatabaseCombiner:
                               device['address'], device['type']))
                     elif device['source'] == 'wifi_data':
                         cursor.execute("""
-                            UPDATE wifi_data 
+                            UPDATE wifi_data
                             SET signal_strength = ?, latitude = ?, longitude = ?, timestamp = ?,
                                 last_seen_latitude = ?, last_seen_longitude = ?, last_seen_timestamp = ?,
                                 movement_distance = ?
@@ -412,14 +456,14 @@ class DatabaseCombiner:
                         """, (new_signal, new_lat, new_lon, new_timestamp,
                               old_lat, old_lon, current_timestamp, distance,
                               device['address']))
-                    
-                    self.log(f"Gerät bewegt: {device['address']} - {distance:.1f}m entfernt, Hauptposition aktualisiert")
+
+                    self.log(f"Device moved: {device['address']} - {distance:.1f}m away, main position updated")
                     return 'updated_with_movement'
                 else:
-                    # Neue Position wird als Last Seen gespeichert
+                    # New position is saved as Last Seen
                     if device['source'] == 'device_data':
                         cursor.execute("""
-                            UPDATE device_data 
+                            UPDATE device_data
                             SET last_seen_latitude = ?, last_seen_longitude = ?, last_seen_timestamp = ?,
                                 movement_distance = ?
                             WHERE device_address = ? AND device_type = ?
@@ -427,22 +471,22 @@ class DatabaseCombiner:
                               device['address'], device['type']))
                     elif device['source'] == 'wifi_data':
                         cursor.execute("""
-                            UPDATE wifi_data 
+                            UPDATE wifi_data
                             SET last_seen_latitude = ?, last_seen_longitude = ?, last_seen_timestamp = ?,
                                 movement_distance = ?
                             WHERE bssid = ?
                         """, (new_lat, new_lon, new_timestamp, distance,
                               device['address']))
-                    
-                    self.log(f"Gerät bewegt: {device['address']} - {distance:.1f}m entfernt, Last Seen aktualisiert")
+
+                    self.log(f"Device moved: {device['address']} - {distance:.1f}m away, Last Seen updated")
                     return 'updated_last_seen'
             else:
-                # Keine gültigen Koordinaten für Entfernungsberechnung
+                # No valid coordinates for distance calculation
                 current_signal = existing.get('signal', -999)
                 new_signal = device.get('signal', -999)
-                
+
                 if new_signal > current_signal and self.coordinate_update_var.get():
-                    # Aktualisiere nur bei besserem Signal
+                    # Only update with better signal
                     if device['source'] == 'device_data':
                         cursor.execute("""
                             UPDATE device_data 
@@ -462,7 +506,7 @@ class DatabaseCombiner:
                 else:
                     return 'skipped_worse_signal'
         else:
-            # Neues Gerät - füge hinzu
+            # New device - add it
             if device['source'] == 'device_data':
                 cursor.execute("""
                     INSERT INTO device_data 
@@ -488,35 +532,35 @@ class DatabaseCombiner:
             return 'added'
     
     def create_backup(self):
-        """Erstellt ein Backup der Haupt-Datenbank"""
+        """Creates a backup of the Main Database"""
         if not self.backup_var.get():
             return True
-        
+
         try:
             backup_name = f"{os.path.splitext(self.main_db_path)[0]}_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
             shutil.copy2(self.main_db_path, backup_name)
-            self.log(f"Backup erstellt: {os.path.basename(backup_name)}")
+            self.log(f"Backup created: {os.path.basename(backup_name)}")
             return True
         except Exception as e:
-            self.log(f"Fehler beim Erstellen des Backups: {str(e)}")
+            self.log(f"Error creating backup: {str(e)}")
             return False
     
     def combine_databases(self):
-        """Führt alle Datenbanken zusammen"""
+        """Merges all databases"""
         if not self.main_db_path:
-            messagebox.showerror("Fehler", "Bitte wählen Sie zuerst eine Haupt-Datenbank aus!")
+            messagebox.showerror("Error", "Please select a Main Database first!")
             return
-            
+
         if not self.source_db_paths:
-            messagebox.showerror("Fehler", "Bitte fügen Sie mindestens eine Quell-Datenbank hinzu oder nutzen Sie 'DB bereinigen' für eine einzelne Datenbank!")
+            messagebox.showerror("Error", "Please add at least one Source Database or use 'Clean DB' for a single database!")
             return
-        
-        # Backup erstellen
+
+        # Create backup
         if not self.create_backup():
-            if not messagebox.askyesno("Warnung", "Backup fehlgeschlagen. Trotzdem fortfahren?"):
+            if not messagebox.askyesno("Warning", "Backup failed. Continue anyway?"):
                 return
 
-        # Stelle sicher, dass alle Quell-DBs die modernen Tabellen/Spalten haben
+        # Ensure all Source DBs have modern tables/columns
         for source_db in self.source_db_paths:
             try:
                 conn = sqlite3.connect(source_db)
@@ -524,29 +568,29 @@ class DatabaseCombiner:
                 self.create_modern_tables(cursor)
                 conn.commit()
                 conn.close()
-                self.log(f"Tabellenstruktur in {os.path.basename(source_db)} aktualisiert.")
+                self.log(f"Table structure in {os.path.basename(source_db)} updated.")
             except Exception as e:
-                self.log(f"Fehler beim Aktualisieren der Tabellenstruktur in {os.path.basename(source_db)}: {e}")
+                self.log(f"Error updating table structure in {os.path.basename(source_db)}: {e}")
 
-        self.log("=== ZUSAMMENFÜHRUNG GESTARTET ===")
+        self.log("=== MERGE STARTED ===")
 
         try:
-            # Lade existierende Geräte aus Haupt-DB
-            self.log("Lade existierende Geräte aus Haupt-DB...")
+            # Load existing devices from Main DB
+            self.log("Loading existing devices from Main DB...")
             existing_devices = {}
             main_devices = self.load_devices_from_db(self.main_db_path)
-            
+
             for device in main_devices:
                 device_key = f"{device['address']}_{device['type']}"
                 existing_devices[device_key] = device
-            
-            self.log(f"Gefunden: {len(existing_devices)} existierende Geräte")
-            
-            # Öffne Haupt-DB für Updates
+
+            self.log(f"Found: {len(existing_devices)} existing devices")
+
+            # Open Main DB for updates
             conn = sqlite3.connect(self.main_db_path)
             cursor = conn.cursor()
-            
-            # Statistiken
+
+            # Statistics
             stats = {
                 'added': 0,
                 'updated': 0,
@@ -557,236 +601,236 @@ class DatabaseCombiner:
                 'skipped_worse_signal': 0,
                 'total_processed': 0
             }
-            
+
             total_sources = len(self.source_db_paths)
-            
-            # Verarbeite jede Quell-DB
+
+            # Process each Source DB
             for i, source_path in enumerate(self.source_db_paths):
-                self.log(f"Verarbeite {os.path.basename(source_path)} ({i+1}/{total_sources})...")
+                self.log(f"Processing {os.path.basename(source_path)} ({i+1}/{total_sources})...")
                 self.progress_var.set((i / total_sources) * 100)
-                
+
                 source_devices = self.load_devices_from_db(source_path)
-                
+
                 for j, device in enumerate(source_devices):
                     result = self.insert_or_update_device(cursor, device, existing_devices)
                     stats[result] += 1
                     stats['total_processed'] += 1
-                    
-                    # Aktualisiere existierende Geräte-Liste bei neuen Geräten
+
+                    # Update existing devices list for new devices
                     if result == 'added':
                         device_key = f"{device['address']}_{device['type']}"
                         existing_devices[device_key] = device
-                    
+
                     # Progress Update
                     if j % 100 == 0:
-                        self.status_var.set(f"Verarbeite {os.path.basename(source_path)}: {j}/{len(source_devices)}")
+                        self.status_var.set(f"Processing {os.path.basename(source_path)}: {j}/{len(source_devices)}")
                         self.root.update()
-            
-            # Änderungen speichern
+
+            # Save changes
             conn.commit()
-            
-            # Nach der Zusammenführung: Duplikate prüfen und entfernen
-            self.log("Prüfe und entferne Duplikate nach Zusammenführung...")
+
+            # After merge: check and remove duplicates
+            self.log("Checking and removing duplicates after merge...")
             removed_duplicates = self.remove_duplicates_after_merge(cursor)
-            
+
             conn.commit()
             conn.close()
-            
+
             self.progress_var.set(100)
-            self.status_var.set("Zusammenführung abgeschlossen!")
+            self.status_var.set("Merge completed!")
             
-            # Ergebnisse anzeigen
-            self.log("=== ZUSAMMENFÜHRUNG ABGESCHLOSSEN ===")
-            self.log(f"Verarbeitet: {stats['total_processed']} Geräte")
-            self.log(f"Neu hinzugefügt: {stats['added']}")
-            self.log(f"Aktualisiert (besseres Signal): {stats['updated']}")
-            self.log(f"Bewegung erkannt - Hauptposition aktualisiert: {stats['updated_with_movement']}")
-            self.log(f"Bewegung erkannt - Last Seen aktualisiert: {stats['updated_last_seen']}")
-            self.log(f"Übersprungen (zu nahe < 100m): {stats['skipped_too_close']}")
-            self.log(f"Übersprungen (schlechteres Signal): {stats['skipped_worse_signal']}")
-            self.log(f"Übersprungen (besseres existiert): {stats['skipped_better_exists']}")
-            
+            # Display results
+            self.log("=== MERGE COMPLETED ===")
+            self.log(f"Processed: {stats['total_processed']} devices")
+            self.log(f"Newly added: {stats['added']}")
+            self.log(f"Updated (better signal): {stats['updated']}")
+            self.log(f"Movement detected - main position updated: {stats['updated_with_movement']}")
+            self.log(f"Movement detected - Last Seen updated: {stats['updated_last_seen']}")
+            self.log(f"Skipped (too close < 100m): {stats['skipped_too_close']}")
+            self.log(f"Skipped (worse signal): {stats['skipped_worse_signal']}")
+            self.log(f"Skipped (better exists): {stats['skipped_better_exists']}")
+
             if removed_duplicates:
-                self.log(f"Duplikate entfernt: {removed_duplicates['wifi_removed']} WiFi, {removed_duplicates['bluetooth_removed']} Bluetooth")
-            
-            # Zeige Bewegungsstatistiken
+                self.log(f"Duplicates removed: {removed_duplicates['wifi_removed']} WiFi, {removed_duplicates['bluetooth_removed']} Bluetooth")
+
+            # Show movement statistics
             total_movements = stats['updated_with_movement'] + stats['updated_last_seen']
             if total_movements > 0:
-                self.log(f"Gerätebewegungen erkannt: {total_movements}")
-            
-            messagebox.showinfo("Erfolg", 
-                f"Zusammenführung abgeschlossen!\n\n"
-                f"Neu hinzugefügt: {stats['added']}\n"
-                f"Aktualisiert: {stats['updated']}\n"
-                f"Bewegungen erkannt: {total_movements}\n"
-                f"Übersprungen (zu nahe): {stats['skipped_too_close']}\n"
-                f"Übersprungen (Signal): {stats['skipped_worse_signal'] + stats['skipped_better_exists']}\n"
-                f"Duplikate entfernt: {removed_duplicates.get('total_removed', 0) if removed_duplicates else 0}")
-            
+                self.log(f"Device movements detected: {total_movements}")
+
+            messagebox.showinfo("Success",
+                f"Merge completed!\n\n"
+                f"Newly added: {stats['added']}\n"
+                f"Updated: {stats['updated']}\n"
+                f"Movements detected: {total_movements}\n"
+                f"Skipped (too close): {stats['skipped_too_close']}\n"
+                f"Skipped (signal): {stats['skipped_worse_signal'] + stats['skipped_better_exists']}\n"
+                f"Duplicates removed: {removed_duplicates.get('total_removed', 0) if removed_duplicates else 0}")
+
         except Exception as e:
-            self.log(f"Fehler bei der Zusammenführung: {str(e)}")
-            messagebox.showerror("Fehler", f"Fehler bei der Zusammenführung:\n{str(e)}")
+            self.log(f"Error during merge: {str(e)}")
+            messagebox.showerror("Error", f"Error during merge:\n{str(e)}")
     
     def clean_database(self):
-        """Bereinigt und sortiert eine Datenbank"""
+        """Cleans and sorts a database"""
         if not self.main_db_path:
-            messagebox.showerror("Fehler", "Bitte wählen Sie zuerst eine Datenbank zum Bereinigen aus!")
+            messagebox.showerror("Error", "Please select a database to clean first!")
             return
-        
-        # Bestätigung
-        if not messagebox.askyesno("Bestätigung", 
-            f"Möchten Sie die Datenbank bereinigen und sortieren?\n\n"
-            f"- WiFi-Daten werden in wifi_data verschoben\n"
-            f"- Bluetooth-Daten werden in device_data verschoben\n"
-            f"- Duplikate werden entfernt\n"
-            f"- Ein Backup wird erstellt\n\n"
-            f"Datei: {os.path.basename(self.main_db_path)}"):
+
+        # Confirmation
+        if not messagebox.askyesno("Confirmation",
+            f"Do you want to clean and sort the database?\n\n"
+            f"- WiFi data will be moved to wifi_data\n"
+            f"- Bluetooth data will be moved to device_data\n"
+            f"- Duplicates will be removed\n"
+            f"- A backup will be created\n\n"
+            f"File: {os.path.basename(self.main_db_path)}"):
             return
-        
-        # Backup erstellen
+
+        # Create backup
         if not self.create_backup():
-            if not messagebox.askyesno("Warnung", "Backup fehlgeschlagen. Trotzdem fortfahren?"):
+            if not messagebox.askyesno("Warning", "Backup failed. Continue anyway?"):
                 return
-        
-        self.log("=== DATENBANK-BEREINIGUNG GESTARTET ===")
+
+        self.log("=== DATABASE CLEANING STARTED ===")
         
         try:
             conn = sqlite3.connect(self.main_db_path)
             cursor = conn.cursor()
-            
-            # Analysiere aktuelle Struktur
+
+            # Analyze current structure
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             existing_tables = [row[0] for row in cursor.fetchall()]
-            
-            self.log(f"Vorhandene Tabellen: {', '.join(existing_tables)}")
-            
-            # Erstelle moderne Tabellenstruktur falls nicht vorhanden
+
+            self.log(f"Existing tables: {', '.join(existing_tables)}")
+
+            # Create modern table structure if not present
             self.create_modern_tables(cursor)
-            
-            # EINFACHE BEREINIGUNG: Nur WiFi aus device_data verschieben und Duplikate entfernen
-            self.log("Verschiebe WiFi-Daten von device_data zu wifi_data...")
+
+            # SIMPLE CLEANING: Only move WiFi from device_data and remove duplicates
+            self.log("Moving WiFi data from device_data to wifi_data...")
             self.migrate_wifi_from_device_data_simple(cursor)
-            
-            # Entferne Duplikate in beiden Tabellen
-            self.log("Entferne Duplikate in wifi_data...")
+
+            # Remove duplicates in both tables
+            self.log("Removing duplicates in wifi_data...")
             wifi_duplicates_removed = self.remove_wifi_duplicates(cursor)
-            
-            self.log("Entferne Duplikate in device_data...")
+
+            self.log("Removing duplicates in device_data...")
             bluetooth_duplicates_removed = self.remove_bluetooth_duplicates(cursor)
-            
-            # Alte Tabellen löschen (optional)
-            if messagebox.askyesno("Aufräumen", "Möchten Sie die alten/leeren Tabellen löschen?"):
+
+            # Delete old tables (optional)
+            if messagebox.askyesno("Cleanup", "Do you want to delete old/empty tables?"):
                 self.cleanup_old_tables(cursor, existing_tables)
-            
+
             conn.commit()
             conn.close()
-            
-            self.log("=== BEREINIGUNG ABGESCHLOSSEN ===")
-            self.log(f"WiFi-Duplikate entfernt: {wifi_duplicates_removed}")
-            self.log(f"Bluetooth-Duplikate entfernt: {bluetooth_duplicates_removed}")
-            
-            messagebox.showinfo("Erfolg", 
-                f"Datenbank bereinigt!\n\n"
-                f"WiFi-Duplikate entfernt: {wifi_duplicates_removed}\n"
-                f"Bluetooth-Duplikate entfernt: {bluetooth_duplicates_removed}\n\n"
-                f"Alle Daten sind jetzt in den korrekten Tabellen sortiert.")
-                
+
+            self.log("=== CLEANING COMPLETED ===")
+            self.log(f"WiFi duplicates removed: {wifi_duplicates_removed}")
+            self.log(f"Bluetooth duplicates removed: {bluetooth_duplicates_removed}")
+
+            messagebox.showinfo("Success",
+                f"Database cleaned!\n\n"
+                f"WiFi duplicates removed: {wifi_duplicates_removed}\n"
+                f"Bluetooth duplicates removed: {bluetooth_duplicates_removed}\n\n"
+                f"All data is now sorted in the correct tables.")
+
         except Exception as e:
-            self.log(f"Fehler bei der Bereinigung: {str(e)}")
-            messagebox.showerror("Fehler", f"Fehler bei der Bereinigung:\n{str(e)}")
+            self.log(f"Error during cleaning: {str(e)}")
+            messagebox.showerror("Error", f"Error during cleaning:\n{str(e)}")
     
     def repair_database(self):
-        """Repariert und aktualisiert die Datenbankstruktur"""
+        """Repairs and updates the database structure"""
         if not self.main_db_path:
-            messagebox.showerror("Fehler", "Bitte wählen Sie zuerst eine Datenbank zum Reparieren aus!")
+            messagebox.showerror("Error", "Please select a database to repair first!")
             return
-        
-        # Bestätigung
-        if not messagebox.askyesno("Bestätigung", 
-            f"Möchten Sie die Datenbankstruktur reparieren und aktualisieren?\n\n"
-            f"- Fehlende Bewegungsverfolgung-Spalten werden hinzugefügt\n"
-            f"- Tabellenstrukturen werden modernisiert\n"
-            f"- Ein Backup wird erstellt\n\n"
-            f"Datei: {os.path.basename(self.main_db_path)}"):
+
+        # Confirmation
+        if not messagebox.askyesno("Confirmation",
+            f"Do you want to repair and update the database structure?\n\n"
+            f"- Missing movement tracking columns will be added\n"
+            f"- Table structures will be modernized\n"
+            f"- A backup will be created\n\n"
+            f"File: {os.path.basename(self.main_db_path)}"):
             return
-        
-        # Backup erstellen
+
+        # Create backup
         if not self.create_backup():
-            if not messagebox.askyesno("Warnung", "Backup fehlgeschlagen. Trotzdem fortfahren?"):
+            if not messagebox.askyesno("Warning", "Backup failed. Continue anyway?"):
                 return
-        
-        self.log("=== DATENBANK-REPARATUR GESTARTET ===")
+
+        self.log("=== DATABASE REPAIR STARTED ===")
         
         try:
             conn = sqlite3.connect(self.main_db_path)
             cursor = conn.cursor()
-            
-            # Analysiere aktuelle Struktur
+
+            # Analyze current structure
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             existing_tables = [row[0] for row in cursor.fetchall()]
-            
-            self.log(f"Vorhandene Tabellen: {', '.join(existing_tables)}")
-            
-            # Statistiken für Reparatur
+
+            self.log(f"Existing tables: {', '.join(existing_tables)}")
+
+            # Statistics for repair
             repair_stats = {
                 'tables_created': 0,
                 'columns_added': 0,
                 'tables_analyzed': len(existing_tables)
             }
-            
-            # Erstelle moderne Tabellenstruktur falls nicht vorhanden
-            self.log("Prüfe und erstelle moderne Tabellenstrukturen...")
+
+            # Create modern table structure if not present
+            self.log("Checking and creating modern table structures...")
             if 'wifi_data' not in existing_tables:
                 self.create_modern_tables(cursor)
                 repair_stats['tables_created'] += 1
-                self.log("Tabelle 'wifi_data' erstellt")
-            
+                self.log("Table 'wifi_data' created")
+
             if 'device_data' not in existing_tables:
-                if repair_stats['tables_created'] == 0:  # Nur wenn wifi_data schon existierte
+                if repair_stats['tables_created'] == 0:  # Only if wifi_data already existed
                     self.create_modern_tables(cursor)
                     repair_stats['tables_created'] += 1
-                self.log("Tabelle 'device_data' erstellt")
-            
-            # Füge Bewegungsverfolgung-Spalten hinzu
-            self.log("Prüfe und füge Bewegungsverfolgung-Spalten hinzu...")
+                self.log("Table 'device_data' created")
+
+            # Add movement tracking columns
+            self.log("Checking and adding movement tracking columns...")
             columns_before = self.count_movement_columns(cursor)
             self.add_movement_tracking_columns(cursor)
             columns_after = self.count_movement_columns(cursor)
             repair_stats['columns_added'] = columns_after - columns_before
-            
-            # Prüfe alle Tabellen auf fehlende Standard-Spalten
-            self.log("Prüfe und repariere Standard-Spalten...")
+
+            # Check all tables for missing standard columns
+            self.log("Checking and repairing standard columns...")
             additional_columns = self.repair_standard_columns(cursor, existing_tables)
             repair_stats['columns_added'] += additional_columns
-            
-            # Erstelle Indizes für bessere Performance
-            self.log("Erstelle Performance-Indizes...")
+
+            # Create indexes for better performance
+            self.log("Creating performance indexes...")
             self.create_performance_indexes(cursor)
-            
+
             conn.commit()
             conn.close()
-            
-            self.log("=== REPARATUR ABGESCHLOSSEN ===")
-            self.log(f"Tabellen erstellt: {repair_stats['tables_created']}")
-            self.log(f"Spalten hinzugefügt: {repair_stats['columns_added']}")
-            self.log(f"Tabellen analysiert: {repair_stats['tables_analyzed']}")
-            
-            messagebox.showinfo("Erfolg", 
-                f"Datenbank-Reparatur abgeschlossen!\n\n"
-                f"Tabellen erstellt: {repair_stats['tables_created']}\n"
-                f"Spalten hinzugefügt: {repair_stats['columns_added']}\n"
-                f"Tabellen analysiert: {repair_stats['tables_analyzed']}\n\n"
-                f"Die Datenbank ist jetzt auf dem neuesten Stand.")
-                
+
+            self.log("=== REPAIR COMPLETED ===")
+            self.log(f"Tables created: {repair_stats['tables_created']}")
+            self.log(f"Columns added: {repair_stats['columns_added']}")
+            self.log(f"Tables analyzed: {repair_stats['tables_analyzed']}")
+
+            messagebox.showinfo("Success",
+                f"Database repair completed!\n\n"
+                f"Tables created: {repair_stats['tables_created']}\n"
+                f"Columns added: {repair_stats['columns_added']}\n"
+                f"Tables analyzed: {repair_stats['tables_analyzed']}\n\n"
+                f"The database is now up to date.")
+
         except Exception as e:
-            self.log(f"Fehler bei der Reparatur: {str(e)}")
-            messagebox.showerror("Fehler", f"Fehler bei der Reparatur:\n{str(e)}")
+            self.log(f"Error during repair: {str(e)}")
+            messagebox.showerror("Error", f"Error during repair:\n{str(e)}")
     
     def count_movement_columns(self, cursor):
-        """Zählt vorhandene Bewegungsverfolgung-Spalten"""
+        """Counts existing movement tracking columns"""
         count = 0
-        
-        # Prüfe wifi_data
+
+        # Check wifi_data
         try:
             cursor.execute("PRAGMA table_info(wifi_data)")
             wifi_columns = [col[1] for col in cursor.fetchall()]
@@ -794,8 +838,8 @@ class DatabaseCombiner:
             count += sum(1 for col in movement_cols if col in wifi_columns)
         except:
             pass
-        
-        # Prüfe device_data
+
+        # Check device_data
         try:
             cursor.execute("PRAGMA table_info(device_data)")
             device_columns = [col[1] for col in cursor.fetchall()]
@@ -803,24 +847,24 @@ class DatabaseCombiner:
             count += sum(1 for col in movement_cols if col in device_columns)
         except:
             pass
-        
+
         return count
     
     def repair_standard_columns(self, cursor, existing_tables):
-        """Repariert und fügt fehlende Standard-Spalten hinzu"""
+        """Repairs and adds missing standard columns"""
         columns_added = 0
-        
-        # Standard-Spalten für wifi_data
+
+        # Standard columns for wifi_data
         wifi_standard_columns = {
             'frequency': 'INTEGER',
-            'channel': 'INTEGER', 
+            'channel': 'INTEGER',
             'wifi_standard': 'TEXT',
             'vendor_info': 'TEXT',
             'channel_width': 'INTEGER',
             'max_connection_speed': 'INTEGER'
         }
-        
-        # Standard-Spalten für device_data
+
+        # Standard columns for device_data
         device_standard_columns = {
             'frequency': 'INTEGER',
             'channel': 'INTEGER',
@@ -829,70 +873,70 @@ class DatabaseCombiner:
             'channel_width': 'INTEGER',
             'max_connection_speed': 'INTEGER'
         }
-        
-        # Repariere wifi_data
+
+        # Repair wifi_data
         if 'wifi_data' in existing_tables:
             try:
                 cursor.execute("PRAGMA table_info(wifi_data)")
                 wifi_columns = [col[1] for col in cursor.fetchall()]
-                
+
                 for col_name, col_type in wifi_standard_columns.items():
                     if col_name not in wifi_columns:
                         try:
                             cursor.execute(f"ALTER TABLE wifi_data ADD COLUMN {col_name} {col_type}")
-                            self.log(f"Spalte '{col_name}' zu wifi_data hinzugefügt")
+                            self.log(f"Column '{col_name}' added to wifi_data")
                             columns_added += 1
                         except Exception as e:
-                            self.log(f"Warnung: Konnte Spalte {col_name} nicht zu wifi_data hinzufügen: {str(e)}")
+                            self.log(f"Warning: Could not add column {col_name} to wifi_data: {str(e)}")
             except Exception as e:
-                self.log(f"Fehler beim Reparieren von wifi_data: {str(e)}")
-        
-        # Repariere device_data
+                self.log(f"Error repairing wifi_data: {str(e)}")
+
+        # Repair device_data
         if 'device_data' in existing_tables:
             try:
                 cursor.execute("PRAGMA table_info(device_data)")
                 device_columns = [col[1] for col in cursor.fetchall()]
-                
+
                 for col_name, col_type in device_standard_columns.items():
                     if col_name not in device_columns:
                         try:
                             cursor.execute(f"ALTER TABLE device_data ADD COLUMN {col_name} {col_type}")
-                            self.log(f"Spalte '{col_name}' zu device_data hinzugefügt")
+                            self.log(f"Column '{col_name}' added to device_data")
                             columns_added += 1
                         except Exception as e:
-                            self.log(f"Warnung: Konnte Spalte {col_name} nicht zu device_data hinzufügen: {str(e)}")
+                            self.log(f"Warning: Could not add column {col_name} to device_data: {str(e)}")
             except Exception as e:
-                self.log(f"Fehler beim Reparieren von device_data: {str(e)}")
-        
+                self.log(f"Error repairing device_data: {str(e)}")
+
         return columns_added
     
     def create_performance_indexes(self, cursor):
-        """Erstellt Indizes für bessere Performance"""
+        """Creates indexes for better performance"""
         indexes = [
-            # WiFi-Daten Indizes
+            # WiFi data indexes
             ("idx_wifi_bssid", "wifi_data", "bssid"),
             ("idx_wifi_signal", "wifi_data", "signal_strength"),
             ("idx_wifi_coords", "wifi_data", "latitude, longitude"),
             ("idx_wifi_timestamp", "wifi_data", "timestamp"),
-            
-            # Device-Daten Indizes
+
+            # Device data indexes
             ("idx_device_address", "device_data", "device_address"),
             ("idx_device_type", "device_data", "device_type"),
             ("idx_device_signal", "device_data", "signal_strength"),
             ("idx_device_coords", "device_data", "latitude, longitude"),
             ("idx_device_timestamp", "device_data", "timestamp"),
         ]
-        
+
         for index_name, table_name, columns in indexes:
             try:
                 cursor.execute(f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({columns})")
-                self.log(f"Index '{index_name}' erstellt/überprüft")
+                self.log(f"Index '{index_name}' created/verified")
             except Exception as e:
-                self.log(f"Warnung: Konnte Index {index_name} nicht erstellen: {str(e)}")
+                self.log(f"Warning: Could not create index {index_name}: {str(e)}")
     
     def create_modern_tables(self, cursor):
-        """Erstellt moderne Tabellenstrukturen mit Bewegungsverfolgung"""
-        # WiFi-Daten Tabelle mit Last Seen Koordinaten
+        """Creates modern table structures with movement tracking"""
+        # WiFi data table with Last Seen coordinates
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS wifi_data (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -916,8 +960,8 @@ class DatabaseCombiner:
                 UNIQUE(bssid)
             )
         """)
-        
-        # Device-Daten Tabelle mit Last Seen Koordinaten
+
+        # Device data table with Last Seen coordinates
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS device_data (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -942,83 +986,83 @@ class DatabaseCombiner:
                 UNIQUE(device_address, device_type)
             )
         """)
-        
-        # Neue Spalten zu bestehenden Tabellen hinzufügen falls sie nicht existieren
+
+        # Add new columns to existing tables if they don't exist
         self.add_movement_tracking_columns(cursor)
     
     def add_movement_tracking_columns(self, cursor):
-        """Fügt Bewegungsverfolgung-Spalten zu bestehenden Tabellen hinzu"""
+        """Adds movement tracking columns to existing tables"""
         try:
-            # Prüfe wifi_data Tabelle
+            # Check wifi_data table
             cursor.execute("PRAGMA table_info(wifi_data)")
             wifi_columns = [col[1] for col in cursor.fetchall()]
-            
+
             if 'last_seen_latitude' not in wifi_columns:
                 cursor.execute("ALTER TABLE wifi_data ADD COLUMN last_seen_latitude REAL")
-                self.log("Spalte 'last_seen_latitude' zu wifi_data hinzugefügt")
-            
+                self.log("Column 'last_seen_latitude' added to wifi_data")
+
             if 'last_seen_longitude' not in wifi_columns:
                 cursor.execute("ALTER TABLE wifi_data ADD COLUMN last_seen_longitude REAL")
-                self.log("Spalte 'last_seen_longitude' zu wifi_data hinzugefügt")
-            
+                self.log("Column 'last_seen_longitude' added to wifi_data")
+
             if 'last_seen_timestamp' not in wifi_columns:
                 cursor.execute("ALTER TABLE wifi_data ADD COLUMN last_seen_timestamp INTEGER")
-                self.log("Spalte 'last_seen_timestamp' zu wifi_data hinzugefügt")
-            
+                self.log("Column 'last_seen_timestamp' added to wifi_data")
+
             if 'movement_distance' not in wifi_columns:
                 cursor.execute("ALTER TABLE wifi_data ADD COLUMN movement_distance REAL")
-                self.log("Spalte 'movement_distance' zu wifi_data hinzugefügt")
-            
-            # Prüfe device_data Tabelle
+                self.log("Column 'movement_distance' added to wifi_data")
+
+            # Check device_data table
             cursor.execute("PRAGMA table_info(device_data)")
             device_columns = [col[1] for col in cursor.fetchall()]
-            
+
             if 'last_seen_latitude' not in device_columns:
                 cursor.execute("ALTER TABLE device_data ADD COLUMN last_seen_latitude REAL")
-                self.log("Spalte 'last_seen_latitude' zu device_data hinzugefügt")
-            
+                self.log("Column 'last_seen_latitude' added to device_data")
+
             if 'last_seen_longitude' not in device_columns:
                 cursor.execute("ALTER TABLE device_data ADD COLUMN last_seen_longitude REAL")
-                self.log("Spalte 'last_seen_longitude' zu device_data hinzugefügt")
-            
+                self.log("Column 'last_seen_longitude' added to device_data")
+
             if 'last_seen_timestamp' not in device_columns:
                 cursor.execute("ALTER TABLE device_data ADD COLUMN last_seen_timestamp INTEGER")
-                self.log("Spalte 'last_seen_timestamp' zu device_data hinzugefügt")
-            
+                self.log("Column 'last_seen_timestamp' added to device_data")
+
             if 'movement_distance' not in device_columns:
                 cursor.execute("ALTER TABLE device_data ADD COLUMN movement_distance REAL")
-                self.log("Spalte 'movement_distance' zu device_data hinzugefügt")
-                
+                self.log("Column 'movement_distance' added to device_data")
+
         except Exception as e:
-            self.log(f"Fehler beim Hinzufügen der Bewegungsverfolgung-Spalten: {str(e)}")
+            self.log(f"Error adding movement tracking columns: {str(e)}")
     
     def calculate_distance(self, lat1, lon1, lat2, lon2):
-        """Berechnet die Entfernung zwischen zwei GPS-Koordinaten in Metern (Haversine-Formel)"""
+        """Calculates the distance between two GPS coordinates in meters (Haversine formula)"""
         import math
-        
-        # Radius der Erde in Kilometern
+
+        # Earth radius in kilometers
         R = 6371.0
-        
-        # Koordinaten in Radiant umwandeln
+
+        # Convert coordinates to radians
         lat1_rad = math.radians(lat1)
         lon1_rad = math.radians(lon1)
         lat2_rad = math.radians(lat2)
         lon2_rad = math.radians(lon2)
-        
-        # Unterschiede berechnen
+
+        # Calculate differences
         dlat = lat2_rad - lat1_rad
         dlon = lon2_rad - lon1_rad
-        
-        # Haversine-Formel
+
+        # Haversine formula
         a = math.sin(dlat/2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon/2)**2
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
         distance_km = R * c
-        
-        # In Meter umwandeln
+
+        # Convert to meters
         return distance_km * 1000
     
     def extract_data_from_device_table(self, cursor):
-        """Extrahiert Daten aus device_data Tabelle"""
+        """Extracts data from device_data table"""
         data = []
         try:
             cursor.execute("PRAGMA table_info(device_data)")
@@ -1054,12 +1098,12 @@ class DatabaseCombiner:
                         'source_table': 'device_data'
                     })
         except Exception as e:
-            self.log(f"Fehler beim Extrahieren aus device_data: {str(e)}")
-        
+            self.log(f"Error extracting from device_data: {str(e)}")
+
         return data
-    
+
     def extract_data_from_wifi_table(self, cursor):
-        """Extrahiert Daten aus wifi_data Tabelle"""
+        """Extracts data from wifi_data table"""
         data = []
         try:
             cursor.execute("PRAGMA table_info(wifi_data)")
@@ -1095,20 +1139,20 @@ class DatabaseCombiner:
                         'source_table': 'wifi_data'
                     })
         except Exception as e:
-            self.log(f"Fehler beim Extrahieren aus wifi_data: {str(e)}")
-        
+            self.log(f"Error extracting from wifi_data: {str(e)}")
+
         return data
     
     def extract_data_from_legacy_table(self, cursor, table_name):
-        """Extrahiert Daten aus alten Tabellenformaten"""
+        """Extracts data from legacy table formats"""
         data = []
         try:
             cursor.execute(f"PRAGMA table_info({table_name})")
             columns = [col[1] for col in cursor.fetchall()]
-            
-            # Bestimme Tabellentyp basierend auf Spalten
+
+            # Determine table type based on columns
             if 'bssid' in columns or 'ssid' in columns:
-                # WiFi Tabelle
+                # WiFi table
                 cursor.execute(f"""
                     SELECT 
                         COALESCE(ssid, device_name, name, '') as name,
@@ -1119,9 +1163,9 @@ class DatabaseCombiner:
                     FROM {table_name} 
                     WHERE latitude != 0 AND longitude != 0
                 """)
-                
+
                 for row in cursor.fetchall():
-                    if row[1]:  # address nicht leer
+                    if row[1]:  # address not empty
                         data.append({
                             'name': row[0],
                             'address': row[1],
@@ -1139,19 +1183,19 @@ class DatabaseCombiner:
                             'max_speed': None,
                             'source_table': table_name
                         })
-            
+
             elif 'device_type' in columns:
-                # Gemischte Tabelle
+                # Mixed table
                 cursor.execute(f"""
                     SELECT device_name, device_address, device_type, signal_strength,
                            COALESCE(encryption_info, '') as encryption,
                            latitude, longitude, timestamp
-                    FROM {table_name} 
+                    FROM {table_name}
                     WHERE latitude != 0 AND longitude != 0
                 """)
-                
+
                 for row in cursor.fetchall():
-                    if row[1]:  # address nicht leer
+                    if row[1]:  # address not empty
                         data.append({
                             'name': row[0],
                             'address': row[1],
@@ -1169,26 +1213,26 @@ class DatabaseCombiner:
                             'max_speed': None,
                             'source_table': table_name
                         })
-                        
+
         except Exception as e:
-            self.log(f"Fehler beim Extrahieren aus {table_name}: {str(e)}")
-        
+            self.log(f"Error extracting from {table_name}: {str(e)}")
+
         return data
     
     def clean_and_sort_data(self, all_data):
-        """Bereinigt und sortiert Daten nach Typ"""
+        """Cleans and sorts data by type"""
         wifi_dict = {}
         bluetooth_dict = {}
-        
+
         for item in all_data:
             if not item['address']:
                 continue
-                
-            # Bestimme Typ basierend auf verschiedenen Kriterien
+
+            # Determine type based on various criteria
             device_type = item['type'].upper() if item['type'] else ''
-            
-            # WiFi-Erkennung
-            if (device_type in ['WIFI', 'WI-FI', 'WIRELESS'] or 
+
+            # WiFi detection
+            if (device_type in ['WIFI', 'WI-FI', 'WIRELESS'] or
                 (item['name'] and len(item['address']) == 17 and ':' in item['address'])):
                 
                 key = item['address'].upper()
@@ -1209,8 +1253,8 @@ class DatabaseCombiner:
                         'channel_width': item['channel_width'],
                         'max_connection_speed': item['max_speed']
                     }
-            
-            # Bluetooth-Erkennung
+
+            # Bluetooth detection
             elif (device_type in ['BLUETOOTH', 'BT', 'BLE'] or
                   (len(item['address']) == 17 and ':' in item['address'])):
                 
@@ -1233,36 +1277,36 @@ class DatabaseCombiner:
                         'channel_width': item['channel_width'],
                         'max_connection_speed': item['max_speed']
                     }
-        
-        self.log(f"Nach Bereinigung: {len(wifi_dict)} WiFi, {len(bluetooth_dict)} Bluetooth")
-        
+
+        self.log(f"After cleaning: {len(wifi_dict)} WiFi, {len(bluetooth_dict)} Bluetooth")
+
         return list(wifi_dict.values()), list(bluetooth_dict.values())
     
     def is_better_entry(self, new_item, existing_item):
-        """Prüft ob ein neuer Eintrag besser ist als der existierende"""
+        """Checks if a new entry is better than the existing one"""
         new_signal = new_item.get('signal', -999)
         existing_signal = existing_item.get('signal_strength', existing_item.get('signal', -999))
-        
+
         new_timestamp = new_item.get('timestamp', 0)
         existing_timestamp = existing_item.get('timestamp', 0)
-        
-        # Besseres Signal bevorzugen
+
+        # Prefer better signal
         if new_signal > existing_signal:
             return True
-        
-        # Bei gleichem Signal, neueren Timestamp bevorzugen
+
+        # With same signal, prefer newer timestamp
         if new_signal == existing_signal and new_timestamp > existing_timestamp:
             return True
-            
+
         return False
     
     def insert_cleaned_data(self, cursor, wifi_data, bluetooth_data):
-        """Fügt bereinigte Daten in die korrekten Tabellen ein"""
-        # WiFi-Daten: nur neue hinzufügen, da Migration bereits erfolgt ist
+        """Inserts cleaned data into the correct tables"""
+        # WiFi data: only add new ones, as migration has already occurred
         for wifi in wifi_data:
             try:
                 cursor.execute("""
-                    INSERT OR IGNORE INTO wifi_data 
+                    INSERT OR IGNORE INTO wifi_data
                     (ssid, bssid, signal_strength, verschluesselung, latitude, longitude, timestamp,
                      frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1271,13 +1315,13 @@ class DatabaseCombiner:
                       wifi['channel'], wifi['wifi_standard'], wifi['vendor_info'],
                       wifi['channel_width'], wifi['max_connection_speed']))
             except Exception as e:
-                self.log(f"Fehler beim Einfügen WiFi {wifi['bssid']}: {str(e)}")
-        
-        # Bluetooth-Daten: nur neue hinzufügen, bestehende behalten
+                self.log(f"Error inserting WiFi {wifi['bssid']}: {str(e)}")
+
+        # Bluetooth data: only add new ones, keep existing
         for bt in bluetooth_data:
             try:
                 cursor.execute("""
-                    INSERT OR IGNORE INTO device_data 
+                    INSERT OR IGNORE INTO device_data
                     (device_name, device_address, device_type, signal_strength, encryption_info,
                      latitude, longitude, timestamp, frequency, channel, wifi_standard,
                      vendor_info, channel_width, max_connection_speed)
@@ -1287,50 +1331,50 @@ class DatabaseCombiner:
                       bt['frequency'], bt['channel'], bt['wifi_standard'], bt['vendor_info'],
                       bt['channel_width'], bt['max_connection_speed']))
             except Exception as e:
-                self.log(f"Fehler beim Einfügen Bluetooth {bt['device_address']}: {str(e)}")
+                self.log(f"Error inserting Bluetooth {bt['device_address']}: {str(e)}")
     
     def cleanup_old_tables(self, cursor, existing_tables):
-        """Löscht alte oder leere Tabellen"""
+        """Deletes old or empty tables"""
         tables_to_check = ['wifi_networks', 'bluetooth_devices', 'scanned_devices']
-        
+
         for table in tables_to_check:
             if table in existing_tables:
                 try:
-                    # Prüfe ob Tabelle leer ist
+                    # Check if table is empty
                     cursor.execute(f"SELECT COUNT(*) FROM {table}")
                     count = cursor.fetchone()[0]
-                    
+
                     if count == 0:
                         cursor.execute(f"DROP TABLE {table}")
-                        self.log(f"Leere Tabelle gelöscht: {table}")
+                        self.log(f"Empty table deleted: {table}")
                     else:
-                        self.log(f"Tabelle {table} behalten (enthält noch {count} Einträge)")
-                        
+                        self.log(f"Table {table} kept (still contains {count} entries)")
+
                 except Exception as e:
-                    self.log(f"Fehler beim Prüfen/Löschen von {table}: {str(e)}")
+                    self.log(f"Error checking/deleting {table}: {str(e)}")
     
     def migrate_wifi_from_device_data(self, cursor, wifi_data):
-        """Migriert WiFi-Daten von device_data zu wifi_data und entfernt sie aus device_data"""
+        """Migrates WiFi data from device_data to wifi_data and removes it from device_data"""
         try:
-            # Erstelle ein Dictionary der WiFi-Daten nach BSSID für schnellen Zugriff
+            # Create a dictionary of WiFi data by BSSID for quick access
             wifi_dict = {wifi['bssid']: wifi for wifi in wifi_data}
-            
-            # Hole alle WiFi-Einträge aus device_data
+
+            # Get all WiFi entries from device_data
             cursor.execute("""
                 SELECT device_name, device_address, signal_strength, encryption_info,
                        latitude, longitude, timestamp, frequency, channel, wifi_standard,
                        vendor_info, channel_width, max_connection_speed
-                FROM device_data 
+                FROM device_data
                 WHERE device_type = 'WIFI' AND latitude != 0 AND longitude != 0
             """)
-            
+
             device_wifi_entries = cursor.fetchall()
-            self.log(f"Gefunden: {len(device_wifi_entries)} WiFi-Einträge in device_data zum Migrieren")
-            
+            self.log(f"Found: {len(device_wifi_entries)} WiFi entries in device_data to migrate")
+
             migrated_count = 0
             updated_count = 0
             skipped_count = 0
-            
+
             for row in device_wifi_entries:
                 if len(row) >= 13:
                     device_name, device_address, signal_strength, encryption_info, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed = row
@@ -1339,17 +1383,17 @@ class DatabaseCombiner:
                     frequency = channel = wifi_standard = vendor_info = channel_width = max_speed = None
                 
                 bssid = device_address.upper()
-                
-                # Prüfe ob bereits in wifi_data vorhanden
+
+                # Check if already in wifi_data
                 if bssid in wifi_dict:
                     existing_wifi = wifi_dict[bssid]
                     existing_signal = existing_wifi['signal_strength']
-                    
-                    # Vergleiche Signalstärke
+
+                    # Compare signal strength
                     if signal_strength and signal_strength > existing_signal:
-                        # Besseres Signal in device_data - aktualisiere wifi_data
+                        # Better signal in device_data - update wifi_data
                         cursor.execute("""
-                            UPDATE wifi_data 
+                            UPDATE wifi_data
                             SET ssid = ?, signal_strength = ?, verschluesselung = ?,
                                 latitude = ?, longitude = ?, timestamp = ?,
                                 frequency = ?, channel = ?, wifi_standard = ?,
@@ -1358,156 +1402,156 @@ class DatabaseCombiner:
                         """, (device_name, signal_strength, encryption_info, lat, lon, timestamp,
                               frequency, channel, wifi_standard, vendor_info, channel_width, max_speed, bssid))
                         updated_count += 1
-                        self.log(f"WiFi aktualisiert: {device_name} ({bssid}) - besseres Signal")
+                        self.log(f"WiFi updated: {device_name} ({bssid}) - better signal")
                     else:
-                        # Schlechteres Signal - behalte bestehende Daten
+                        # Worse signal - keep existing data
                         skipped_count += 1
                 else:
-                    # Nicht in wifi_data vorhanden - füge hinzu
+                    # Not in wifi_data - add it
                     cursor.execute("""
-                        INSERT INTO wifi_data 
+                        INSERT INTO wifi_data
                         (ssid, bssid, signal_strength, verschluesselung, latitude, longitude, timestamp,
                          frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """, (device_name, bssid, signal_strength, encryption_info, lat, lon, timestamp,
                           frequency, channel, wifi_standard, vendor_info, channel_width, max_speed))
                     migrated_count += 1
-            
-            # Entferne alle WiFi-Einträge aus device_data
+
+            # Remove all WiFi entries from device_data
             cursor.execute("DELETE FROM device_data WHERE device_type = 'WIFI'")
             deleted_count = cursor.rowcount
-            
-            self.log(f"Migration abgeschlossen:")
-            self.log(f"  - {migrated_count} neue WiFi-Einträge zu wifi_data hinzugefügt")
-            self.log(f"  - {updated_count} WiFi-Einträge in wifi_data aktualisiert")
-            self.log(f"  - {skipped_count} WiFi-Einträge übersprungen (schlechteres Signal)")
-            self.log(f"  - {deleted_count} WiFi-Einträge aus device_data entfernt")
-            
+
+            self.log(f"Migration completed:")
+            self.log(f"  - {migrated_count} new WiFi entries added to wifi_data")
+            self.log(f"  - {updated_count} WiFi entries updated in wifi_data")
+            self.log(f"  - {skipped_count} WiFi entries skipped (worse signal)")
+            self.log(f"  - {deleted_count} WiFi entries removed from device_data")
+
         except Exception as e:
-            self.log(f"Fehler bei der WiFi-Migration: {str(e)}")
+            self.log(f"Error during WiFi migration: {str(e)}")
     
     def migrate_wifi_from_device_data_simple(self, cursor):
-        """Einfache Migration: Verschiebt WiFi-Daten von device_data zu wifi_data"""
+        """Simple migration: Moves WiFi data from device_data to wifi_data"""
         try:
-            # Prüfe ob WiFi-Einträge in device_data existieren
+            # Check if WiFi entries exist in device_data
             cursor.execute("SELECT COUNT(*) FROM device_data WHERE device_type = 'WIFI'")
             wifi_count = cursor.fetchone()[0]
-            
+
             if wifi_count == 0:
-                self.log("Keine WiFi-Einträge in device_data gefunden.")
+                self.log("No WiFi entries found in device_data.")
                 return
-            
-            self.log(f"Gefunden: {wifi_count} WiFi-Einträge in device_data")
-            
-            # Verschiebe WiFi-Daten zu wifi_data
+
+            self.log(f"Found: {wifi_count} WiFi entries in device_data")
+
+            # Move WiFi data to wifi_data
             cursor.execute("""
-                INSERT OR IGNORE INTO wifi_data 
+                INSERT OR IGNORE INTO wifi_data
                 (ssid, bssid, signal_strength, verschluesselung, latitude, longitude, timestamp,
                  frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed)
                 SELECT device_name, device_address, signal_strength, encryption_info, latitude, longitude, timestamp,
                        frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed
-                FROM device_data 
+                FROM device_data
                 WHERE device_type = 'WIFI' AND latitude != 0 AND longitude != 0
             """)
-            
+
             inserted_count = cursor.rowcount
-            
-            # Entferne WiFi-Einträge aus device_data
+
+            # Remove WiFi entries from device_data
             cursor.execute("DELETE FROM device_data WHERE device_type = 'WIFI'")
             deleted_count = cursor.rowcount
-            
-            self.log(f"Migration abgeschlossen: {inserted_count} eingefügt, {deleted_count} aus device_data entfernt")
-            
+
+            self.log(f"Migration completed: {inserted_count} inserted, {deleted_count} removed from device_data")
+
         except Exception as e:
-            self.log(f"Fehler bei der einfachen WiFi-Migration: {str(e)}")
+            self.log(f"Error during simple WiFi migration: {str(e)}")
     
     def remove_wifi_duplicates(self, cursor):
-        """Entfernt WiFi-Duplikate basierend auf BSSID"""
+        """Removes WiFi duplicates based on BSSID"""
         try:
-            # Finde Duplikate
+            # Find duplicates
             cursor.execute("""
-                SELECT bssid, COUNT(*) as count 
-                FROM wifi_data 
-                GROUP BY bssid 
+                SELECT bssid, COUNT(*) as count
+                FROM wifi_data
+                GROUP BY bssid
                 HAVING COUNT(*) > 1
             """)
             duplicates = cursor.fetchall()
-            
+
             if not duplicates:
-                self.log("Keine WiFi-Duplikate gefunden.")
+                self.log("No WiFi duplicates found.")
                 return 0
-            
+
             total_removed = 0
             for bssid, count in duplicates:
-                # Behalte nur den besten Eintrag (bestes Signal, neuester Timestamp)
+                # Keep only the best entry (best signal, newest timestamp)
                 cursor.execute("""
-                    DELETE FROM wifi_data 
+                    DELETE FROM wifi_data
                     WHERE bssid = ? AND id NOT IN (
-                        SELECT id FROM wifi_data 
-                        WHERE bssid = ? 
-                        ORDER BY signal_strength DESC, timestamp DESC, id DESC 
+                        SELECT id FROM wifi_data
+                        WHERE bssid = ?
+                        ORDER BY signal_strength DESC, timestamp DESC, id DESC
                         LIMIT 1
                     )
                 """, (bssid, bssid))
                 removed = cursor.rowcount
                 total_removed += removed
                 if removed > 0:
-                    self.log(f"WiFi {bssid}: {removed} Duplikate entfernt")
-            
+                    self.log(f"WiFi {bssid}: {removed} duplicates removed")
+
             return total_removed
-            
+
         except Exception as e:
-            self.log(f"Fehler beim Entfernen von WiFi-Duplikaten: {str(e)}")
+            self.log(f"Error removing WiFi duplicates: {str(e)}")
             return 0
     
     def remove_bluetooth_duplicates(self, cursor):
-        """Entfernt Bluetooth-Duplikate basierend auf device_address"""
+        """Removes Bluetooth duplicates based on device_address"""
         try:
-            # Finde Duplikate
+            # Find duplicates
             cursor.execute("""
-                SELECT device_address, COUNT(*) as count 
-                FROM device_data 
+                SELECT device_address, COUNT(*) as count
+                FROM device_data
                 WHERE device_type = 'BLUETOOTH'
-                GROUP BY device_address 
+                GROUP BY device_address
                 HAVING COUNT(*) > 1
             """)
             duplicates = cursor.fetchall()
-            
+
             if not duplicates:
-                self.log("Keine Bluetooth-Duplikate gefunden.")
+                self.log("No Bluetooth duplicates found.")
                 return 0
-            
+
             total_removed = 0
             for device_address, count in duplicates:
-                # Behalte nur den besten Eintrag (bestes Signal, neuester Timestamp)
+                # Keep only the best entry (best signal, newest timestamp)
                 cursor.execute("""
-                    DELETE FROM device_data 
+                    DELETE FROM device_data
                     WHERE device_address = ? AND device_type = 'BLUETOOTH' AND id NOT IN (
-                        SELECT id FROM device_data 
+                        SELECT id FROM device_data
                         WHERE device_address = ? AND device_type = 'BLUETOOTH'
-                        ORDER BY signal_strength DESC, timestamp DESC, id DESC 
+                        ORDER BY signal_strength DESC, timestamp DESC, id DESC
                         LIMIT 1
                     )
                 """, (device_address, device_address))
                 removed = cursor.rowcount
                 total_removed += removed
                 if removed > 0:
-                    self.log(f"Bluetooth {device_address}: {removed} Duplikate entfernt")
-            
+                    self.log(f"Bluetooth {device_address}: {removed} duplicates removed")
+
             return total_removed
-            
+
         except Exception as e:
-            self.log(f"Fehler beim Entfernen von Bluetooth-Duplikaten: {str(e)}")
+            self.log(f"Error removing Bluetooth duplicates: {str(e)}")
             return 0
     
     def remove_duplicates_after_merge(self, cursor):
-        """Entfernt Duplikate nach der Zusammenführung basierend auf besserem Signal und neuerem Timestamp"""
+        """Removes duplicates after merge based on better signal and newer timestamp"""
         try:
             wifi_removed = 0
             bluetooth_removed = 0
-            
-            # 1. WiFi-Duplikate in wifi_data entfernen
-            self.log("Entferne WiFi-Duplikate basierend auf BSSID...")
+
+            # 1. Remove WiFi duplicates in wifi_data
+            self.log("Removing WiFi duplicates based on BSSID...")
             cursor.execute("""
                 DELETE FROM wifi_data 
                 WHERE id NOT IN (
@@ -1542,78 +1586,78 @@ class DatabaseCombiner:
                 )
             """)
             wifi_removed = cursor.rowcount
-            
-            # Einfachere Methode für WiFi-Duplikate
+
+            # Simpler method for WiFi duplicates
             if wifi_removed == 0:
-                # Finde und entferne WiFi-Duplikate mit besserer Logik
+                # Find and remove WiFi duplicates with better logic
                 cursor.execute("""
-                    SELECT bssid, COUNT(*) as count 
-                    FROM wifi_data 
-                    GROUP BY bssid 
+                    SELECT bssid, COUNT(*) as count
+                    FROM wifi_data
+                    GROUP BY bssid
                     HAVING COUNT(*) > 1
                 """)
                 wifi_duplicates = cursor.fetchall()
-                
+
                 for bssid, count in wifi_duplicates:
-                    # Behalte den Eintrag mit bestem Signal und neuestem Timestamp
+                    # Keep the entry with best signal and newest timestamp
                     cursor.execute("""
-                        DELETE FROM wifi_data 
+                        DELETE FROM wifi_data
                         WHERE bssid = ? AND id NOT IN (
-                            SELECT id FROM wifi_data 
-                            WHERE bssid = ? 
-                            ORDER BY signal_strength DESC, timestamp DESC, id DESC 
+                            SELECT id FROM wifi_data
+                            WHERE bssid = ?
+                            ORDER BY signal_strength DESC, timestamp DESC, id DESC
                             LIMIT 1
                         )
                     """, (bssid, bssid))
                     wifi_removed += cursor.rowcount
-            
-            # 2. Bluetooth-Duplikate in device_data entfernen
-            self.log("Entferne Bluetooth-Duplikate basierend auf device_address...")
+
+            # 2. Remove Bluetooth duplicates in device_data
+            self.log("Removing Bluetooth duplicates based on device_address...")
             cursor.execute("""
-                SELECT device_address, COUNT(*) as count 
-                FROM device_data 
+                SELECT device_address, COUNT(*) as count
+                FROM device_data
                 WHERE device_type = 'BLUETOOTH'
-                GROUP BY device_address 
+                GROUP BY device_address
                 HAVING COUNT(*) > 1
             """)
             bluetooth_duplicates = cursor.fetchall()
-            
+
             for device_address, count in bluetooth_duplicates:
-                # Behalte den Eintrag mit bestem Signal und neuestem Timestamp
+                # Keep the entry with best signal and newest timestamp
                 cursor.execute("""
-                    DELETE FROM device_data 
+                    DELETE FROM device_data
                     WHERE device_address = ? AND device_type = 'BLUETOOTH' AND id NOT IN (
-                        SELECT id FROM device_data 
+                        SELECT id FROM device_data
                         WHERE device_address = ? AND device_type = 'BLUETOOTH'
-                        ORDER BY signal_strength DESC, timestamp DESC, id DESC 
+                        ORDER BY signal_strength DESC, timestamp DESC, id DESC
                         LIMIT 1
                     )
                 """, (device_address, device_address))
                 bluetooth_removed += cursor.rowcount
-            
+
             total_removed = wifi_removed + bluetooth_removed
-            
+
             if total_removed > 0:
-                self.log(f"Duplikate entfernt: {wifi_removed} WiFi, {bluetooth_removed} Bluetooth (Gesamt: {total_removed})")
+                self.log(f"Duplicates removed: {wifi_removed} WiFi, {bluetooth_removed} Bluetooth (Total: {total_removed})")
             else:
-                self.log("Keine Duplikate gefunden.")
-            
+                self.log("No duplicates found.")
+
             return {
                 'wifi_removed': wifi_removed,
                 'bluetooth_removed': bluetooth_removed,
                 'total_removed': total_removed
             }
-            
+
         except Exception as e:
-            self.log(f"Fehler beim Entfernen von Duplikaten: {str(e)}")
+            self.log(f"Error removing duplicates: {str(e)}")
             return None
     
     def run(self):
-        """Startet die GUI"""
+        """Starts the GUI"""
         self.root.mainloop()
 
 def main():
-    """Hauptfunktion"""
+    """Main function"""
     app = DatabaseCombiner()
     app.run()
 

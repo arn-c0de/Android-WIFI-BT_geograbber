@@ -9,15 +9,15 @@ import tempfile
 import json
 
 def get_vendor_from_oui(bssid):
-    """Ermittelt den Hersteller anhand der OUI (ersten 6 Zeichen der MAC-Adresse)"""
+    """Determines the manufacturer based on the OUI (first 6 characters of the MAC address)"""
     if not bssid or len(bssid) < 8:
         return "Unknown"
-    
+
     oui = bssid[:8].upper().replace(":", "").replace("-", "")
     if len(oui) < 6:
         return "Unknown"
-    
-    # Bekannte Hersteller-OUIs
+
+    # Known manufacturer OUIs
     vendor_db = {
         "005056": "VMware",
         "000C29": "VMware", 
@@ -77,15 +77,15 @@ def get_vendor_from_oui(bssid):
     return vendor_db.get(oui_key, f"Unknown ({bssid[:8]})")
 
 def select_database_file():
-    """Öffnet einen Dateiauswahl-Dialog für .db Dateien"""
+    """Opens a file selection dialog for .db files"""
     root = tk.Tk()
-    root.withdraw()  # Versteckt das Hauptfenster
-    
-    # Startverzeichnis ist der Programmordner
+    root.withdraw()  # Hides the main window
+
+    # Start directory is the program folder
     initial_dir = os.path.dirname(os.path.abspath(__file__))
-    
+
     file_path = filedialog.askopenfilename(
-        title="Wähle eine WiFi-Scanner Datenbank aus",
+        title="Select a WiFi Scanner Database",
         initialdir=initial_dir,
         filetypes=[("Database files", "*.db"), ("All files", "*.*")]
     )
@@ -94,25 +94,25 @@ def select_database_file():
     return file_path
 
 def load_wifi_data(db_path):
-    """Lädt WiFi- und Bluetooth-Daten aus der SQLite-Datenbank"""
+    """Loads WiFi and Bluetooth data from the SQLite database"""
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        
-        # Prüfe zuerst ob die neue device_data Tabelle existiert
+
+        # Check first if the new device_data table exists
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='device_data'")
         has_device_table = cursor.fetchone() is not None
         
         all_data = []
         
         if has_device_table:
-            # Prüfe verfügbare Spalten in device_data Tabelle
+            # Check available columns in device_data table
             cursor.execute("PRAGMA table_info(device_data)")
             device_columns = [col[1] for col in cursor.fetchall()]
             has_movement_tracking = 'last_seen_latitude' in device_columns
-            
-            # Nur Bluetooth-Daten aus device_data laden (WiFi ist in wifi_data)
-            # Alle Bluetooth-Geräte laden (auch Unknown Device für "Bluetooth" Filter)
+
+            # Only load Bluetooth data from device_data (WiFi is in wifi_data)
+            # Load all Bluetooth devices (including Unknown Device for "Bluetooth" filter)
             if has_movement_tracking:
                 query = """
                 SELECT device_name, device_address, device_type, signal_strength, 
@@ -135,12 +135,12 @@ def load_wifi_data(db_path):
             
             cursor.execute(query)
             device_data = cursor.fetchall()
-            
-            # Konvertiere zu erweitertem Format
+
+            # Convert to extended format
             for row in device_data:
-                if has_movement_tracking and len(row) >= 18:  # Neue Struktur mit Bewegungsverfolgung
+                if has_movement_tracking and len(row) >= 18:  # New structure with movement tracking
                     device_name, device_address, device_type, signal_strength, encryption_info, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed, last_seen_lat, last_seen_lon, last_seen_timestamp, movement_distance = row
-                    # Vendor-Info aus DB verwenden, falls nicht vorhanden aus MAC ableiten
+                    # Use vendor info from DB, if not available derive from MAC
                     if not vendor_info or vendor_info == "Unknown":
                         vendor_info = get_vendor_from_oui(device_address)
                     
@@ -165,9 +165,9 @@ def load_wifi_data(db_path):
                         'movement_distance': movement_distance,
                         'source_table': 'device_data'
                     })
-                elif len(row) >= 14:  # Erweiterte Daten verfügbar (ohne Bewegungsverfolgung)
+                elif len(row) >= 14:  # Extended data available (without movement tracking)
                     device_name, device_address, device_type, signal_strength, encryption_info, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed = row
-                    # Vendor-Info aus DB verwenden, falls nicht vorhanden aus MAC ableiten
+                    # Use vendor info from DB, if not available derive from MAC
                     if not vendor_info or vendor_info == "Unknown":
                         vendor_info = get_vendor_from_oui(device_address)
                     
@@ -192,7 +192,7 @@ def load_wifi_data(db_path):
                         'movement_distance': None,
                         'source_table': 'device_data'
                     })
-                else:  # Alte Datenstruktur
+                else:  # Old data structure
                     device_name, device_address, device_type, signal_strength, encryption_info, lat, lon, timestamp = row[:8]
                     vendor_info = get_vendor_from_oui(device_address)
                     
@@ -217,14 +217,14 @@ def load_wifi_data(db_path):
                         'movement_distance': None,
                         'source_table': 'device_data'
                     })
-        
-        # Prüfe ob wifi_data Tabelle existiert
+
+        # Check if wifi_data table exists
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wifi_data'")
         has_wifi_table = cursor.fetchone() is not None
-        
+
         if has_wifi_table:
-            # Alle WiFi-Daten aus wifi_data laden
-            # Prüfe ob erweiterte Felder in wifi_data existieren
+            # Load all WiFi data from wifi_data
+            # Check if extended fields exist in wifi_data
             cursor.execute("PRAGMA table_info(wifi_data)")
             columns = [column[1] for column in cursor.fetchall()]
             has_extended_fields = 'frequency' in columns
@@ -249,8 +249,8 @@ def load_wifi_data(db_path):
             
             cursor.execute(query)
             wifi_data = cursor.fetchall()
-            
-            # Konvertiere WiFi-Daten
+
+            # Convert WiFi data
             for row in wifi_data:
                 if has_extended_fields and len(row) >= 13:
                     ssid, bssid, signal_strength, verschluesselung, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed = row[:13]
@@ -278,11 +278,11 @@ def load_wifi_data(db_path):
                     'max_speed': max_speed,
                     'source_table': 'wifi_data'
                 })
-        
+
         conn.close()
-        
-        # Deduplizierung: Entferne Duplikate basierend auf BSSID/MAC-Adresse
-        # Bevorzuge neueste Einträge (höchster Zeitstempel) und bessere Signalstärke
+
+        # Deduplication: Remove duplicates based on BSSID/MAC address
+        # Prefer newest entries (highest timestamp) and better signal strength
         seen_devices = {}
         deduplicated_data = []
         
@@ -291,50 +291,50 @@ def load_wifi_data(db_path):
             
             if device_key in seen_devices:
                 existing = seen_devices[device_key]
-                
-                # Vergleiche zuerst Zeitstempel (neuester gewinnt)
+
+                # Compare timestamp first (newest wins)
                 if device['timestamp'] > existing['timestamp']:
-                    # Neuerer Eintrag - ersetze
+                    # Newer entry - replace
                     seen_devices[device_key] = device
                 elif device['timestamp'] == existing['timestamp']:
-                    # Gleicher Zeitstempel - vergleiche Signal
+                    # Same timestamp - compare signal
                     current_signal = existing.get('signal', -999)
                     new_signal = device.get('signal', -999)
                     if new_signal > current_signal:
                         seen_devices[device_key] = device
-                # Sonst behalte den existierenden
+                # Otherwise keep the existing one
             else:
                 seen_devices[device_key] = device
-        
-        # Erstelle finale Liste ohne Duplikate
+
+        # Create final list without duplicates
         deduplicated_data = list(seen_devices.values())
-        
-        print(f"Vor Deduplizierung: {len(all_data)} Geräte")
-        print(f"Nach Deduplizierung: {len(deduplicated_data)} Geräte")
-        print(f"Entfernte Duplikate: {len(all_data) - len(deduplicated_data)}")
+
+        print(f"Before deduplication: {len(all_data)} devices")
+        print(f"After deduplication: {len(deduplicated_data)} devices")
+        print(f"Removed duplicates: {len(all_data) - len(deduplicated_data)}")
         
         return deduplicated_data
-        
+
     except Exception as e:
-        messagebox.showerror("Datenbankfehler", f"Fehler beim Laden der Datenbank: {str(e)}")
+        messagebox.showerror("Database Error", f"Error loading database: {str(e)}")
         return []
 
 def update_device_location_in_db(db_path, device_address, device_type, new_lat, new_lon):
-    """Aktualisiert die GPS-Koordinaten eines Geräts in der Datenbank"""
+    """Updates the GPS coordinates of a device in the database"""
     try:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
-        
-        # Prüfe welche Tabellen existieren
+
+        # Check which tables exist
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='device_data'")
         has_device_table = cursor.fetchone() is not None
         
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='wifi_data'")
         has_wifi_table = cursor.fetchone() is not None
-        
+
         updated_rows = 0
-        
-        # Update in device_data Tabelle falls vorhanden
+
+        # Update in device_data table if available
         if has_device_table:
             cursor.execute("""
                 UPDATE device_data 
@@ -342,8 +342,8 @@ def update_device_location_in_db(db_path, device_address, device_type, new_lat, 
                 WHERE device_address = ? AND device_type = ?
             """, (new_lat, new_lon, device_address, device_type))
             updated_rows += cursor.rowcount
-        
-        # Update in wifi_data Tabelle falls WiFi-Gerät und Tabelle vorhanden
+
+        # Update in wifi_data table if WiFi device and table available
         if has_wifi_table and device_type == 'WIFI':
             cursor.execute("""
                 UPDATE wifi_data 
@@ -356,83 +356,83 @@ def update_device_location_in_db(db_path, device_address, device_type, new_lat, 
         conn.close()
         
         return updated_rows > 0
-        
+
     except Exception as e:
-        print(f"Fehler beim Aktualisieren der Geräteposition: {str(e)}")
+        print(f"Error updating device position: {str(e)}")
         return False
 
 def create_wifi_map(device_data, db_filename, db_path=None):
-    """Erstellt eine interaktive Karte mit WiFi- und Bluetooth-Daten"""
+    """Creates an interactive map with WiFi and Bluetooth data"""
     if not device_data:
-        messagebox.showwarning("Keine Daten", "Keine Geräte mit gültigen GPS-Koordinaten gefunden!")
+        messagebox.showwarning("No Data", "No devices with valid GPS coordinates found!")
         return None
-    
-    # Berechne Kartenzentrum (Durchschnitt aller Koordinaten)
+
+    # Calculate map center (average of all coordinates)
     avg_lat = sum(device['lat'] for device in device_data) / len(device_data)
     avg_lon = sum(device['lon'] for device in device_data) / len(device_data)
-    
-    # Erstelle die Karte
+
+    # Create the map
     device_map = folium.Map(
         location=[avg_lat, avg_lon],
         zoom_start=15,
         tiles='OpenStreetMap'
     )
-    
-    # Erstelle eine einzige FeatureGroup für alle Marker
-    all_devices_group = folium.FeatureGroup(name="Alle Geräte")
-    
-    # Filter-Kategorien für JavaScript-basierte Filterung
+
+    # Create a single FeatureGroup for all markers
+    all_devices_group = folium.FeatureGroup(name="All Devices")
+
+    # Filter categories for JavaScript-based filtering
     filter_categories = {
-        'wifi_open': 'WiFi Offen',
-        'wifi_encrypted': 'WiFi Verschlüsselt',
+        'wifi_open': 'WiFi Open',
+        'wifi_encrypted': 'WiFi Encrypted',
         'bluetooth': 'Bluetooth',
-        'bluetooth_known': 'Bluetooth ohne Unknown',
-        'devices_with_movement': 'Geräte mit Bewegung',
-        'signal_very_strong': 'Signal Sehr Stark (≥-50 dBm)',
-        'signal_strong': 'Signal Stark (-50 bis -70 dBm)',
-        'signal_medium': 'Signal Mittel (-70 bis -80 dBm)',
-        'signal_weak': 'Signal Schwach (<-80 dBm)',
+        'bluetooth_known': 'Bluetooth without Unknown',
+        'devices_with_movement': 'Devices with Movement',
+        'signal_very_strong': 'Signal Very Strong (≥-50 dBm)',
+        'signal_strong': 'Signal Strong (-50 to -70 dBm)',
+        'signal_medium': 'Signal Medium (-70 to -80 dBm)',
+        'signal_weak': 'Signal Weak (<-80 dBm)',
         'vodafone': 'Vodafone Homespot/Hotspot',
-        'wifi_open_no_vodafone': 'WiFi Offen ohne Vodafone'
+        'wifi_open_no_vodafone': 'WiFi Open without Vodafone'
     }
-    
-    # Zähle verschiedene Gerätetypen
+
+    # Count different device types
     wifi_open = 0
     wifi_encrypted = 0
     bluetooth_count = 0
     bluetooth_known_count = 0
     vodafone_homespot_count = 0
     wifi_open_no_vodafone = 0
-    
-    # Berechne Filter-Klassen für jedes Gerät im Voraus
+
+    # Calculate filter classes for each device in advance
     device_filters = []
     for device in device_data:
         filter_classes = []
-        
-        # Nach Gerätetyp und Verschlüsselung
+
+        # By device type and encryption
         if device['type'] == "WIFI":
             if device['encryption'] == "offen":
                 filter_classes.append('wifi_open')
-                # WiFi Offen ohne Vodafone - nur wenn es KEIN Vodafone Homespot ist
+                # WiFi Open without Vodafone - only if it's NOT a Vodafone Homespot
                 if not (device['name'] and ("vodafone homespot" in device['name'].lower() or "vodafone hotspot" in device['name'].lower())):
                     filter_classes.append('wifi_open_no_vodafone')
             else:
                 filter_classes.append('wifi_encrypted')
         else:  # Bluetooth
             filter_classes.append('bluetooth')
-            # Bluetooth ohne Unknown Device in separate Gruppe
+            # Bluetooth without Unknown Device in separate group
             if device['name'] and device['name'] not in ["[Unknown Device]", "Unknown Device"]:
                 filter_classes.append('bluetooth_known')
-        
-        # Vodafone Homespot in separate Gruppe
+
+        # Vodafone Homespot in separate group
         if device['type'] == "WIFI" and device['name'] and ("vodafone homespot" in device['name'].lower() or "vodafone hotspot" in device['name'].lower()):
             filter_classes.append('vodafone')
-        
-        # Nach Bewegung - prüfe ob Gerät Bewegungsdaten hat
+
+        # By movement - check if device has movement data
         if device.get('last_seen_lat') is not None and device.get('last_seen_lon') is not None:
             filter_classes.append('devices_with_movement')
-        
-        # Nach Signalstärke
+
+        # By signal strength
         if device['signal'] is not None:
             if device['signal'] >= -50:
                 filter_classes.append('signal_very_strong')
@@ -443,16 +443,16 @@ def create_wifi_map(device_data, db_filename, db_path=None):
             else:
                 filter_classes.append('signal_weak')
         else:
-            filter_classes.append('signal_weak')  # Fallback für unbekannte Signale
-            
+            filter_classes.append('signal_weak')  # Fallback for unknown signals
+
         device_filters.append(filter_classes)
 
-    # Keine Verteilung überlappender Marker mehr, alle Marker bleiben exakt auf ihren Datenbank-Koordinaten
+    # No distribution of overlapping markers anymore, all markers stay exactly on their database coordinates
     device_data_distributed = device_data.copy()
-    
-    # Füge alle Marker zu einer einzigen Gruppe hinzu mit Filter-Klassen
+
+    # Add all markers to a single group with filter classes
     for i, device in enumerate(device_data_distributed):
-        filter_classes = device_filters[i]  # Verwende vorberechnete Filter-Klassen
+        filter_classes = device_filters[i]  # Use pre-calculated filter classes
         device_name = device['name']
         device_address = device['address']
         device_type = device['type']
@@ -461,41 +461,41 @@ def create_wifi_map(device_data, db_filename, db_path=None):
         lat = device['lat']
         lon = device['lon']
         timestamp = device['timestamp']
-        # Keine Verteilung mehr, daher immer False und original = aktuelle Koordinaten
+        # No distribution anymore, so always False and original = current coordinates
         is_distributed = False
         original_lat = lat
         original_lon = lon
 
-        # Dynamischer Kreisradius je nach Signalstärke (dBm)
+        # Dynamic circle radius depending on signal strength (dBm)
         if signal is not None:
             if signal >= -50:
-                circle_radius = 10  # sehr stark
+                circle_radius = 10  # very strong
             elif signal >= -70:
-                circle_radius = 20  # stark
+                circle_radius = 20  # strong
             elif signal >= -80:
-                circle_radius = 30  # mittel
+                circle_radius = 30  # medium
             else:
-                circle_radius = 40  # schwach
+                circle_radius = 40  # weak
         else:
             circle_radius = 30  # fallback
 
-        # Gerätenamen behandeln (falls leer)
+        # Handle device names (if empty)
         if not device_name or device_name.strip() == "":
             if device_type == "WIFI":
                 device_name = "[Hidden Network]"
             else:
                 device_name = "[Unknown Device]"
 
-        # Hat das Gerät Bewegungsdaten?
+        # Does the device have movement data?
         has_movement_data = device.get('last_seen_lat') is not None and device.get('last_seen_lon') is not None
 
-        # Icon und Farbe basierend auf Gerätetyp und Verschlüsselung
+        # Icon and color based on device type and encryption
         if device_type == "WIFI":
             if encryption_info == "offen":
                 icon_color = "red"
                 icon_name = "wifi"
                 wifi_open += 1
-                # Zähle WiFi offen ohne Vodafone separat (exkludiert Homespot UND Hotspot)
+                # Count WiFi open without Vodafone separately (excludes Homespot AND Hotspot)
                 if not (device_name and ("vodafone homespot" in device_name.lower() or "vodafone hotspot" in device_name.lower())):
                     wifi_open_no_vodafone += 1
             else:
@@ -506,94 +506,94 @@ def create_wifi_map(device_data, db_filename, db_path=None):
             icon_color = "blue"
             icon_name = "bluetooth"
             bluetooth_count += 1
-            # Zähle bekannte Bluetooth-Geräte (nicht "Unknown Device")
+            # Count known Bluetooth devices (not "Unknown Device")
             if device_name and device_name not in ["[Unknown Device]", "Unknown Device"]:
                 bluetooth_known_count += 1
 
-        # Zähle Vodafone Homespot und Hotspot separat
+        # Count Vodafone Homespot and Hotspot separately
         if device_type == "WIFI" and device_name and ("vodafone homespot" in device_name.lower() or "vodafone hotspot" in device_name.lower()):
             vodafone_homespot_count += 1
 
-        # Signalstärke-Bewertung
+        # Signal strength rating
         if signal >= -50:
-            signal_text = "Sehr stark"
+            signal_text = "Very strong"
         elif signal >= -70:
-            signal_text = "Stark"
+            signal_text = "Strong"
         elif signal >= -80:
-            signal_text = "Mittel"
+            signal_text = "Medium"
         else:
-            signal_text = "Schwach"
+            signal_text = "Weak"
 
-        # Popup-Text mit allen Informationen
+        # Popup text with all information
         if device_type == "WIFI":
             popup_text = f"""
             <b>SSID:</b> {device_name}<br>
             <b>BSSID:</b> {device_address}<br>
             <b>Signal:</b> {signal} dBm ({signal_text})<br>
-            <b>Verschlüsselung:</b> {encryption_info}<br>
+            <b>Encryption:</b> {encryption_info}<br>
             """
 
-            # Erweiterte WiFi-Informationen hinzufügen falls verfügbar
+            # Add extended WiFi information if available
             if device.get('frequency'):
-                popup_text += f"<b>Frequenz:</b> {device['frequency']} MHz<br>"
+                popup_text += f"<b>Frequency:</b> {device['frequency']} MHz<br>"
             if device.get('channel'):
-                popup_text += f"<b>Kanal:</b> {device['channel']}<br>"
+                popup_text += f"<b>Channel:</b> {device['channel']}<br>"
             if device.get('standard'):
                 popup_text += f"<b>Standard:</b> {device['standard']}<br>"
             if device.get('channel_width'):
-                popup_text += f"<b>Kanalbreite:</b> {device['channel_width']} MHz<br>"
+                popup_text += f"<b>Channel Width:</b> {device['channel_width']} MHz<br>"
             if device.get('max_speed'):
                 popup_text += f"<b>Max. Speed:</b> {device['max_speed']} Mbps<br>"
             if device.get('vendor'):
-                popup_text += f"<b>Hersteller:</b> {device['vendor']}<br>"
+                popup_text += f"<b>Manufacturer:</b> {device['vendor']}<br>"
 
 
             popup_text += f"""
-            <b>Koordinaten:</b> {lat:.6f}, {lon:.6f}<br>
-            <b>Zeitstempel:</b> {timestamp}
+            <b>Coordinates:</b> {lat:.6f}, {lon:.6f}<br>
+            <b>Timestamp:</b> {timestamp}
             """
-            
-            # Bewegungsdaten hinzufügen falls verfügbar
+
+            # Add movement data if available
             if has_movement_data:
-                popup_text += f"""<br><br><b>--- Bewegungsanalyse ---</b><br>
-                <b>Letzte Position:</b> {device['last_seen_lat']:.6f}, {device['last_seen_lon']:.6f}<br>
-                <b>Letzte Sichtung:</b> {device['last_seen_timestamp']}<br>"""
+                popup_text += f"""<br><br><b>--- Movement Analysis ---</b><br>
+                <b>Last Position:</b> {device['last_seen_lat']:.6f}, {device['last_seen_lon']:.6f}<br>
+                <b>Last Seen:</b> {device['last_seen_timestamp']}<br>"""
                 if device.get('movement_distance'):
-                    popup_text += f"<b>Bewegung:</b> {device['movement_distance']:.1f} m<br>"
+                    popup_text += f"<b>Movement:</b> {device['movement_distance']:.1f} m<br>"
         else:  # Bluetooth
             popup_text = f"""
-            <b>Gerätename:</b> {device_name}<br>
-            <b>MAC-Adresse:</b> {device_address}<br>
+            <b>Device Name:</b> {device_name}<br>
+            <b>MAC Address:</b> {device_address}<br>
             <b>Signal:</b> {signal} dBm ({signal_text})<br>
-            <b>Gerätetyp:</b> Bluetooth<br>
-            <b>Geräteklasse:</b> {encryption_info}<br>
+            <b>Device Type:</b> Bluetooth<br>
+            <b>Device Class:</b> {encryption_info}<br>
             """
             if device.get('vendor'):
-                popup_text += f"<b>Hersteller:</b> {device['vendor']}<br>"
-            
-            
-            popup_text += f"""
-            <b>Koordinaten:</b> {lat:.6f}, {lon:.6f}<br>
-            <b>Zeitstempel:</b> {timestamp}
-            """
-            
-            # Bewegungsdaten hinzufügen falls verfügbar
-            if has_movement_data:
-                popup_text += f"""<br><br><b>--- Bewegungsanalyse ---</b><br>
-                <b>Letzte Position:</b> {device['last_seen_lat']:.6f}, {device['last_seen_lon']:.6f}<br>
-                <b>Letzte Sichtung:</b> {device['last_seen_timestamp']}<br>"""
-                if device.get('movement_distance'):
-                    popup_text += f"<b>Bewegung:</b> {device['movement_distance']:.1f} m<br>"
+                popup_text += f"<b>Manufacturer:</b> {device['vendor']}<br>"
 
-        # Tooltip Text mit Hinweis auf Verteilung
+
+            popup_text += f"""
+            <b>Coordinates:</b> {lat:.6f}, {lon:.6f}<br>
+            <b>Timestamp:</b> {timestamp}
+            """
+
+            # Add movement data if available
+            if has_movement_data:
+                popup_text += f"""<br><br><b>--- Movement Analysis ---</b><br>
+                <b>Last Position:</b> {device['last_seen_lat']:.6f}, {device['last_seen_lon']:.6f}<br>
+                <b>Last Seen:</b> {device['last_seen_timestamp']}<br>"""
+                if device.get('movement_distance'):
+                    popup_text += f"<b>Movement:</b> {device['movement_distance']:.1f} m<br>"
+
+        # Tooltip text with distribution note
         tooltip_text = f"{device_name} ({signal} dBm)"
         if device_type == "BLUETOOTH":
             tooltip_text = f"[BT] {tooltip_text}"
         if device.get('vendor') and device['vendor'] != "Unknown" and not device['vendor'].startswith('Unknown ('):
             tooltip_text += f" - {device['vendor']}"
-        
 
-        # Einziger Marker mit eindeutiger ID für Filter-Zuordnung
+
+        # Single marker with unique ID for filter assignment
         marker_id = f"marker_{device_address.replace(':', '').replace('-', '')}"
         
         marker_color = icon_color
@@ -614,7 +614,7 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                 icon=icon_name,
                 prefix='fa'
             ),
-            draggable=True  # Marker verschiebbar machen
+            draggable=True  # Make marker draggable
         )
         
         circle_id = f"circle_{device_address.replace(':', '').replace('-', '')}"
@@ -628,16 +628,16 @@ def create_wifi_map(device_data, db_filename, db_path=None):
             fill_opacity=0.2,
             weight=1
         )
-        
-        
-        # Zu der einzigen Gruppe hinzufügen
+
+
+        # Add to the single group
         all_devices_group.add_child(marker)
         all_devices_group.add_child(circle)
-    
-    # Einzelne Gruppe zur Karte hinzufügen (alle Marker sind hier drin)
+
+    # Add single group to map (all markers are in here)
     device_map.add_child(all_devices_group)
-    
-    # Custom Layer Control für JavaScript-basierte Filter und Marker-Kontrolle hinzufügen
+
+    # Add custom Layer Control for JavaScript-based filters and marker control
     filter_control_html = f"""
     <div class="custom-layer-control" style="
         position: absolute;
@@ -653,16 +653,16 @@ def create_wifi_map(device_data, db_filename, db_path=None):
         overflow-y: auto;
         box-shadow: 0 1px 7px rgba(0,0,0,0.4);
     ">
-        <h4 style="margin: 0 0 10px 0; font-size: 14px;">Marker Kontrolle</h4>
-        <button onclick="resetAllMarkers()" style="margin: 2px; padding: 6px 12px; font-size: 12px; background: #ff6b6b; color: white; border: none; border-radius: 3px; cursor: pointer;">Marker Zurücksetzen</button>
-        <button onclick="saveAllMarkers()" style="margin: 2px; padding: 6px 12px; font-size: 12px; background: #4ecdc4; color: white; border: none; border-radius: 3px; cursor: pointer;">Positionen Speichern</button>
-        <button onclick="debugMarkers()" style="margin: 2px; padding: 6px 12px; font-size: 12px; background: #9b59b6; color: white; border: none; border-radius: 3px; cursor: pointer;">Debug Marker</button>
+        <h4 style="margin: 0 0 10px 0; font-size: 14px;">Marker Control</h4>
+        <button onclick="resetAllMarkers()" style="margin: 2px; padding: 6px 12px; font-size: 12px; background: #ff6b6b; color: white; border: none; border-radius: 3px; cursor: pointer;">Reset Markers</button>
+        <button onclick="saveAllMarkers()" style="margin: 2px; padding: 6px 12px; font-size: 12px; background: #4ecdc4; color: white; border: none; border-radius: 3px; cursor: pointer;">Save Positions</button>
+        <button onclick="debugMarkers()" style="margin: 2px; padding: 6px 12px; font-size: 12px; background: #9b59b6; color: white; border: none; border-radius: 3px; cursor: pointer;">Debug Markers</button>
         <br>
-        <button onclick="toggleBluetoothMode()" style="margin: 5px 2px 2px 2px; padding: 6px 12px; font-size: 12px; background: #6c5ce7; color: white; border: none; border-radius: 3px; cursor: pointer;" id="bluetooth-mode-btn">BT-Nähe: Nur Bekannte</button>
+        <button onclick="toggleBluetoothMode()" style="margin: 5px 2px 2px 2px; padding: 6px 12px; font-size: 12px; background: #6c5ce7; color: white; border: none; border-radius: 3px; cursor: pointer;" id="bluetooth-mode-btn">BT-Proximity: Known Only</button>
         <div id="save-status" style="font-size: 11px; margin: 5px 0; min-height: 20px;"></div>
-        
+
         <hr style="margin: 10px 0;">
-        <h4 style="margin: 0 0 10px 0; font-size: 14px;">Filter</h4>
+        <h4 style="margin: 0 0 10px 0; font-size: 14px;">Filters</h4>
         """ + "".join([f'''
         <label style="display: block; margin: 5px 0; font-size: 12px; cursor: pointer;">
             <input type="checkbox" id="filter_{key}" onchange="toggleFilter('{key}')" style="margin-right: 8px;">
@@ -670,27 +670,27 @@ def create_wifi_map(device_data, db_filename, db_path=None):
         </label>
         ''' for key, label in filter_categories.items()]) + """
         <hr style="margin: 10px 0;">
-        <button onclick="toggleAllFilters(true)" style="margin: 2px; padding: 4px 8px; font-size: 11px;">Alle Ein</button>
-        <button onclick="toggleAllFilters(false)" style="margin: 2px; padding: 4px 8px; font-size: 11px;">Alle Aus</button>
+        <button onclick="toggleAllFilters(true)" style="margin: 2px; padding: 4px 8px; font-size: 11px;">All On</button>
+        <button onclick="toggleAllFilters(false)" style="margin: 2px; padding: 4px 8px; font-size: 11px;">All Off</button>
     </div>
     """
-    
+
     device_map.get_root().html.add_child(folium.Element(filter_control_html))
-    
-    # CSS und JavaScript für Suchfunktion und Layer-Kontrolle hinzufügen
+
+    # Add CSS and JavaScript for search function and layer control
     search_and_control_js = f"""
     <style>
-    /* Verstecke alle Overlay-Layer beim Start */
+    /* Hide all overlay layers at start */
     .leaflet-control-layers-overlays input[type="checkbox"] {{
-        /* Alle Checkboxen sind standardmäßig nicht aktiviert */
+        /* All checkboxes are not activated by default */
     }}
-    
-    /* Verstecke alle Layer-Gruppen beim Laden */
+
+    /* Hide all layer groups when loading */
     .leaflet-overlay-pane svg g {{
         display: none;
     }}
-    
-    /* Suchbox Styling */
+
+    /* Search box styling */
     .search-container {{
         position: fixed;
         top: 10px;
@@ -736,14 +736,14 @@ def create_wifi_map(device_data, db_filename, db_path=None):
     .search-result-item:last-child {{
         border-bottom: none;
     }}
-    
+
     .search-count {{
         font-size: 12px;
         color: #666;
         margin-top: 5px;
     }}
-    
-    /* Drag-Info Styling */
+
+    /* Drag-Info styling */
     .drag-info {{
         position: fixed;
         bottom: 10px;
@@ -780,33 +780,33 @@ def create_wifi_map(device_data, db_filename, db_path=None):
         filter: brightness(1.1);
     }}
     </style>
-    
-    <!-- Suchbox HTML -->
+
+    <!-- Search box HTML -->
     <div class="search-container">
-        <input type="text" class="search-input" placeholder="SSID oder MAC suchen (z.B. 'Eduard' oder 'db:7a')..." id="searchInput">
+        <input type="text" class="search-input" placeholder="Search SSID or MAC (e.g. 'Eduard' or 'db:7a')..." id="searchInput">
         <div class="search-count" id="searchCount"></div>
         <div class="search-results" id="searchResults"></div>
     </div>
-    
+
     <!-- Drag Info -->
     <div class="drag-info">
-        💡 Tipp: Marker können per Drag & Drop verschoben werden
+        💡 Tip: Markers can be moved via drag & drop
     </div>
-    
+
     <!-- Middle-Click Info -->
     <div class="middle-click-info">
-        🖱️ Mittlere Maustaste oder Rechtsklick: Marker hervorheben + SSID in Suchleiste<br>
-        🔄 Nochmaliger Klick auf denselben Marker: Hervorhebung entfernen
+        🖱️ Middle mouse button or right click: Highlight marker + SSID in search bar<br>
+        🔄 Click same marker again: Remove highlight
     </div>
     
     <script>
-    // Erstelle Filter-Mapping aus den Geräte-Daten
+    // Create filter mapping from device data
     let deviceFilterMap = new Map();
     """ + "".join([f"""
     deviceFilterMap.set('{device["address"]}', {json.dumps(device_filters[i])});""" 
     for i, device in enumerate(device_data_distributed)]) + """
-    
-    // Globale Variablen - Vereinfachte Search-Daten mit verteilten Koordinaten
+
+    // Global variables - Simplified search data with distributed coordinates
     let searchData = """ + json.dumps([{
         'name': device['name'] if device['name'] and device['name'].strip() else '[Hidden Network]',
         'address': device['address'] if device['address'] else 'Unknown',
@@ -826,24 +826,24 @@ def create_wifi_map(device_data, db_filename, db_path=None):
     let highlightedMarkers = [];
     let map = null;
     let pendingUpdates = [];
-    let activeFilters = new Set(); // Aktive Filter
-    let allMarkers = []; // Referenzen zu allen Markern
-    let allCircles = []; // Referenzen zu allen Kreisen
-    let currentlyHighlightedDevice = null; // Aktuell hervorgehobenes Gerät für Toggle-Funktion
-    let movementLayer = null; // Layer für die Bewegungslinie und den zweiten Marker
-    let bluetoothMode = 'known'; // 'known', 'all', 'none' - Standard: nur bekannte Bluetooth-Geräte
+    let activeFilters = new Set(); // Active filters
+    let allMarkers = []; // References to all markers
+    let allCircles = []; // References to all circles
+    let currentlyHighlightedDevice = null; // Currently highlighted device for toggle function
+    let movementLayer = null; // Layer for movement line and second marker
+    let bluetoothMode = 'known'; // 'known', 'all', 'none' - Default: only known Bluetooth devices
     
     console.log('Search data loaded:', searchData.length, 'devices');
-    
-    // Globale Daten für Drag-Events mit verteilten Koordinaten
+
+    // Global data for drag events with distributed coordinates
     let deviceDataMap = new Map();
     """ + "".join([f"""
     deviceDataMap.set('{device["address"]}', {{
         address: '{device["address"]}', 
         type: '{device["type"]}'
     }});""" for device in device_data_distributed]) + """
-    
-    // Filter-Funktionen
+
+    // Filter functions
     function toggleFilter(filterKey) {
         const checkbox = document.getElementById('filter_' + filterKey);
         if (checkbox.checked) {
@@ -870,7 +870,7 @@ def create_wifi_map(device_data, db_filename, db_path=None):
     }
     
     function updateMarkerVisibility() {
-        // Wenn keine Filter aktiv sind, alle verstecken
+        // If no filters are active, hide all
         if (activeFilters.size === 0) {
             allMarkers.forEach(marker => {
                 if (marker._map) {
@@ -884,27 +884,27 @@ def create_wifi_map(device_data, db_filename, db_path=None):
             });
             return;
         }
-        
-        // Durchlaufe alle Geräte und prüfe Filter
+
+        // Iterate through all devices and check filters
         searchData.forEach((device, index) => {
             const deviceFilters = deviceFilterMap.get(device.address) || [];
             let shouldShow = deviceFilters.some(cls => activeFilters.has(cls));
-            // Bluetooth-Filter-Logik
+            // Bluetooth filter logic
             if (device.type === 'BLUETOOTH') {
                 const isUnknown = (device.name === '[Unknown Device]' || device.name === 'Unknown Device' || device.name === '' || device.name == null);
-                // Nur bluetooth_known aktiv: nur bekannte Geräte
+                // Only bluetooth_known active: only known devices
                 if (activeFilters.has('bluetooth_known') && activeFilters.size === 1) {
                     shouldShow = !isUnknown;
                 }
-                // Nur bluetooth aktiv: alle Geräte
+                // Only bluetooth active: all devices
                 else if (activeFilters.has('bluetooth') && activeFilters.size === 1) {
                     shouldShow = true;
                 }
-                // Beide aktiv: nur bekannte Geräte
+                // Both active: only known devices
                 else if (activeFilters.has('bluetooth') && activeFilters.has('bluetooth_known') && activeFilters.size === 2) {
                     shouldShow = !isUnknown;
                 }
-                // bluetooth_known + weitere Filter: Unknown Devices nur zeigen, wenn ein anderer Filter (außer bluetooth_known) für dieses Gerät greift
+                // bluetooth_known + other filters: only show Unknown Devices if another filter (except bluetooth_known) applies to this device
                 else if (activeFilters.has('bluetooth_known') && isUnknown) {
                     const otherActive = deviceFilters.some(cls => cls !== 'bluetooth_known' && activeFilters.has(cls));
                     shouldShow = otherActive;
@@ -913,7 +913,7 @@ def create_wifi_map(device_data, db_filename, db_path=None):
             const marker = allMarkers[index];
             const circle = allCircles[index];
             if (shouldShow) {
-                // Marker anzeigen
+                // Show marker
                 if (marker && !marker._map) {
                     marker.addTo(map);
                 }
@@ -921,7 +921,7 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                     circle.addTo(map);
                 }
             } else {
-                // Marker verstecken
+                // Hide marker
                 if (marker && marker._map) {
                     marker._map.removeLayer(marker);
                 }
@@ -932,56 +932,56 @@ def create_wifi_map(device_data, db_filename, db_path=None):
         });
     }
 
-    // Bluetooth-Modus umschalten
+    // Toggle Bluetooth mode
     function toggleBluetoothMode() {
         const button = document.getElementById('bluetooth-mode-btn');
-        
-        // Umschalten zwischen den Modi
+
+        // Switch between modes
         if (bluetoothMode === 'known') {
             bluetoothMode = 'all';
-            button.textContent = 'BT-Nähe: Alle';
+            button.textContent = 'BT-Proximity: All';
             button.style.background = '#74b9ff';
         } else if (bluetoothMode === 'all') {
             bluetoothMode = 'none';
-            button.textContent = 'BT-Nähe: Keine';
+            button.textContent = 'BT-Proximity: None';
             button.style.background = '#636e72';
         } else {
             bluetoothMode = 'known';
-            button.textContent = 'BT-Nähe: Nur Bekannte';
+            button.textContent = 'BT-Proximity: Known Only';
             button.style.background = '#6c5ce7';
         }
-        
-        // Wenn ein Gerät hervorgehoben ist, aktualisiere die Anzeige
+
+        // If a device is highlighted, update the display
         if (currentlyHighlightedDevice) {
-            // Entferne alte Bluetooth-Marker und erstelle neue
+            // Remove old Bluetooth markers and create new ones
             const currentHighlights = [...highlightedMarkers];
             clearHighlights();
-            
-            // Finde das Gerät und hebe es erneut hervor mit neuen Einstellungen
-            const device = searchData.find(d => 
-                d.address === currentlyHighlightedDevice.address && 
+
+            // Find the device and highlight it again with new settings
+            const device = searchData.find(d =>
+                d.address === currentlyHighlightedDevice.address &&
                 d.type === currentlyHighlightedDevice.type
             );
-            
+
             if (device) {
-                highlightDeviceByObject(device, 'Bluetooth-Modus geändert');
+                highlightDeviceByObject(device, 'Bluetooth mode changed');
             }
         }
-        
-        console.log(`Bluetooth-Modus geändert auf: ${bluetoothMode}`);
+
+        console.log(`Bluetooth mode changed to: ${bluetoothMode}`);
     }
-    
-    // Warte bis die Karte geladen ist
+
+    // Wait until the map is loaded
     document.addEventListener('DOMContentLoaded', function() {
         console.log('DOM loaded, setting up search...');
-        
-        // Finde die Leaflet-Karte
+
+        // Find the Leaflet map
         setTimeout(function() {
-            // Karten-Referenz finden - bessere Methode
+            // Find map reference - better method
             if (typeof window.map_1 !== 'undefined') {
                 map = window.map_1;
             } else {
-                // Fallback: Suche nach Leaflet-Karten-Instanz
+                // Fallback: Search for Leaflet map instance
                 let mapElements = document.querySelectorAll('.leaflet-container');
                 if (mapElements.length > 0) {
                     let mapId = mapElements[0].id;
@@ -990,10 +990,10 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                     }
                 }
             }
-            
+
             console.log('Map found:', map ? 'Yes' : 'No');
-            
-            // Sammle alle Marker und Kreise für die Filter-Kontrolle
+
+            // Collect all markers and circles for filter control
             map.eachLayer(function(layer) {
                 if (layer instanceof L.Marker) {
                     allMarkers.push(layer);
@@ -1002,9 +1002,9 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                 }
             });
 
-            // Alle Marker wirklich als draggable setzen (Leaflet)
+            // Actually set all markers as draggable (Leaflet)
             allMarkers.forEach(function(marker, idx) {
-                // Speichere Gerätedaten direkt am Marker
+                // Store device data directly on marker
                 marker.deviceAddress = searchData[idx].address;
                 marker.deviceType = searchData[idx].type;
                 if (!marker.options.draggable) {
@@ -1020,13 +1020,13 @@ def create_wifi_map(device_data, db_filename, db_path=None):
 
             console.log('Found markers:', allMarkers.length, 'circles:', allCircles.length);
 
-            // Initial alle Marker verstecken (da keine Filter aktiv)
+            // Initially hide all markers (since no filters are active)
             updateMarkerVisibility();
 
             setupSearch();
             setupDragHandlers();
 
-            // Drag-End-Event für alle Marker im Layer registrieren
+            // Register drag-end event for all markers in layer
             map.eachLayer(function(layer) {
                 if (layer instanceof L.Marker && layer.options.draggable && layer.dragging) {
                     layer.on('dragend', function(e) {
@@ -1035,22 +1035,22 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                         var address = e.target.deviceAddress;
                         var typ = e.target.deviceType;
                         if (address && typ) {
-                            console.log('DragEnd (global): Device direkt am Marker:', address, typ, newLat, newLon);
+                            console.log('DragEnd (global): Device directly on marker:', address, typ, newLat, newLon);
                             updateDeviceLocation(address, typ, newLat, newLon);
                             console.log('pendingUpdates:', pendingUpdates.length);
                         } else {
-                            console.warn('DragEnd (global): Keine Gerätedaten am Marker!', newLat, newLon);
+                            console.warn('DragEnd (global): No device data on marker!', newLat, newLon);
                         }
                     });
                 }
             });
         }, 1500);
     });
-    
-    // Setup Drag-Event und Click-Handler für alle Marker
+
+    // Setup drag event and click handler for all markers
     function setupDragHandlers() {
         setTimeout(function() {
-            // Finde alle Marker auf der Karte
+            // Find all markers on the map
             map.eachLayer(function(layer) {
                 if (layer instanceof L.Marker && layer.options.draggable) {
                     // Drag-Event Handler
@@ -1062,34 +1062,34 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                         if (markerIndex !== -1) {
                             device = searchData[markerIndex];
                         }
-                        // Fallback: Suche nach Gerät anhand der Koordinaten
+                        // Fallback: Search for device based on coordinates
                         if (!device) {
                             device = searchData.find(d => Math.abs(d.lat - newLat) < 0.0001 && Math.abs(d.lon - newLon) < 0.0001);
                         }
                         if (device) {
-                            console.log('DragEnd: Device gefunden:', device.address, device.type, newLat, newLon);
+                            console.log('DragEnd: Device found:', device.address, device.type, newLat, newLon);
                             updateDeviceLocation(device.address, device.type, newLat, newLon);
                             console.log('pendingUpdates:', pendingUpdates.length);
                         } else {
-                            console.warn('DragEnd: Kein Gerät zu Marker gefunden!', newLat, newLon);
+                            console.warn('DragEnd: No device found for marker!', newLat, newLon);
                         }
                     });
-                    
-                    // Middle-Click Handler für Highlight-Funktion - Verbesserte Version
+
+                    // Middle-click handler for highlight function - Improved version
                     layer.on('mousedown', function(e) {
                         console.log('Mouse button pressed:', e.originalEvent.button);
-                        
-                        // Prüfe auf mittlere Maustaste (Button 1) oder Rechtsklick als Alternative
+
+                        // Check for middle mouse button (Button 1) or right-click as alternative
                         if (e.originalEvent.button === 1 || e.originalEvent.button === 2) {
-                            e.originalEvent.preventDefault(); // Verhindere Standard-Verhalten
+                            e.originalEvent.preventDefault(); // Prevent default behavior
                             e.originalEvent.stopPropagation();
-                            
+
                             console.log('Middle/Right click detected on marker');
-                            
-                            // Extrahiere Geräte-Info aus Popup
+
+                            // Extract device info from popup
                             var popupContent = e.target.getPopup().getContent();
-                            var addressMatch = popupContent.match(/(?:BSSID|MAC-Adresse):<\/b>\s*([A-Fa-f0-9:]{17})/);
-                            var ssidMatch = popupContent.match(/<b>(?:SSID|Gerätename):<\/b>\s*([^<]+)/);
+                            var addressMatch = popupContent.match(/(?:BSSID|MAC Address):<\/b>\s*([A-Fa-f0-9:]{17})/);
+                            var ssidMatch = popupContent.match(/<b>(?:SSID|Device Name):<\/b>\s*([^<]+)/);
                             
                             console.log('Popup content:', popupContent);
                             console.log('Address match:', addressMatch);
@@ -1105,34 +1105,34 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                                 var device = searchData.find(d => d.address === deviceAddress);
                                 if (device) {
                                     console.log('Device found in searchData, highlighting...');
-                                    
-                                    // Highlight das Gerät wie bei der Suche
+
+                                    // Highlight the device like in search
                                     highlightDeviceByObject(device, deviceName);
-                                    
-                                    // Setze SSID in die Suchleiste (bereinige Sonderzeichen)
+
+                                    // Set SSID in search bar (clean special characters)
                                     var searchInput = document.getElementById('searchInput');
                                     if (searchInput && device.type === 'WIFI') {
-                                        // Entferne HTML-Entities und bereinige String
+                                        // Remove HTML entities and clean string
                                         var cleanName = deviceName.replace(/&lt;/g, '<')
                                                                   .replace(/&gt;/g, '>')
                                                                   .replace(/&amp;/g, '&')
                                                                   .replace(/&quot;/g, '"')
                                                                   .replace(/&#x27;/g, "'");
-                                        
+
                                         searchInput.value = cleanName;
-                                        
+
                                         // Trigger search update
                                         var event = new Event('input', { bubbles: true });
                                         searchInput.dispatchEvent(event);
-                                        
+
                                         // Visual feedback
                                         searchInput.style.backgroundColor = '#e8f5e8';
                                         setTimeout(() => {
                                             searchInput.style.backgroundColor = '';
                                         }, 1000);
                                     }
-                                    
-                                    // Erfolgs-Feedback
+
+                                    // Success feedback
                                     console.log('✅ Marker highlighted successfully!');
                                 } else {
                                     console.warn('Device not found in searchData');
@@ -1140,29 +1140,31 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                             } else {
                                 console.warn('Could not extract device info from popup');
                             }
-                            
-                            return false; // Verhindere weitere Event-Propagation
+
+
+                            return false; // Prevent further event propagation
                         }
                     });
-                    
-                    // Zusätzlicher Context-Menu Handler als Alternative
+
+                    // Additional context menu handler as alternative
                     layer.on('contextmenu', function(e) {
                         e.originalEvent.preventDefault();
                         console.log('Context menu (right click) on marker');
-                        
-                        // Triggere den gleichen Highlight-Prozess
+
+                        // Trigger the same highlight process
                         var popupContent = e.target.getPopup().getContent();
-                        var addressMatch = popupContent.match(/(?:BSSID|MAC-Adresse):<\/b>\s*([A-Fa-f0-9:]{17})/);
-                        var ssidMatch = popupContent.match(/<b>(?:SSID|Gerätename):<\/b>\s*([^<]+)/);
+                        var addressMatch = popupContent.match(/(?:BSSID|MAC Address):<\/b>\s*([A-Fa-f0-9:]{17})/);
+                        var ssidMatch = popupContent.match(/<b>(?:SSID|Device Name):<\/b>\s*([^<]+)/);
                         
                         if (addressMatch && ssidMatch) {
                             var deviceAddress = addressMatch[1];
                             var deviceName = ssidMatch[1].trim();
                             var device = searchData.find(d => d.address === deviceAddress);
-                            
+
+
                             if (device) {
-                                highlightDeviceByObject(device, 'Rechtsklick');
-                                
+                                highlightDeviceByObject(device, 'Right click');
+
                                 var searchInput = document.getElementById('searchInput');
                                 if (searchInput && device.type === 'WIFI') {
                                     var cleanName = deviceName.replace(/&lt;/g, '<')
@@ -1171,13 +1173,13 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                                                               .replace(/&quot;/g, '"')
                                                               .replace(/&#x27;/g, "'");
                                     searchInput.value = cleanName;
-                                    
+
                                     var event = new Event('input', { bubbles: true });
                                     searchInput.dispatchEvent(event);
                                 }
-                                
-                                // Zeige Bestätigung
-                                alert(`✅ Marker hervorgehoben!\nSSID: ${deviceName}\nBSSID: ${deviceAddress}`);
+
+                                // Show confirmation
+                                alert(`✅ Marker highlighted!\nSSID: ${deviceName}\nBSSID: ${deviceAddress}`);
                             }
                         }
                         
@@ -1188,33 +1190,33 @@ def create_wifi_map(device_data, db_filename, db_path=None):
             console.log('Drag and click handlers setup complete');
         }, 2000);
     }
-    
-    // Suchfunktion einrichten
+
+    // Setup search function
     function setupSearch() {
         const searchInput = document.getElementById('searchInput');
         const searchResults = document.getElementById('searchResults');
         const searchCount = document.getElementById('searchCount');
-        
+
         searchInput.addEventListener('input', function() {
             const query = this.value.trim().toLowerCase();
-            
+
             if (query.length < 2) {
                 searchResults.style.display = 'none';
                 searchCount.textContent = '';
                 clearHighlights();
                 return;
             }
-            
-            // Suche in den Daten: SSID ODER MAC-Adresse (bzw. address)
-            const results = searchData.filter(device => 
+
+            // Search in data: SSID OR MAC address
+            const results = searchData.filter(device =>
                 (device.name.toLowerCase().includes(query) || device.address.toLowerCase().includes(query)) && device.type === 'WIFI'
             );
-            
-            // Ergebnisse anzeigen
+
+            // Display results
             displaySearchResults(results, query);
         });
-        
-        // Beim Löschen der Suchleiste auch Hervorhebungen entfernen
+
+        // When clearing search bar, also remove highlights
         searchInput.addEventListener('keyup', function(e) {
             if (e.key === 'Escape' || (e.key === 'Backspace' && this.value.length === 0)) {
                 clearHighlights();
@@ -1222,103 +1224,103 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                 searchCount.textContent = '';
             }
         });
-        
-        // Klick außerhalb schließt Ergebnisse
+
+        // Click outside closes results
         document.addEventListener('click', function(e) {
             if (!e.target.closest('.search-container')) {
                 searchResults.style.display = 'none';
             }
         });
     }
-    
-    // Suchergebnisse anzeigen
+
+    // Display search results
     function displaySearchResults(results, query) {
         const searchResults = document.getElementById('searchResults');
         const searchCount = document.getElementById('searchCount');
-        
+
         if (results.length === 0) {
-            searchResults.innerHTML = '<div class="search-result-item">Keine Ergebnisse gefunden</div>';
-            searchCount.textContent = '0 Ergebnisse';
-            clearHighlights(); // Hervorhebung löschen wenn nichts gefunden
+            searchResults.innerHTML = '<div class="search-result-item">No results found</div>';
+            searchCount.textContent = '0 Results';
+            clearHighlights(); // Clear highlighting when nothing found
             searchResults.style.display = 'block';
         } else {
             searchResults.innerHTML = results.map((device, index) => {
-                const signalText = device.signal >= -50 ? 'Sehr stark' : 
-                                 device.signal >= -70 ? 'Stark' : 
-                                 device.signal >= -80 ? 'Mittel' : 'Schwach';
+                const signalText = device.signal >= -50 ? 'Very strong' :
+                                 device.signal >= -70 ? 'Strong' :
+                                 device.signal >= -80 ? 'Medium' : 'Weak';
                 
                 return `<div class="search-result-item" onclick="highlightDevice(${index}, '${query}')">
                     <strong>${device.name}</strong><br>
                     <small>${device.address} | ${device.signal} dBm (${signalText}) | ${device.encryption}</small>
                 </div>`;
             }).join('');
-            
-            searchCount.textContent = `${results.length} Ergebnis${results.length !== 1 ? 'se' : ''}`;
+
+            searchCount.textContent = `${results.length} Result${results.length !== 1 ? 's' : ''}`;
             searchResults.style.display = 'block';
-            
-            // Automatisch hervorheben, wenn nur ein Ergebnis gefunden wurde
+
+            // Automatically highlight if only one result was found
             if (results.length === 1) {
                 setTimeout(() => {
                     highlightDeviceByObject(results[0], query);
                 }, 100);
             }
         }
-        
-        // Speichere aktuelle Suchergebnisse
+
+        // Save current search results
         window.currentSearchResults = results;
     }
-    
-    // Gerät auf Karte hervorheben (über Index aus Suchergebnissen)
+
+    // Highlight device on map (via index from search results)
     function highlightDevice(index, query) {
         if (!map || !window.currentSearchResults) return;
-        
+
         const device = window.currentSearchResults[index];
         highlightDeviceByObject(device, query);
     }
-    
-    // Gerät auf Karte hervorheben (direkt über Device-Objekt)
+
+    // Highlight device on map (directly via device object)
     function highlightDeviceByObject(device, query) {
         if (!map || !device) return;
-        
-        // Prüfe ob das gleiche Gerät bereits hervorgehoben ist (Toggle-Funktion)
-        if (currentlyHighlightedDevice && 
-            currentlyHighlightedDevice.address === device.address && 
+
+        // Check if the same device is already highlighted (toggle function)
+        if (currentlyHighlightedDevice &&
+            currentlyHighlightedDevice.address === device.address &&
             currentlyHighlightedDevice.type === device.type) {
-            
-            // Entferne Hervorhebung (Toggle OFF)
+
+            // Remove highlighting (Toggle OFF)
             clearHighlights();
             currentlyHighlightedDevice = null;
-            
-            // Feedback für Benutzer
-            console.log(`🔄 Hervorhebung für ${device.name} (${device.address}) entfernt`);
-            
-            // Optional: Kurze Meldung anzeigen
+
+            // User feedback
+            console.log(`🔄 Highlighting for ${device.name} (${device.address}) removed`);
+
+            // Optional: Show brief message
             const searchInput = document.getElementById('searchInput');
             if (searchInput) {
                 const originalPlaceholder = searchInput.placeholder;
-                searchInput.placeholder = `✅ ${device.name} abgewählt`;
+                searchInput.placeholder = `✅ ${device.name} deselected`;
                 setTimeout(() => {
                     searchInput.placeholder = originalPlaceholder;
                 }, 2000);
             }
-            
+
             return;
         }
-        
-        // Alte Highlights entfernen
+
+        // Remove old highlights
         clearHighlights();
-        
-        // Speichere aktuell hervorgehobenes Gerät
+
+        // Save currently highlighted device
         currentlyHighlightedDevice = {
             address: device.address,
             type: device.type,
             name: device.name
         };
-        
-        // Zur Position zoomen
+
+        // Zoom to position
         map.setView([device.lat, device.lon], 18);
-        
-        // Finde den originalen Marker für dieses Gerät
+
+        // Find the original marker for this device
         let originalMarkerIndex = -1;
         for (let i = 0; i < searchData.length; i++) {
             if (searchData[i].address === device.address && searchData[i].type === device.type) {
@@ -1326,12 +1328,12 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                 break;
             }
         }
-        
-        // Stelle sicher, dass der originale Marker sichtbar ist (auch wenn Filter ihn versteckt haben)
+
+        // Ensure the original marker is visible (even if filters hid it)
         if (originalMarkerIndex !== -1) {
             const originalMarker = allMarkers[originalMarkerIndex];
             const originalCircle = allCircles[originalMarkerIndex];
-            
+
             if (originalMarker && !originalMarker._map) {
                 originalMarker.addTo(map);
             }
@@ -1339,8 +1341,8 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                 originalCircle.addTo(map);
             }
         }
-        
-        // Zusätzlicher goldener Highlight-Ring (ohne neuen Marker)
+
+        // Additional golden highlight ring (without new marker)
         const highlightCircle = L.circle([device.lat, device.lon], {
             color: 'gold',
             fillColor: 'gold',
@@ -1348,8 +1350,8 @@ def create_wifi_map(device_data, db_filename, db_path=None):
             radius: 80,
             weight: 4
         }).addTo(map);
-        
-        // Pulsierender äußerer Ring
+
+        // Pulsing outer ring
         const pulseCircle = L.circle([device.lat, device.lon], {
             color: 'orange',
             fillColor: 'orange',
@@ -1357,11 +1359,11 @@ def create_wifi_map(device_data, db_filename, db_path=None):
             radius: 120,
             weight: 2
         }).addTo(map);
-        
-        // 50m Radius für Bluetooth-Suche (nur bei WiFi-Geräten)
+
+        // 50m radius for Bluetooth search (only for WiFi devices)
         let searchRadius = null;
         let bluetoothMarkers = [];
-        
+
         if (device.type === 'WIFI') {
             searchRadius = L.circle([device.lat, device.lon], {
                 color: 'orange',
@@ -1371,31 +1373,31 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                 weight: 2,
                 dashArray: '5, 5'
             }).addTo(map);
-            
-            // Finde und zeige alle Bluetooth-Geräte im 50m Umkreis
+
+            // Find and show all Bluetooth devices within 50m radius
             const nearbyBluetoothDevices = findBluetoothDevicesInRadius(device.lat, device.lon, 50);
             bluetoothMarkers = showNearbyBluetoothDevices(nearbyBluetoothDevices);
-            
-            // Info über gefundene Bluetooth-Geräte anzeigen (verzögert)
+
+            // Show info about found Bluetooth devices (delayed)
             if (nearbyBluetoothDevices.length > 0 && bluetoothMode !== 'none') {
                 setTimeout(() => {
-                    let displayedCount = bluetoothMarkers.length / 3; // 3 Elemente pro Gerät (Marker, Circle, Label)
-                    let modeText = bluetoothMode === 'known' ? ' (nur bekannte)' : 
-                                  bluetoothMode === 'all' ? ' (alle)' : '';
-                    console.log(`📱 ${displayedCount} von ${nearbyBluetoothDevices.length} Bluetooth-Geräte im 50m Umkreis angezeigt${modeText}`);
+                    let displayedCount = bluetoothMarkers.length / 3; // 3 elements per device (Marker, Circle, Label)
+                    let modeText = bluetoothMode === 'known' ? ' (known only)' :
+                                  bluetoothMode === 'all' ? ' (all)' : '';
+                    console.log(`📱 ${displayedCount} of ${nearbyBluetoothDevices.length} Bluetooth devices displayed within 50m radius${modeText}`);
                 }, 1000);
             }
         }
-        
-        // Speichere Highlights zum späteren Entfernen
+
+        // Save highlights for later removal
         highlightedMarkers.push(highlightCircle, pulseCircle);
         if (searchRadius) highlightedMarkers.push(searchRadius);
         highlightedMarkers.push(...bluetoothMarkers);
-        
-        // Suchergebnisse ausblenden falls geöffnet
+
+        // Hide search results if open
         document.getElementById('searchResults').style.display = 'none';
-        
-        // Animation für Aufmerksamkeit
+
+        // Animation for attention
         setTimeout(() => {
             if (highlightCircle._map) {
                 highlightCircle.setStyle({fillOpacity: 0.1});
@@ -1405,8 +1407,8 @@ def create_wifi_map(device_data, db_filename, db_path=None):
             }
         }, 300);
     }
-    
-    // Highlights entfernen
+
+    // Remove highlights
     function clearHighlights() {
         highlightedMarkers.forEach(marker => {
             if (marker._map) {
@@ -1414,9 +1416,9 @@ def create_wifi_map(device_data, db_filename, db_path=None):
             }
         });
         highlightedMarkers = [];
-        // Setze aktuell hervorgehobenes Gerät zurück wenn Highlights manuell gelöscht werden
+        // Reset currently highlighted device when highlights are manually cleared
         if (currentlyHighlightedDevice) {
-            console.log(`🔄 Hervorhebung für ${currentlyHighlightedDevice.name} manuell entfernt`);
+            console.log(`🔄 Highlighting for ${currentlyHighlightedDevice.name} manually removed`);
             currentlyHighlightedDevice = null;
         }
     }
@@ -1433,14 +1435,15 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                 hiddenCount++;
             }
         });
-        
+
+
         highlightedCount = highlightedMarkers.length;
-        
+
         let debugInfo = `Debug Info:\\n`;
-        debugInfo += `Sichtbare Marker: ${visibleCount}\\n`;
-        debugInfo += `Versteckte Marker: ${hiddenCount}\\n`;
-        debugInfo += `Hervorgehobene Marker: ${highlightedCount}\\n`;
-        debugInfo += `Gesamt Marker: ${allMarkers.length}\\n`;
+        debugInfo += `Visible Markers: ${visibleCount}\\n`;
+        debugInfo += `Hidden Markers: ${hiddenCount}\\n`;
+        debugInfo += `Highlighted Markers: ${highlightedCount}\\n`;
+        debugInfo += `Total Markers: ${allMarkers.length}\\n`;
         debugInfo += `Filter Status: Signal=${signalFilter.enabled}, Vendor=${vendorFilter.enabled}, Security=${securityFilter.enabled}`;
         
         alert(debugInfo);
@@ -1456,10 +1459,10 @@ def create_wifi_map(device_data, db_filename, db_path=None):
             }
         });
     }
-    
-    // Berechne Entfernung zwischen zwei GPS-Koordinaten (Haversine Formel)
+
+    // Calculate distance between two GPS coordinates (Haversine formula)
     function calculateDistance(lat1, lon1, lat2, lon2) {
-        const R = 6371e3; // Erdradius in Metern
+        const R = 6371e3; // Earth radius in meters
         const φ1 = lat1 * Math.PI/180;
         const φ2 = lat2 * Math.PI/180;
         const Δφ = (lat2-lat1) * Math.PI/180;
@@ -1470,44 +1473,44 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                   Math.sin(Δλ/2) * Math.sin(Δλ/2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 
-        return R * c; // Entfernung in Metern
+        return R * c; // Distance in meters
     }
-    
-    // Finde alle Bluetooth-Geräte im angegebenen Radius
+
+    // Find all Bluetooth devices within specified radius
     function findBluetoothDevicesInRadius(centerLat, centerLon, radiusMeters) {
         return searchData.filter(device => {
             if (device.type !== 'BLUETOOTH') return false;
-            
+
             const distance = calculateDistance(centerLat, centerLon, device.lat, device.lon);
             return distance <= radiusMeters;
         });
     }
-    
-    // Zeige Bluetooth-Geräte in der Nähe an
+
+    // Show nearby Bluetooth devices
     function showNearbyBluetoothDevices(bluetoothDevices) {
         const bluetoothMarkers = [];
-        
-        // Prüfe Bluetooth-Modus und filtere entsprechend
+
+        // Check Bluetooth mode and filter accordingly
         let filteredDevices = bluetoothDevices;
-        
+
         if (bluetoothMode === 'none') {
-            // Keine Bluetooth-Geräte anzeigen
+            // Don't show any Bluetooth devices
             return bluetoothMarkers;
         } else if (bluetoothMode === 'known') {
-            // Nur bekannte Bluetooth-Geräte (ohne "Unknown")
+            // Only known Bluetooth devices (without "Unknown")
             filteredDevices = bluetoothDevices.filter(device => {
                 const deviceName = device.name || '';
-                return deviceName !== '[Unknown Device]' && 
-                       deviceName !== 'Unknown Device' && 
-                       deviceName !== '' && 
+                return deviceName !== '[Unknown Device]' &&
+                       deviceName !== 'Unknown Device' &&
+                       deviceName !== '' &&
                        deviceName !== null &&
                        !deviceName.toLowerCase().includes('unknown');
             });
         }
-        // Bei bluetoothMode === 'all' werden alle Geräte angezeigt (keine Filterung)
-        
+        // For bluetoothMode === 'all', all devices are shown (no filtering)
+
         filteredDevices.forEach((device, index) => {
-            // Bluetooth-Marker mit spezieller Farbe
+            // Bluetooth marker with special color
             const btMarker = L.marker([device.lat, device.lon], {
                 icon: L.icon({
                     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-violet.png',
@@ -1518,21 +1521,21 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                     shadowSize: [33, 33]
                 })
             }).addTo(map);
-            
-            // Popup für Bluetooth-Gerät
-            const signalText = device.signal >= -50 ? 'Sehr stark' : 
-                             device.signal >= -70 ? 'Stark' : 
-                             device.signal >= -80 ? 'Mittel' : 'Schwach';
-            
+
+            // Popup for Bluetooth device
+            const signalText = device.signal >= -50 ? 'Very strong' :
+                             device.signal >= -70 ? 'Strong' :
+                             device.signal >= -80 ? 'Medium' : 'Weak';
+
             btMarker.bindPopup(`
                 <b>📱 BLUETOOTH: ${device.name}</b><br>
                 <b>MAC:</b> ${device.address}<br>
                 <b>Signal:</b> ${device.signal} dBm (${signalText})<br>
-                <b>Klasse:</b> ${device.encryption}<br>
-                <small><i>Automatisch angezeigt (50m Radius)</i></small>
+                <b>Class:</b> ${device.encryption}<br>
+                <small><i>Automatically displayed (50m radius)</i></small>
             `);
-            
-            // Name-Label über dem Bluetooth-Marker
+
+            // Name label above Bluetooth marker
             const nameLabel = L.marker([device.lat, device.lon], {
                 icon: L.divIcon({
                     className: 'bt-name-label',
@@ -1554,8 +1557,8 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                     iconAnchor: [0, 0]
                 })
             }).addTo(map);
-            
-            // Kleiner Kreis um Bluetooth-Gerät
+
+            // Small circle around Bluetooth device
             const btCircle = L.circle([device.lat, device.lon], {
                 color: 'purple',
                 fillColor: 'purple',
@@ -1563,31 +1566,31 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                 radius: 20,
                 weight: 2
             }).addTo(map);
-            
+
             bluetoothMarkers.push(btMarker, btCircle, nameLabel);
         });
-        
+
         return bluetoothMarkers;
     }
-    
-    // Funktion zum Aktualisieren der Geräteposition in der Datenbank
+
+    // Function to update device position in database
     function updateDeviceLocation(deviceAddress, deviceType, newLat, newLon) {
-        // Zeige Bestätigung mit den neuen Koordinaten
+        // Show confirmation with new coordinates
         const confirmed = confirm(
-            `Gerät ${deviceAddress} (${deviceType}) verschieben?\n\n` +
-            `Neue Koordinaten:\n` +
+            `Move device ${deviceAddress} (${deviceType})?\n\n` +
+            `New coordinates:\n` +
             `Latitude: ${newLat.toFixed(6)}\n` +
             `Longitude: ${newLon.toFixed(6)}\n\n` +
-            `Änderung wird für Datenbank-Update vorgemerkt.`
+            `Change will be queued for database update.`
         );
-        
+
         if (!confirmed) {
-            // Seite neu laden um Marker zurückzusetzen
+            // Reload page to reset marker
             location.reload();
             return;
         }
-        
-        // Füge Update zur Liste hinzu
+
+        // Add update to list
         pendingUpdates.push({
             address: deviceAddress,
             type: deviceType,
@@ -1595,72 +1598,72 @@ def create_wifi_map(device_data, db_filename, db_path=None):
             longitude: newLon,
             timestamp: new Date().toISOString()
         });
-        
-        // Zeige Erfolg-Meldung mit Batch-Option
+
+        // Show success message with batch option
         const batchUpdate = pendingUpdates.length > 1;
-        let message = `📍 Position vorgemerkt!\n\n` +
-            `Gerät: ${deviceAddress}\n` +
-            `Typ: ${deviceType}\n` +
-            `Neue Lat: ${newLat.toFixed(6)}\n` +
-            `Neue Lon: ${newLon.toFixed(6)}\n\n`;
-        
+        let message = `📍 Position queued!\n\n` +
+            `Device: ${deviceAddress}\n` +
+            `Type: ${deviceType}\n` +
+            `New Lat: ${newLat.toFixed(6)}\n` +
+            `New Lon: ${newLon.toFixed(6)}\n\n`;
+
         if (batchUpdate) {
-            message += `📝 ${pendingUpdates.length} Änderungen vorgemerkt.\n` +
-                      `Beim Schließen der Anwendung werden alle\n` +
-                      `Änderungen in die Datenbank geschrieben.`;
+            message += `📝 ${pendingUpdates.length} changes queued.\n` +
+                      `When closing the application, all\n` +
+                      `changes will be written to the database.`;
         } else {
-            message += `💾 Beim Schließen der Anwendung wird die\n` +
-                      `Änderung in die Datenbank geschrieben.`;
+            message += `💾 When closing the application, the\n` +
+                      `change will be written to the database.`;
         }
-        
+
         alert(message);
-        
-        // Update auch in den searchData für Konsistenz
+
+        // Update also in searchData for consistency
         const dataIndex = searchData.findIndex(d => d.address === deviceAddress && d.type === deviceType);
         if (dataIndex !== -1) {
             searchData[dataIndex].lat = newLat;
             searchData[dataIndex].lon = newLon;
         }
-        
+
         console.log(`Position queued for update: ${deviceAddress} -> ${newLat}, ${newLon}`);
         console.log(`Total pending updates: ${pendingUpdates.length}`);
     }
-    
-    // Beim Schließen der Seite Updates speichern
+
+    // Save updates when closing the page
     window.addEventListener('beforeunload', function(e) {
         if (pendingUpdates.length > 0) {
-            // Speichere Updates in localStorage für Python-Verarbeitung
+            // Save updates in localStorage for Python processing
             localStorage.setItem('pendingLocationUpdates', JSON.stringify(pendingUpdates));
-            
-            const message = `${pendingUpdates.length} Positionsänderung(en) werden gespeichert...`;
+
+            const message = `${pendingUpdates.length} position change(s) will be saved...`;
             e.returnValue = message;
             return message;
         }
     });
 
-    // Funktion zum Zurücksetzen aller Marker auf ursprüngliche Positionen
+    // Function to reset all markers to original positions
     function resetAllMarkers() {
-        if (!confirm('Alle Marker auf ursprüngliche Positionen zurücksetzen?')) return;
-        
-        // Seite neu laden um alle Marker zurückzusetzen
+        if (!confirm('Reset all markers to original positions?')) return;
+
+        // Reload page to reset all markers
         location.reload();
     }
 
-    // Funktion zum Speichern aller vorgemerkten Positionsänderungen
+    // Function to save all queued position changes
     function saveAllMarkers() {
         if (pendingUpdates.length === 0) {
-            alert('Keine Positionsänderungen vorgemerkt!');
+            alert('No position changes queued!');
             return;
         }
-        // Übersicht der geänderten Marker anzeigen
-        let msg = `Folgende Marker wurden verschoben und werden gespeichert:\n\n`;
+        // Show overview of changed markers
+        let msg = `The following markers have been moved and will be saved:\n\n`;
         pendingUpdates.forEach((upd, idx) => {
-            msg += `${idx+1}. ${upd.address} (${upd.type})\n   Neue Lat: ${upd.latitude.toFixed(6)}\n   Neue Lon: ${upd.longitude.toFixed(6)}\n\n`;
+            msg += `${idx+1}. ${upd.address} (${upd.type})\n   New Lat: ${upd.latitude.toFixed(6)}\n   New Lon: ${upd.longitude.toFixed(6)}\n\n`;
         });
-        msg += `\nJetzt wirklich in die Datenbank schreiben?`;
+        msg += `\nReally write to database now?`;
         if (!confirm(msg)) return;
 
-        // Speichere Updates in localStorage und als Datei
+        // Save updates in localStorage and as file
         localStorage.setItem('pendingLocationUpdates', JSON.stringify(pendingUpdates));
         const updatesJson = JSON.stringify(pendingUpdates, null, 2);
         const blob = new Blob([updatesJson], { type: 'application/json' });
@@ -1673,15 +1676,15 @@ def create_wifi_map(device_data, db_filename, db_path=None):
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
 
-        // Status anzeigen
+        // Show status
         const statusEl = document.getElementById('save-status');
-        statusEl.innerHTML = `✅ ${pendingUpdates.length} Position(en) exportiert!`;
+        statusEl.innerHTML = `✅ ${pendingUpdates.length} position(s) exported!`;
         statusEl.style.color = 'green';
 
         setTimeout(() => {
-            alert(`✅ Updates wurden als JSON-Datei heruntergeladen!\n\n` +
-                  `Legen Sie die Datei "wifi_scanner_updates.json" in den Programmordner.\n\n` +
-                  `Die Updates werden beim nächsten Programmstart automatisch in die Datenbank geschrieben.`);
+            alert(`✅ Updates have been downloaded as JSON file!\n\n` +
+                  `Place the file "wifi_scanner_updates.json" in the program folder.\n\n` +
+                  `The updates will be automatically written to the database at the next program start.`);
             pendingUpdates = [];
             statusEl.innerHTML = '';
         }, 1500);
@@ -1690,24 +1693,24 @@ def create_wifi_map(device_data, db_filename, db_path=None):
     """
     
     device_map.get_root().html.add_child(folium.Element(search_and_control_js))
-    
-    # Legende hinzufügen
+
+    # Add legend
     total_wifi = wifi_open + wifi_encrypted
     total_devices = len(device_data)
-    
+
     legend_html = f"""
-    <div id="legend-info-box" style="position: fixed; 
+    <div id="legend-info-box" style="position: fixed;
                 top: 10px; right: 10px; width: 230px; max-height: 340px;
-                background-color: white; border:1.5px solid #888; z-index:9999; 
+                background-color: white; border:1.5px solid #888; z-index:9999;
                 font-size:12px; padding: 7px 8px; overflow-y: auto; box-shadow: 0 1px 7px rgba(0,0,0,0.13); border-radius: 7px;">
     <h4 style='margin:0 0 6px 0; font-size:13px; font-weight:bold;'>WiFi & Bluetooth Scanner</h4>
-    <p style='margin:2px 0;'><i class="fa fa-wifi" style="color:red"></i> WiFi Offen: {wifi_open}</p>
-    <p style='margin:2px 0;'><i class="fa fa-lock" style="color:green"></i> WiFi Verschlüsselt: {wifi_encrypted}</p>
+    <p style='margin:2px 0;'><i class="fa fa-wifi" style="color:red"></i> WiFi Open: {wifi_open}</p>
+    <p style='margin:2px 0;'><i class="fa fa-lock" style="color:green"></i> WiFi Encrypted: {wifi_encrypted}</p>
     <p style='margin:2px 0;'><i class="fa fa-bluetooth" style="color:blue"></i> Bluetooth: {bluetooth_count}</p>
-    <p style='margin:2px 0;'><i class="fa fa-bluetooth" style="color:darkblue"></i> Bluetooth ohne Unknown: {bluetooth_known_count}</p>
+    <p style='margin:2px 0;'><i class="fa fa-bluetooth" style="color:darkblue"></i> Bluetooth without Unknown: {bluetooth_known_count}</p>
     <p style='margin:2px 0;'><i class="fa fa-wifi" style="color:orange"></i> Vodafone Homespot/Hotspot: {vodafone_homespot_count}</p>
-    <p style='margin:2px 0;'><i class="fa fa-star" style="color:purple"></i> WiFi Offen ohne Vodafone: {wifi_open_no_vodafone}</p>
-    <p style='margin:2px 0;'><b>Gesamt:</b> {total_devices} Geräte</p>
+    <p style='margin:2px 0;'><i class="fa fa-star" style="color:purple"></i> WiFi Open without Vodafone: {wifi_open_no_vodafone}</p>
+    <p style='margin:2px 0;'><b>Total:</b> {total_devices} Devices</p>
     <hr style='margin:6px 0;'>
     <div id="legend-selected-device" style="margin-bottom:6px; font-size:11px;"></div>
     <button id="legend-highlight-btn" style="display:none;margin-bottom:6px;padding:4px 8px;font-size:11px;background:#ffd700;color:#333;border:none;border-radius:3px;cursor:pointer;">Highlight</button>
@@ -1742,13 +1745,13 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                             info += `<b>Name:</b> ${device.name}<br>`;
                             info += `<b>MAC:</b> ${device.address}<br>`;
                         }
-                        info += `<b>Typ:</b> ${device.type}<br>`;
+                        info += `<b>Type:</b> ${device.type}<br>`;
                         info += `<b>Signal:</b> ${device.signal} dBm<br>`;
                         document.getElementById('legend-selected-device').innerHTML = info;
                         // Show highlight button
                         document.getElementById('legend-highlight-btn').style.display = 'block';
 
-                        // --- NEU: Bewegungsdaten anzeigen ---
+                        // --- NEW: Display movement data ---
                         if (movementLayer) {
                             map.removeLayer(movementLayer);
                             movementLayer = null;
@@ -1757,7 +1760,7 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                         if (device.last_seen_lat && device.last_seen_lon) {
                             movementLayer = L.layerGroup().addTo(map);
 
-                            // Marker für die letzte Position
+                            // Marker for last position
                             const lastSeenMarker = L.marker([device.last_seen_lat, device.last_seen_lon], {
                                 icon: L.icon({
                                     iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-grey.png',
@@ -1768,9 +1771,9 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                                     shadowSize: [41, 41]
                                 })
                             }).addTo(movementLayer);
-                            lastSeenMarker.bindPopup(`<b>Letzte Position von:</b><br>${device.name}<br>${device.last_seen_timestamp}`);
+                            lastSeenMarker.bindPopup(`<b>Last Position of:</b><br>${device.name}<br>${device.last_seen_timestamp}`);
 
-                            // Linie zwischen den beiden Punkten
+                            // Line between the two points
                             const line = L.polyline([[device.lat, device.lon], [device.last_seen_lat, device.last_seen_lon]], {
                                 color: 'black',
                                 weight: 2,
@@ -1800,11 +1803,11 @@ def create_wifi_map(device_data, db_filename, db_path=None):
     return device_map
 
 def process_pending_location_updates(db_path):
-    """Verarbeitet ausstehende Standort-Updates aus temporärer Datei"""
+    """Processes pending location updates from temporary file"""
     import json, os, tempfile
     try:
-        print("Prüfe auf ausstehende Standort-Updates...")
-        # Unterstütze beide Speicherorte
+        print("Checking for pending location updates...")
+        # Support both storage locations
         update_files = [
             os.path.join(os.path.dirname(db_path), 'wifi_scanner_updates.json'),
             os.path.join(tempfile.gettempdir(), 'wifi_scanner_updates.json')
@@ -1815,15 +1818,15 @@ def process_pending_location_updates(db_path):
                 found_file = fpath
                 break
         if not found_file:
-            print("Keine Positions-Updates gefunden.")
+            print("No position updates found.")
             return True
         with open(found_file, 'r', encoding='utf-8') as f:
             pending_updates = json.load(f)
         if not pending_updates:
             os.remove(found_file)
-            print("Update-Datei ist leer.")
+            print("Update file is empty.")
             return True
-        print(f"Gefunden: {len(pending_updates)} ausstehende Positionsänderungen")
+        print(f"Found: {len(pending_updates)} pending position changes")
         successful_updates = 0
         for update in pending_updates:
             try:
@@ -1841,82 +1844,82 @@ def process_pending_location_updates(db_path):
                     print(f"❌ Failed to update {update['address']}")
             except Exception as e:
                 print(f"❌ Error updating {update['address']}: {str(e)}")
-        print(f"Erfolgreich aktualisiert: {successful_updates}/{len(pending_updates)} Geräte")
+        print(f"Successfully updated: {successful_updates}/{len(pending_updates)} devices")
         os.remove(found_file)
         if successful_updates > 0:
-            print("Positionsänderungen wurden in die Datenbank übernommen!")
+            print("Position changes have been applied to the database!")
         return True
     except Exception as e:
-        print(f"Fehler beim Verarbeiten der Updates: {str(e)}")
+        print(f"Error processing updates: {str(e)}")
         return False
 
 def main():
-    """Hauptfunktion des Programms"""
-    print("WiFi & Bluetooth Scanner Karten-Viewer")
+    """Main function of the program"""
+    print("WiFi & Bluetooth Scanner Map Viewer")
     print("=" * 40)
-    
-    # Datenbankdatei auswählen
+
+    # Select database file
     db_path = select_database_file()
-    
+
     if not db_path:
-        print("Keine Datei ausgewählt. Programm wird beendet.")
+        print("No file selected. Program will exit.")
         return
-    
-    print(f"Lade Datenbank: {os.path.basename(db_path)}")
-    
-    # Verarbeite ausstehende Standort-Updates
+
+    print(f"Loading database: {os.path.basename(db_path)}")
+
+    # Process pending location updates
     process_pending_location_updates(db_path)
-    
-    # Geräte-Daten laden (WiFi + Bluetooth)
+
+    # Load device data (WiFi + Bluetooth)
     device_data = load_wifi_data(db_path)
-    
+
     if not device_data:
-        print("Keine gültigen Geräte-Daten gefunden.")
+        print("No valid device data found.")
         return
-    
-    # Zähle verschiedene Gerätetypen
+
+    # Count different device types
     wifi_count = sum(1 for device in device_data if device['type'] == 'WIFI')
     bluetooth_count = sum(1 for device in device_data if device['type'] == 'BLUETOOTH')
-    
-    print(f"Gefunden: {len(device_data)} Geräte mit GPS-Daten")
-    print(f"  - WiFi-Netzwerke: {wifi_count}")
-    print(f"  - Bluetooth-Geräte: {bluetooth_count}")
-    
-    # Zeige Vendor-Statistik
+
+    print(f"Found: {len(device_data)} devices with GPS data")
+    print(f"  - WiFi networks: {wifi_count}")
+    print(f"  - Bluetooth devices: {bluetooth_count}")
+
+    # Show vendor statistics
     vendors = {}
     for device in device_data:
         vendor = device.get('vendor', 'Unknown')
         if vendor != 'Unknown' and not vendor.startswith('Unknown ('):
             vendors[vendor] = vendors.get(vendor, 0) + 1
-    
+
     if vendors:
-        print(f"\nTop Hersteller:")
+        print(f"\nTop Manufacturers:")
         sorted_vendors = sorted(vendors.items(), key=lambda x: x[1], reverse=True)[:5]
         for vendor, count in sorted_vendors:
-            print(f"  - {vendor}: {count} Geräte")
-    
-    # Karte erstellen
+            print(f"  - {vendor}: {count} devices")
+
+    # Create map
     db_filename = os.path.basename(db_path)
     device_map = create_wifi_map(device_data, db_filename, db_path)
-    
+
     if device_map:
-        # Temporäre HTML-Datei erstellen
+        # Create temporary HTML file
         temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.html')
         map_path = temp_file.name
         temp_file.close()
-        
-        # Karte speichern
+
+        # Save map
         device_map.save(map_path)
-        
-        print(f"Karte wurde erstellt: {map_path}")
-        print("Öffne Karte im Browser...")
-        
-        # Karte im Browser öffnen
+
+        print(f"Map has been created: {map_path}")
+        print("Opening map in browser...")
+
+        # Open map in browser
         webbrowser.open('file://' + os.path.realpath(map_path))
-        
-        input("Drücke Enter zum Beenden...")
-        
-        # Temporäre Datei löschen
+
+        input("Press Enter to exit...")
+
+        # Delete temporary file
         try:
             os.unlink(map_path)
         except:

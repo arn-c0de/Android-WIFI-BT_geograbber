@@ -1,3 +1,57 @@
+# Quickstart: Setup & Usage (Windows & Linux)
+
+## 1. Environment Setup
+
+### Windows
+1. Open a command prompt and navigate to the `Python` folder:
+   ```bat
+   cd Python
+   ```
+2. Run the setup script:
+   ```bat
+   setup.bat
+   ```
+   - This will create a virtual environment (`venv`) and install all required dependencies from `requirements.txt`.
+
+### Linux
+1. Open a terminal and navigate to the `Python` folder:
+   ```bash
+   cd Python
+   ```
+2. Make the setup and run scripts executable (only needed once):
+   ```bash
+   chmod +x setup.sh run.sh
+   ```
+3. Run the setup script:
+   ```bash
+   ./setup.sh
+   ```
+   - This will create a virtual environment (`venv`) and install all required dependencies from `requirements.txt`.
+
+## 2. Starting the Tools
+
+### Windows
+1. In the same command prompt, run:
+   ```bat
+   run.bat
+   ```
+2. Select the tool you want to use:
+   - [1] Map Viewer (Plot GUI)
+   - [2] Database Combiner
+   - [3] Exit
+
+### Linux
+1. In the same terminal, run:
+   ```bash
+   ./run.sh
+   ```
+2. Select the tool you want to use:
+   - [1] Map Viewer (Plot GUI)
+   - [2] Database Combiner
+   - [3] Exit
+
+---
+
 # WiFi/Bluetooth Database Combiner - Quickstart Guide
 
 ## Overview

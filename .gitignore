@@ -46,3 +46,7 @@ credentials.json
 *.pem
 *.jks
 *.keystore
+
+# Ignore Python virtual environment
+venv/
+venv/*

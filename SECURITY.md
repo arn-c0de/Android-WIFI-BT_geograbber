@@ -35,9 +35,10 @@ Please report vulnerabilities responsibly via:
 2. Click "Report a vulnerability"
 3. Fill out the form with details
 
+
 #### Email (alternative for sensitive leaks)
 
-- **Email**: [security@protonmail.com](mailto:security@protonmail.com)
+- **Email**: [arn-c0de@protonmail.com](mailto:arn-c0de@protonmail.com)
 - **Subject**: `[SECURITY] Short Description`
 - **Encryption**: Proton Mail offers end-to-end encryption
 
