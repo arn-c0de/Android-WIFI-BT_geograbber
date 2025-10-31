@@ -14,6 +14,11 @@
    <div style="display:flex;flex-direction:column;justify-content:center;">
       <h1 style="margin:0; padding:0; font-size:2em; line-height:1.1;">📡 WiFi & Bluetooth GeoGrabber</h1>
       <span style="font-size:1.1em; color:#555; font-weight:bold;">Professional Geolocation & Signal Mapping</span>
+      
+<div align="left">
+  <b>Scan, Map, and Analyze WiFi Networks & Bluetooth Devices with GPS Precision</b>
+</div>
+
    </div>
 </div>
 
@@ -28,11 +33,19 @@
    > This is a very early stage of the program. While it is already functional, it is based on an older project that I have recently resumed. Therefore, extensive refactoring and further development are still required. Expect ongoing changes and improvements as work continues.
 
 
+  ---
 
-**Professional Android Geolocation Tool for Network Analysis & Signal Mapping**
 
-<div align="left">
-  <b>Scan, Map, and Analyze WiFi Networks & Bluetooth Devices with GPS Precision</b>
+
+
+## 🤝 Contribute to GeoGrabber!
+
+> **We welcome your ideas, bug reports, and feature requests!**
+
+<div align="center">
+  <a href="CONTRIBUTING.md">
+    <img src="https://img.shields.io/badge/Contribute-Get%20Started-brightgreen?style=for-the-badge" alt="Contribute Badge">
+  </a>
 </div>
 
 ---
