@@ -245,7 +245,7 @@ public class MapActivity extends AppCompatActivity {
 
             // Additionally load WiFi data from old table (only in visible area, without LIMIT)
             Cursor wifiCursor = database.rawQuery(
-                "SELECT ssid, bssid, signal_strength, verschluesselung, " +
+                "SELECT ssid, bssid, signal_strength, encryption, " +
                 "latitude, longitude, timestamp " +
                 "FROM wifi_data WHERE latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? " +
                 "AND latitude != 0 AND longitude != 0 " +
@@ -672,7 +672,7 @@ public class MapActivity extends AppCompatActivity {
             "                let filterClasses = [];\n" +
             "                // Determine filter classes\n" +
             "                if (device.type === 'WIFI') {\n" +
-            "                    if (device.encryption === 'offen') {\n" +
+            "                    if (device.encryption === 'open') {\n" +
             "                        filterClasses.push('wifi_open');\n" +
             "                        // WiFi Open without Vodafone: SSID must not contain 'Vodafone Homespot' or 'Vodafone Hotspot'\n" +
             "                        if (typeof device.name === 'string' && device.name.toLowerCase().indexOf('vodafone') === -1 && device.name !== '[Hidden/Unknown]') {\n" +
@@ -700,7 +700,7 @@ public class MapActivity extends AppCompatActivity {
             "                // Icon and color\n" +
             "                let iconColor, iconName;\n" +
             "                if (device.type === 'WIFI') {\n" +
-            "                    if (device.encryption === 'offen') {\n" +
+            "                    if (device.encryption === 'open') {\n" +
             "                        iconColor = 'red';\n" +
             "                    } else {\n" +
             "                        iconColor = 'green';\n" +

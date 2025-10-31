@@ -32,8 +32,8 @@ import java.util.List;
 public class ScanService extends Service {
     private static final String CHANNEL_ID = "ScanServiceChannel";
     private static final int NOTIFICATION_ID = 1;
-    private static final long SCAN_INTERVAL = 5000; // 5 Sekunden - sehr häufig
-    private static final long MIN_SCAN_INTERVAL = 3000; // Minimum 3 Sekunden zwischen Scans
+    private static final long SCAN_INTERVAL = 5000; // 5 seconds - very frequently
+    private static final long MIN_SCAN_INTERVAL = 3000; // Minimum 3 seconds between scans
     
     private WifiManager wifiManager;
     private LocationManager locationManager;
@@ -46,7 +46,7 @@ public class ScanService extends Service {
     private boolean isBluetoothEnabled = false;
     private int wifiCount = 0;
     private int bluetoothCount = 0;
-    private String databasePath = null; // Pfad zur aktiven Datenbank
+    private String databasePath = null; // Path to the active database
 
     @Override
     public void onCreate() {
@@ -57,14 +57,14 @@ public class ScanService extends Service {
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         handler = new Handler();
         
-        // Bluetooth initialisieren
+        // Initialize Bluetooth
         BluetoothManager bluetoothManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
         bluetoothAdapter = bluetoothManager.getAdapter();
         
-        // Datenbank initialisieren
+        // Initialize database
         initializeDatabase();
         
-        // Receiver registrieren
+        // Register receiver
         IntentFilter wifiFilter = new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
         registerReceiver(wifiScanReceiver, wifiFilter);
         
@@ -93,14 +93,14 @@ public class ScanService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId) {
         createNotificationChannel();
         
-        // Bluetooth-Status aus Intent auslesen
+        // Read Bluetooth status from intent
         if (intent != null) {
             isBluetoothEnabled = intent.getBooleanExtra("bluetooth_enabled", false);
-            // Datenbankpfad aus Intent auslesen
+            // Extract database path from intent
             databasePath = intent.getStringExtra("database_path");
         }
         
-        // Datenbank neu initialisieren falls Pfad geändert wurde
+        // Reinitialize database if path has changed
         initializeDatabase();
         
         startForeground(NOTIFICATION_ID, createNotification());
@@ -112,7 +112,7 @@ public class ScanService extends Service {
             Log.d("ScanService", "Background scanning started - Bluetooth: " + isBluetoothEnabled);
         }
         
-        return START_STICKY; // Service wird automatisch neu gestartet wenn beendet
+        return START_STICKY; // The service will automatically restart when it is stopped.
     }
 
     @Override
@@ -141,30 +141,30 @@ public class ScanService extends Service {
 
     @Override
     public IBinder onBind(Intent intent) {
-        return null; // Wir verwenden einen unbound service
+        return null; //We use an unbound service
     }
 
-    // Datenbank initialisieren basierend auf Pfad
+    // Initialize database based on path
     private void initializeDatabase() {
         try {
-            // Alte Verbindung schließen
+            // Close old connection
             if (database != null) {
                 database.close();
             }
             
             if (databasePath != null && !databasePath.isEmpty()) {
-                // Externe Datenbank verwenden
+                // Use external database
                 database = SQLiteDatabase.openDatabase(databasePath, null, SQLiteDatabase.OPEN_READWRITE);
                 Log.d("ScanService", "Using external database: " + databasePath);
             } else {
-                // Interne Datenbank verwenden
+                // Use internal database
                 MainActivity.DatabaseHelper dbHelper = new MainActivity.DatabaseHelper(this);
                 database = dbHelper.getWritableDatabase();
                 Log.d("ScanService", "Using internal database");
             }
         } catch (Exception e) {
             Log.e("ScanService", "Error initializing database: " + e.getMessage());
-            // Fallback zur internen Datenbank
+            // Fallback to the internal database
             MainActivity.DatabaseHelper dbHelper = new MainActivity.DatabaseHelper(this);
             database = dbHelper.getWritableDatabase();
         }
@@ -209,7 +209,7 @@ public class ScanService extends Service {
 
     private void performWifiScan() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            // Verwende Cache-Ergebnisse
+            // Use cached results
             List<ScanResult> cachedResults = wifiManager.getScanResults();
             if (cachedResults != null && !cachedResults.isEmpty()) {
                 Location location = getLocationForSaving();
@@ -218,7 +218,7 @@ public class ScanService extends Service {
                 }
             }
             
-            // Versuche neuen Scan nur wenn genug Zeit vergangen ist
+            // Only attempt a new scan if enough time has passed.
             long currentTime = System.currentTimeMillis();
             if (currentTime - lastScanTime >= MIN_SCAN_INTERVAL) {
                 lastScanTime = currentTime;
@@ -235,33 +235,33 @@ public class ScanService extends Service {
         }
     }
 
-    // Bluetooth-Scan-Steuerung: Starte neuen Scan erst nach Abschluss des vorherigen und mit Pause
+    // Bluetooth scan control: Start a new scan only after the previous one is complete and after a pause.
     private boolean isBtScanRunning = false;
     private long lastBtScanTime = 0;
-    private static final long BT_SCAN_PAUSE = 7000; // 7 Sekunden Pause zwischen BT-Scans
+    private static final long BT_SCAN_PAUSE = 7000; // 7-second pause between BT scans
 
     private void performBluetoothScan() {
         if (!isBluetoothEnabled) {
-            return; // Bluetooth-Scanning ist deaktiviert
+            return; // Bluetooth scanning is disabled.
         }
         if (isBtScanRunning) {
-            // Noch ein Scan läuft, nicht erneut starten
+            // Another scan is running, do not restart.
             return;
         }
         long now = System.currentTimeMillis();
         if (now - lastBtScanTime < BT_SCAN_PAUSE) {
-            // Noch Pause, nicht erneut starten
+            // Pause, do not restart.
             return;
         }
         if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
                 isBtScanRunning = true;
                 lastBtScanTime = now;
-                // Vorherige Discovery stoppen falls läuft
+                // Stop previous discovery if it's running
                 if (bluetoothAdapter.isDiscovering()) {
                     bluetoothAdapter.cancelDiscovery();
                 }
-                // Neue Discovery starten
+                // Start new discovery
                 boolean started = bluetoothAdapter.startDiscovery();
                 if (started) {
                     Log.d("ScanService", "Bluetooth discovery started");
@@ -290,9 +290,9 @@ public class ScanService extends Service {
         return location;
     }
     
-    // Berechnet die Distanz zwischen zwei GPS-Koordinaten in Metern (Haversine-Formel)
+    // Calculates the distance between two GPS coordinates in meters (Haversine formula)
     private double calculateDistance(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371; // Erdradius in Kilometern
+        final int R = 6371; // Earth's radius in kilometers
         
         double latDistance = Math.toRadians(lat2 - lat1);
         double lonDistance = Math.toRadians(lon2 - lon1);
@@ -300,9 +300,9 @@ public class ScanService extends Service {
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
                 * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        double distance = R * c; // Distanz in Kilometern
+        double distance = R * c; // Distance in kilometers
         
-        return distance * 1000; // Rückgabe in Metern
+        return distance * 1000; // Return in meters
     }
 
     private void startLocationUpdates() {
@@ -314,7 +314,7 @@ public class ScanService extends Service {
     private final LocationListener locationListener = new LocationListener() {
         @Override
         public void onLocationChanged(Location location) {
-            // Location wird automatisch beim Speichern verwendet
+            // The location is automatically used when saving.
         }
         @Override
         public void onStatusChanged(String provider, int status, Bundle extras) {}
@@ -365,7 +365,7 @@ public class ScanService extends Service {
                     }
                 }
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
-                // Scan ist fertig, Pause einhalten
+                // Scan is complete, please pause.
                 isBtScanRunning = false;
             }
         }
@@ -375,14 +375,14 @@ public class ScanService extends Service {
         int newCount = 0;
         for (ScanResult result : results) {
             String capabilities = result.capabilities;
-            String verschluesselung = "offen";
+            String  encryption = "open";
             if (capabilities != null && !capabilities.equals("") && !capabilities.equals("[]")) {
                 if (capabilities.contains("WEP") || capabilities.contains("WPA") || capabilities.contains("EAP")) {
-                    verschluesselung = "verschlüsselt";
+                    encryption = "encryption";
                 }
             }
             
-            // WiFi nur in wifi_data Tabelle speichern
+            // Store WiFi data only in the wifi_data table
             Cursor wifiCursor = database.rawQuery("SELECT signal_strength FROM wifi_data WHERE bssid = ?", new String[]{result.BSSID});
             boolean wifiUpdate = false;
             boolean wifiExists = false;
@@ -396,16 +396,16 @@ public class ScanService extends Service {
             wifiCursor.close();
             
             if (wifiUpdate) {
-                database.execSQL("UPDATE wifi_data SET ssid=?, signal_strength=?, verschluesselung=?, latitude=?, longitude=?, timestamp=? WHERE bssid=?",
-                        new Object[]{result.SSID, result.level, verschluesselung, location.getLatitude(), location.getLongitude(), System.currentTimeMillis(), result.BSSID});
+                database.execSQL("UPDATE wifi_data SET ssid=?, signal_strength=?, encryption=?, latitude=?, longitude=?, timestamp=? WHERE bssid=?",
+                        new Object[]{result.SSID, result.level, encryption, location.getLatitude(), location.getLongitude(), System.currentTimeMillis(), result.BSSID});
             } else if (!wifiExists) {
-                database.execSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, verschluesselung, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                        new Object[]{result.SSID, result.BSSID, result.level, verschluesselung, location.getLatitude(), location.getLongitude(), System.currentTimeMillis()});
+                database.execSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        new Object[]{result.SSID, result.BSSID, result.level, encryption, location.getLatitude(), location.getLongitude(), System.currentTimeMillis()});
                 newCount++;
             }
             
-            // Zusätzlich WiFi-Gerät auch in device_data speichern für Bewegungsanalyse
-            saveWifiDeviceForMovementTracking(result.SSID, result.BSSID, result.level, verschluesselung, location);
+            // Additionally, store the WiFi device information in device_data for motion analysis.
+            saveWifiDeviceForMovementTracking(result.SSID, result.BSSID, result.level, encryption, location);
         }
         
         if (newCount > 0) {
@@ -414,9 +414,9 @@ public class ScanService extends Service {
         }
     }
     
-    // WiFi-Gerät für Bewegungsanalyse in device_data Tabelle speichern/aktualisieren
+    // Save/update WiFi device for motion analysis in device data table
     private void saveWifiDeviceForMovementTracking(String ssid, String bssid, int signal, String encryption, Location location) {
-        // Prüfe, ob WiFi-Gerät in device_data schon existiert
+        // Check if the WiFi device already exists in device_data.
         Cursor cursor = database.rawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'WIFI'", new String[]{bssid});
         boolean update = false;
         boolean exists = false;
@@ -441,14 +441,14 @@ public class ScanService extends Service {
             double currentLon = location.getLongitude();
             long currentTimestamp = System.currentTimeMillis();
             
-            // Berechne Bewegungsdistanz falls vorherige Position vorhanden
+            // Calculate movement distance if previous position exists
             Double movementDistance = null;
             if (exists && lastLat != 0 && lastLon != 0) {
                 movementDistance = calculateDistance(lastLat, lastLon, currentLat, currentLon);
             }
             
             if (update) {
-                // Update mit Bewegungsdaten
+                // Update with movement data
                 if (movementDistance != null) {
                     database.execSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
                             "last_seen_latitude=latitude, last_seen_longitude=longitude, last_seen_timestamp=timestamp, " +
@@ -460,7 +460,7 @@ public class ScanService extends Service {
                             new Object[]{ssid, signal, encryption, currentLat, currentLon, currentTimestamp, bssid});
                 }
             } else {
-                // Neuer Eintrag
+                // New entry
                 database.execSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                         new Object[]{ssid, bssid, "WIFI", signal, encryption, currentLat, currentLon, currentTimestamp});
             }
@@ -492,14 +492,14 @@ public class ScanService extends Service {
             double currentLon = location.getLongitude();
             long currentTimestamp = System.currentTimeMillis();
             
-            // Berechne Bewegungsdistanz falls vorherige Position vorhanden
+            // Calculate movement distance if previous position exists
             Double movementDistance = null;
             if (exists && lastLat != 0 && lastLon != 0) {
                 movementDistance = calculateDistance(lastLat, lastLon, currentLat, currentLon);
             }
             
             if (update) {
-                // Update mit Bewegungsdaten
+                // update with movement data
                 if (movementDistance != null) {
                     database.execSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
                             "last_seen_latitude=latitude, last_seen_longitude=longitude, last_seen_timestamp=timestamp, " +
@@ -511,7 +511,7 @@ public class ScanService extends Service {
                             new Object[]{deviceName, rssi, deviceClass, currentLat, currentLon, currentTimestamp, deviceAddress});
                 }
             } else {
-                // Neuer Eintrag
+                // New entry
                 database.execSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                         new Object[]{deviceName, deviceAddress, "BLUETOOTH", rssi, deviceClass, currentLat, currentLon, currentTimestamp});
                 bluetoothCount++;

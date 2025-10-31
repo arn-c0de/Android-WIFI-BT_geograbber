@@ -231,7 +231,7 @@ def load_wifi_data(db_path):
             
             if has_extended_fields:
                 query = """
-                SELECT ssid, bssid, signal_strength, verschluesselung, 
+                SELECT ssid, bssid, signal_strength, encryption, 
                        latitude, longitude, timestamp, frequency, channel, 
                        wifi_standard, vendor_info, channel_width, max_connection_speed
                 FROM wifi_data 
@@ -240,7 +240,7 @@ def load_wifi_data(db_path):
                 """
             else:
                 query = """
-                SELECT ssid, bssid, signal_strength, verschluesselung, 
+                SELECT ssid, bssid, signal_strength, encryption, 
                        latitude, longitude, timestamp
                 FROM wifi_data 
                 WHERE latitude != 0 AND longitude != 0
@@ -253,11 +253,11 @@ def load_wifi_data(db_path):
             # Convert WiFi data
             for row in wifi_data:
                 if has_extended_fields and len(row) >= 13:
-                    ssid, bssid, signal_strength, verschluesselung, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed = row[:13]
+                    ssid, bssid, signal_strength, encryption, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed = row[:13]
                     if not vendor_info or vendor_info == "Unknown":
                         vendor_info = get_vendor_from_oui(bssid)
                 else:
-                    ssid, bssid, signal_strength, verschluesselung, lat, lon, timestamp = row[:7]
+                    ssid, bssid, signal_strength, encryption, lat, lon, timestamp = row[:7]
                     frequency = channel = wifi_standard = channel_width = max_speed = None
                     vendor_info = get_vendor_from_oui(bssid)
                 
@@ -266,7 +266,7 @@ def load_wifi_data(db_path):
                     'address': bssid,
                     'type': 'WIFI',
                     'signal': signal_strength,
-                    'encryption': verschluesselung,
+                    'encryption': encryption,
                     'lat': lat,
                     'lon': lon,
                     'timestamp': timestamp,
@@ -411,7 +411,7 @@ def create_wifi_map(device_data, db_filename, db_path=None):
 
         # By device type and encryption
         if device['type'] == "WIFI":
-            if device['encryption'] == "offen":
+            if device['encryption'] == "open":
                 filter_classes.append('wifi_open')
                 # WiFi Open without Vodafone - only if it's NOT a Vodafone Homespot
                 if not (device['name'] and ("vodafone homespot" in device['name'].lower() or "vodafone hotspot" in device['name'].lower())):
@@ -491,7 +491,7 @@ def create_wifi_map(device_data, db_filename, db_path=None):
 
         # Icon and color based on device type and encryption
         if device_type == "WIFI":
-            if encryption_info == "offen":
+            if encryption_info == "open":
                 icon_color = "red"
                 icon_name = "wifi"
                 wifi_open += 1
@@ -1101,7 +1101,7 @@ def create_wifi_map(device_data, db_filename, db_path=None):
                                 
                                 console.log('Found device:', deviceAddress, deviceName);
                                 
-                                // Finde das Gerät in den searchData
+                                // Find the device in the searchData
                                 var device = searchData.find(d => d.address === deviceAddress);
                                 if (device) {
                                     console.log('Device found in searchData, highlighting...');
