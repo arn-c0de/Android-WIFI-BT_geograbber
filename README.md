@@ -35,6 +35,17 @@
   <b>Scan, Map, and Analyze WiFi Networks & Bluetooth Devices with GPS Precision</b>
 </div>
 
+
+## 🤝 Contribute to GeoGrabber!
+
+> **We welcome your ideas, bug reports, and feature requests!**
+
+<div align="center">
+  <a href="CONTRIBUTING.md">
+    <img src="https://img.shields.io/badge/Contribute-Get%20Started-brightgreen?style=for-the-badge" alt="Contribute Badge">
+  </a>
+</div>
+
 ---
 
 ## 📖 Table of Contents
