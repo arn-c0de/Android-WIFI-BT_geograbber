@@ -6,7 +6,8 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.1] – 2025-10-30 [LATEST]
 - Remove clear-text logging of sensitive device data; redact address and coordinates from log output in location update process.
-
+- Disabled automatic application backup by setting android:allowBackup="false" in the manifest to protect sensitive user data.
+- Sanitized user input before logging in MapActivity to prevent log injection vulnerabilities.
 
 
 ## [1.0.0] – 2025-06-01

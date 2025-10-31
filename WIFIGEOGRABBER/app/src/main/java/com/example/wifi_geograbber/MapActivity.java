@@ -879,13 +879,15 @@ public class MapActivity extends AppCompatActivity {
         @JavascriptInterface
         public void updateDeviceLocation(String deviceAddress, String deviceType, double newLat, double newLon) {
             runOnUiThread(() -> {
-                // Database could be updated here
+                // Sanitize user input to prevent log injection
+                String safeAddress = deviceAddress == null ? "" : deviceAddress.replaceAll("[\r\n]", " ");
+                String safeType = deviceType == null ? "" : deviceType.replaceAll("[\r\n]", " ");
                 Toast.makeText(MapActivity.this,
-                    "Position updated for " + deviceAddress + " -> " +
+                    "Position updated for " + safeAddress + " -> " +
                     String.format("%.6f, %.6f", newLat, newLon),
                     Toast.LENGTH_SHORT).show();
-                Log.d("MapActivity", String.format("Device %s (%s) moved to: %.6f, %.6f", 
-                    deviceAddress, deviceType, newLat, newLon));
+                Log.d("MapActivity", String.format("Device %s (type: %s) moved to: %.6f, %.6f", 
+                    safeAddress, safeType, newLat, newLon));
             });
         }
 
