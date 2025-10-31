@@ -39,6 +39,8 @@ docs/
 ├── quickstart/
 │   ├── database_combiner_quickstart.md
 │   └── map_viewer_quickstart.md
+├── security/
+│   └── SHA256_CHECKSUM_VERIFICATION.md
 ```
 
 ---
@@ -65,6 +67,7 @@ docs/
 ### 3. Development & Security 🔧
 1. [CONTRIBUTING.md](../CONTRIBUTING.md) – Contribution guidelines
 2. [SECURITY.md](../SECURITY.md) – Security policy
+ 3. [SHA-256 Checksum Verification Guide](security/SHA256_CHECKSUM_VERIFICATION.md) – Database integrity & verification
 
 ---
 

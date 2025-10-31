@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
   - Added validation for numeric ranges (coordinates, timestamps, signal strength)
   - Limited query results (50,000 records max) to prevent resource exhaustion
   - Added table name whitelist validation to prevent SQL injection via PRAGMA commands
+  - MainActivity.java:1265-1339 - Added two security warning dialogs and helper method
 
 ### Added
 - New security validation methods:

@@ -68,6 +68,9 @@
     <string name="external_db_as_active">External DB as active DB</string>
     <string name="yes_activate">Yes, activate</string>
 
+    <!-- Title for external DB as active dialog -->
+    <string name="external_db_as_active_title">Set External Database as Active</string>
+
     <!-- Database Status Messages -->
     <string name="internal_database_loaded">Internal database loaded</string>
 

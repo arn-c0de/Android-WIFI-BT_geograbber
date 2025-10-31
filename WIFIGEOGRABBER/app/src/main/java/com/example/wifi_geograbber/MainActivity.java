@@ -34,6 +34,9 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import java.util.ArrayList;
 import java.util.List;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import org.json.JSONObject;
 
 public class MainActivity extends AppCompatActivity {
     /**
@@ -65,10 +68,20 @@ public class MainActivity extends AppCompatActivity {
     private static final int EXPORT_DB_REQUEST_CODE = 101;
     private static final int IMPORT_DB_REQUEST_CODE = 102;
     private static final int IMPORT_ACTIVE_DB_REQUEST_CODE = 103;
+    private static final int EXPORT_CHECKSUM_REQUEST_CODE = 104;
+    private static final int IMPORT_CHECKSUM_REQUEST_CODE = 105;
     private static final long SCAN_INTERVAL = 5000; // 5 seconds - very frequently
     private static final long MIN_SCAN_INTERVAL = 3000; // Minimum 3 seconds between scans
     private long lastScanTime = 0;
     private StringBuilder logBuffer = new StringBuilder();
+
+    // Store checksum data for export
+    private String lastExportedDbChecksum = null;
+    private String lastExportedDbFilename = null;
+
+    // Store import data temporarily during checksum verification
+    private android.net.Uri pendingImportUri = null;
+    private java.io.File pendingImportFile = null;
 
 
         
@@ -1227,6 +1240,17 @@ public class MainActivity extends AppCompatActivity {
             if (uri != null) {
                 try {
                     String dbPath = getDatabasePath("wifi_scanner.db").getAbsolutePath();
+                    java.io.File dbFile = new java.io.File(dbPath);
+
+                    // Calculate SHA-256 checksum before export
+                    addLogMessage("Calculating SHA-256 checksum...");
+                    String checksum = calculateSHA256(dbFile);
+
+                    if (checksum != null) {
+                        addLogMessage("Checksum calculated: " + checksum);
+                    }
+
+                    // Export database file
                     java.io.FileInputStream inStream = new java.io.FileInputStream(dbPath);
                     java.io.OutputStream outStream = getContentResolver().openOutputStream(uri);
                     byte[] buffer = new byte[1024];
@@ -1236,9 +1260,68 @@ public class MainActivity extends AppCompatActivity {
                     }
                     inStream.close();
                     outStream.close();
-                    Toast.makeText(this, "DB exported!", Toast.LENGTH_LONG).show();
+
+                    // Extract filename from URI for metadata
+                    String exportedFilename = "exported_database.db";
+                    try {
+                        android.database.Cursor cursor = getContentResolver().query(uri, null, null, null, null);
+                        if (cursor != null && cursor.moveToFirst()) {
+                            int nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
+                            if (nameIndex >= 0) {
+                                exportedFilename = cursor.getString(nameIndex);
+                            }
+                            cursor.close();
+                        }
+                    } catch (Exception e) {
+                        // Use default filename if extraction fails
+                    }
+
+                    // Store checksum data for metadata export
+                    lastExportedDbChecksum = checksum;
+                    lastExportedDbFilename = exportedFilename;
+
+                    Toast.makeText(this, "DB exported successfully!", Toast.LENGTH_LONG).show();
+                    addLogMessage("Database exported: " + exportedFilename);
+
+                    // Offer to export checksum metadata file
+                    if (checksum != null) {
+                        offerChecksumExport(exportedFilename, checksum, dbFile.length());
+                    }
+
                 } catch (Exception e) {
-                    Toast.makeText(this, "Export failed:" + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    addLogMessage("ERROR: Export failed: " + e.getMessage());
+                }
+            }
+        } else if (requestCode == EXPORT_CHECKSUM_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
+            android.net.Uri uri = data.getData();
+            if (uri != null && lastExportedDbChecksum != null && lastExportedDbFilename != null) {
+                try {
+                    // Create checksum metadata JSON
+                    String metadata = createChecksumMetadata(
+                        lastExportedDbFilename,
+                        lastExportedDbChecksum,
+                        getDatabasePath("wifi_scanner.db").length()
+                    );
+
+                    if (metadata != null) {
+                        // Write metadata to file
+                        java.io.OutputStream outStream = getContentResolver().openOutputStream(uri);
+                        outStream.write(metadata.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                        outStream.close();
+
+                        Toast.makeText(this, "Checksum metadata exported!", Toast.LENGTH_LONG).show();
+                        addLogMessage("Checksum metadata exported successfully");
+                        addLogMessage("SHA-256: " + lastExportedDbChecksum);
+                    }
+
+                    // Clear temporary data
+                    lastExportedDbChecksum = null;
+                    lastExportedDbFilename = null;
+
+                } catch (Exception e) {
+                    Toast.makeText(this, "Checksum export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    addLogMessage("ERROR: Checksum export failed: " + e.getMessage());
                 }
             }
         } else if (requestCode == IMPORT_DB_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
@@ -1251,6 +1334,11 @@ public class MainActivity extends AppCompatActivity {
             if (uri != null) {
                 loadExternalDatabaseAsActive(uri);
             }
+        } else if (requestCode == IMPORT_CHECKSUM_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
+            android.net.Uri uri = data.getData();
+            if (uri != null && pendingImportFile != null) {
+                verifyAndImportWithChecksum(uri, pendingImportFile);
+            }
         }
     }
 
@@ -1260,6 +1348,347 @@ public class MainActivity extends AppCompatActivity {
         database.execSQL("DELETE FROM device_data");
         Toast.makeText(this, R.string.all_networks_deleted, Toast.LENGTH_SHORT).show();
         showData();
+    }
+
+    // Offer to export checksum metadata file
+    private void offerChecksumExport(String dbFilename, String checksum, long fileSize) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("Export Checksum Metadata");
+
+        String message = "Database exported successfully!\n\n" +
+                "Would you like to export a checksum metadata file?\n\n" +
+                "BENEFITS:\n" +
+                "• Verify file integrity during import\n" +
+                "• Detect tampering or corruption\n" +
+                "• Establish trust for file sharing\n\n" +
+                "METADATA INCLUDES:\n" +
+                "• SHA-256 checksum\n" +
+                "• Original filename\n" +
+                "• File size\n" +
+                "• Export timestamp\n\n" +
+                "The metadata will be saved as a .json file that you can share alongside the database file.";
+
+        builder.setMessage(message);
+
+        builder.setPositiveButton("Yes, Export Checksum", (dialog, which) -> {
+            // Create suggested filename for checksum metadata
+            String metadataFilename = dbFilename.replace(".db", ".sha256.json");
+            if (!metadataFilename.contains(".sha256.json")) {
+                metadataFilename = dbFilename + ".sha256.json";
+            }
+
+            // Launch file picker for checksum metadata
+            Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("application/json");
+            intent.putExtra(Intent.EXTRA_TITLE, metadataFilename);
+            startActivityForResult(intent, EXPORT_CHECKSUM_REQUEST_CODE);
+
+            addLogMessage("User chose to export checksum metadata");
+        });
+
+        builder.setNegativeButton("Skip", (dialog, which) -> {
+            dialog.dismiss();
+            addLogMessage("User skipped checksum metadata export");
+            Toast.makeText(this, "Note: You can verify checksums manually if needed", Toast.LENGTH_SHORT).show();
+
+            // Clear temporary data
+            lastExportedDbChecksum = null;
+            lastExportedDbFilename = null;
+        });
+
+        builder.setCancelable(false);
+        builder.show();
+    }
+
+    // Offer checksum verification during import
+    private void offerChecksumVerification(android.net.Uri dbUri, java.io.File dbFile) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("Verify Checksum?");
+
+        String message = "Do you have a checksum metadata file (.sha256.json) for this database?\n\n" +
+                "VERIFICATION BENEFITS:\n" +
+                "• Confirm file hasn't been tampered with\n" +
+                "• Verify file integrity\n" +
+                "• Ensure authentic source\n\n" +
+                "If you don't have a checksum file, you can skip this step. The database will still be validated using other security checks.";
+
+        builder.setMessage(message);
+
+        builder.setPositiveButton("Yes, Select Checksum File", (dialog, which) -> {
+            // Store pending import data
+            pendingImportUri = dbUri;
+            pendingImportFile = dbFile;
+
+            // Open file picker for checksum metadata
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("application/json");
+            startActivityForResult(intent, IMPORT_CHECKSUM_REQUEST_CODE);
+
+            addLogMessage("User chose to verify checksum");
+        });
+
+        builder.setNegativeButton("Skip Verification", (dialog, which) -> {
+            dialog.dismiss();
+            addLogMessage("User skipped checksum verification");
+            Toast.makeText(this, "Proceeding without checksum verification", Toast.LENGTH_SHORT).show();
+
+            // Continue with import without checksum verification
+            continueImportWithoutChecksum(dbFile);
+        });
+
+        builder.setCancelable(false);
+        builder.show();
+    }
+
+    // Continue import without checksum verification
+    private void continueImportWithoutChecksum(java.io.File externalDbFile) {
+        // Continue with the normal validation flow
+        proceedWithDatabaseImport(externalDbFile);
+    }
+
+    // Verify checksum and import database
+    private void verifyAndImportWithChecksum(android.net.Uri checksumUri, java.io.File dbFile) {
+        try {
+            // Read checksum metadata file
+            java.io.InputStream inStream = getContentResolver().openInputStream(checksumUri);
+            java.io.BufferedReader reader = new java.io.BufferedReader(
+                new java.io.InputStreamReader(inStream, java.nio.charset.StandardCharsets.UTF_8)
+            );
+
+            StringBuilder jsonBuilder = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                jsonBuilder.append(line);
+            }
+            reader.close();
+            inStream.close();
+
+            // Parse JSON metadata
+            JSONObject metadata = new JSONObject(jsonBuilder.toString());
+            String expectedChecksum = metadata.getString("checksum");
+            String algorithm = metadata.getString("algorithm");
+            String originalFilename = metadata.optString("filename", "unknown");
+            long originalFileSize = metadata.optLong("fileSize", -1);
+
+            addLogMessage("Checksum metadata loaded:");
+            addLogMessage("  Algorithm: " + algorithm);
+            addLogMessage("  Filename: " + originalFilename);
+            addLogMessage("  Expected checksum: " + expectedChecksum);
+
+            // Verify algorithm
+            if (!"SHA-256".equals(algorithm)) {
+                Toast.makeText(this, "Unsupported checksum algorithm: " + algorithm, Toast.LENGTH_LONG).show();
+                addLogMessage("ERROR: Unsupported algorithm: " + algorithm);
+                dbFile.delete();
+                clearPendingImport();
+                return;
+            }
+
+            // Verify file size if available
+            if (originalFileSize > 0 && dbFile.length() != originalFileSize) {
+                addLogMessage("WARNING: File size mismatch!");
+                addLogMessage("  Expected: " + originalFileSize + " bytes");
+                addLogMessage("  Actual: " + dbFile.length() + " bytes");
+
+                // Show warning but allow user to decide
+                showFileSizeMismatchWarning(dbFile, expectedChecksum, originalFileSize);
+                return;
+            }
+
+            // Calculate actual checksum
+            addLogMessage("Calculating file checksum...");
+            String actualChecksum = calculateSHA256(dbFile);
+
+            if (actualChecksum == null) {
+                Toast.makeText(this, "Failed to calculate checksum", Toast.LENGTH_LONG).show();
+                dbFile.delete();
+                clearPendingImport();
+                return;
+            }
+
+            // Verify checksum
+            boolean checksumValid = verifyChecksum(actualChecksum, expectedChecksum, originalFilename);
+
+            if (checksumValid) {
+                // Checksum verified successfully
+                Toast.makeText(this, "✓ Checksum verified successfully!", Toast.LENGTH_LONG).show();
+                addLogMessage("Proceeding with verified import...");
+                clearPendingImport();
+                proceedWithDatabaseImport(dbFile);
+            } else {
+                // Checksum mismatch - show error
+                showChecksumMismatchError(dbFile);
+            }
+
+        } catch (Exception e) {
+            Toast.makeText(this, "Checksum verification failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            addLogMessage("ERROR: Checksum verification failed: " + e.getMessage());
+            dbFile.delete();
+            clearPendingImport();
+        }
+    }
+
+    // Clear pending import data
+    private void clearPendingImport() {
+        pendingImportUri = null;
+        pendingImportFile = null;
+    }
+
+    // Show checksum mismatch error
+    private void showChecksumMismatchError(java.io.File dbFile) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("⚠️ Checksum Verification Failed");
+
+        String message = "The checksum verification FAILED!\n\n" +
+                "POSSIBLE CAUSES:\n" +
+                "• File has been tampered with\n" +
+                "• File corruption during transfer\n" +
+                "• Wrong checksum file selected\n" +
+                "• Mismatched database and checksum files\n\n" +
+                "RECOMMENDATION:\n" +
+                "Do NOT import this database. It may be corrupted or compromised.\n\n" +
+                "For security reasons, import has been blocked.";
+
+        builder.setMessage(message);
+
+        builder.setPositiveButton("OK", (dialog, which) -> {
+            dbFile.delete();
+            clearPendingImport();
+            Toast.makeText(this, "Import cancelled for security", Toast.LENGTH_SHORT).show();
+        });
+
+        builder.setCancelable(false);
+        builder.show();
+    }
+
+    // Show file size mismatch warning
+    private void showFileSizeMismatchWarning(java.io.File dbFile, String expectedChecksum, long originalFileSize) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("⚠️ File Size Mismatch");
+
+        String message = "The database file size doesn't match the metadata!\n\n" +
+                "Expected size: " + originalFileSize + " bytes\n" +
+                "Actual size: " + dbFile.length() + " bytes\n\n" +
+                "This could indicate:\n" +
+                "• File corruption\n" +
+                "• Wrong file selected\n" +
+                "• Metadata mismatch\n\n" +
+                "Do you want to continue with checksum verification anyway?";
+
+        builder.setMessage(message);
+
+        builder.setPositiveButton("Continue Verification", (dialog, which) -> {
+            // Calculate and verify checksum despite size mismatch
+            addLogMessage("User chose to continue despite size mismatch");
+            String actualChecksum = calculateSHA256(dbFile);
+
+            if (actualChecksum != null) {
+                boolean checksumValid = verifyChecksum(actualChecksum, expectedChecksum, dbFile.getName());
+
+                if (checksumValid) {
+                    Toast.makeText(this, "✓ Checksum verified!", Toast.LENGTH_SHORT).show();
+                    clearPendingImport();
+                    proceedWithDatabaseImport(dbFile);
+                } else {
+                    showChecksumMismatchError(dbFile);
+                }
+            } else {
+                Toast.makeText(this, "Failed to calculate checksum", Toast.LENGTH_SHORT).show();
+                dbFile.delete();
+                clearPendingImport();
+            }
+        });
+
+        builder.setNegativeButton("Cancel Import", (dialog, which) -> {
+            dbFile.delete();
+            clearPendingImport();
+            Toast.makeText(this, "Import cancelled", Toast.LENGTH_SHORT).show();
+        });
+
+        builder.setCancelable(false);
+        builder.show();
+    }
+
+    // Process validated database import
+    private void proceedWithDatabaseImport(java.io.File externalDbFile) {
+        try {
+            // Security validation: Check database integrity and structure
+            if (!validateExternalDatabase(externalDbFile)) {
+                Toast.makeText(this, "Security error: Invalid or malicious database file!", Toast.LENGTH_LONG).show();
+                addLogMessage("ERROR: Database validation failed - possible malicious content");
+                externalDbFile.delete();
+                return;
+            }
+
+            // Check if it is a valid SQLite database
+            SQLiteDatabase testDb = null;
+            try {
+                // Open in read-only mode for security
+                testDb = SQLiteDatabase.openDatabase(externalDbFile.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
+
+                // Check for required tables
+                boolean hasWifiData = hasTable(testDb, "wifi_data");
+                boolean hasDeviceData = hasTable(testDb, "device_data");
+
+                if (!hasWifiData && !hasDeviceData) {
+                    testDb.close();
+                    Toast.makeText(this, "Invalid database: No WiFi or Bluetooth data tables found!", Toast.LENGTH_LONG).show();
+                    externalDbFile.delete();
+                    return;
+                }
+
+                // Count available data
+                int wifiCountTemp = 0;
+                int bluetoothCountTemp = 0;
+
+                android.database.Cursor cursor = testDb.rawQuery("SELECT COUNT(*) FROM device_data WHERE device_type='WIFI' AND latitude != 0 AND longitude != 0", null);
+                if (cursor.moveToFirst()) wifiCountTemp += cursor.getInt(0);
+                cursor.close();
+
+                cursor = testDb.rawQuery("SELECT COUNT(*) FROM device_data WHERE device_type='BLUETOOTH' AND latitude != 0 AND longitude != 0", null);
+                if (cursor.moveToFirst()) bluetoothCountTemp = cursor.getInt(0);
+                cursor.close();
+
+                cursor = testDb.rawQuery("SELECT COUNT(*) FROM wifi_data WHERE latitude != 0 AND longitude != 0", null);
+                if (cursor.moveToFirst()) wifiCountTemp += cursor.getInt(0);
+                cursor.close();
+
+                testDb.close();
+
+                // Final variables for Lambda
+                final int wifiCount = wifiCountTemp;
+                final int bluetoothCount = bluetoothCountTemp;
+                final String dbPath = externalDbFile.getAbsolutePath();
+
+                // Confirmation dialog for activation
+                android.app.AlertDialog.Builder confirmBuilder = new android.app.AlertDialog.Builder(this);
+                confirmBuilder.setTitle(R.string.external_db_as_active_title);
+                confirmBuilder.setMessage(
+                    "Load external DB as active database?\n\n" +
+                    "Existing devices:\n• " + wifiCount + " WiFi networks\n• " + bluetoothCount + " Bluetooth devices\n\n" +
+                    "New scans will be added to this DB!"
+                );
+                confirmBuilder.setPositiveButton(R.string.yes_activate, (d2, w2) -> {
+                    switchToExternalDatabase(dbPath, wifiCount, bluetoothCount);
+                });
+                confirmBuilder.setNegativeButton(R.string.cancel, (d2, w2) -> {
+                    externalDbFile.delete();
+                });
+                confirmBuilder.show();
+
+            } catch (Exception e) {
+                if (testDb != null) testDb.close();
+                Toast.makeText(this, "Error loading the database: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                addLogMessage("ERROR: Failed to load database: " + e.getMessage());
+                externalDbFile.delete();
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "Invalid database file: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            addLogMessage("ERROR: Invalid database file: " + e.getMessage());
+            externalDbFile.delete();
+        }
     }
 
     // Select external database
@@ -1599,6 +2028,87 @@ public class MainActivity extends AppCompatActivity {
         return input.replaceAll("[\\x00\\x08\\x0B\\x0C\\x0E-\\x1F]", "");
     }
 
+    // Calculate SHA-256 checksum for a file
+    private String calculateSHA256(java.io.File file) {
+        try {
+            java.io.FileInputStream fis = new java.io.FileInputStream(file);
+            String checksum = calculateSHA256FromStream(fis);
+            fis.close();
+            return checksum;
+        } catch (Exception e) {
+            addLogMessage("ERROR: Failed to calculate checksum: " + e.getMessage());
+            return null;
+        }
+    }
+
+    // Calculate SHA-256 checksum from InputStream
+    private String calculateSHA256FromStream(java.io.InputStream inputStream) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                digest.update(buffer, 0, bytesRead);
+            }
+
+            byte[] hashBytes = digest.digest();
+
+            // Convert byte array to hex string
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hashBytes) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+
+            return hexString.toString();
+        } catch (NoSuchAlgorithmException | java.io.IOException e) {
+            addLogMessage("ERROR: Failed to calculate SHA-256: " + e.getMessage());
+            return null;
+        }
+    }
+
+    // Create checksum metadata JSON
+    private String createChecksumMetadata(String filename, String checksum, long fileSize) {
+        try {
+            JSONObject metadata = new JSONObject();
+            metadata.put("version", "1.0");
+            metadata.put("algorithm", "SHA-256");
+            metadata.put("filename", filename);
+            metadata.put("checksum", checksum);
+            metadata.put("fileSize", fileSize);
+            metadata.put("timestamp", System.currentTimeMillis());
+            metadata.put("exportedBy", "WiFi GeoGrabber v" + APP_VERSION);
+
+            return metadata.toString(2); // Pretty print with indent of 2
+        } catch (Exception e) {
+            addLogMessage("ERROR: Failed to create metadata: " + e.getMessage());
+            return null;
+        }
+    }
+
+    // Verify checksum from metadata
+    private boolean verifyChecksum(String fileChecksum, String metadataChecksum, String filename) {
+        if (fileChecksum == null || metadataChecksum == null) {
+            return false;
+        }
+
+        boolean matches = fileChecksum.equalsIgnoreCase(metadataChecksum);
+
+        if (matches) {
+            addLogMessage("✓ Checksum verified successfully for " + filename);
+        } else {
+            addLogMessage("✗ Checksum verification FAILED for " + filename);
+            addLogMessage("  Expected: " + metadataChecksum);
+            addLogMessage("  Actual:   " + fileChecksum);
+        }
+
+        return matches;
+    }
+
     // Load external database as active database
     private void loadExternalDatabaseAsActive(android.net.Uri uri) {
         try {
@@ -1622,78 +2132,11 @@ public class MainActivity extends AppCompatActivity {
             inStream.close();
             outStream.close();
 
-            // Security validation: Check database integrity and structure
-            if (!validateExternalDatabase(externalDbFile)) {
-                Toast.makeText(this, "Security error: Invalid or malicious database file!", Toast.LENGTH_LONG).show();
-                addLogMessage("ERROR: Database validation failed - possible malicious content");
-                externalDbFile.delete();
-                return;
-            }
+            addLogMessage("Database file copied, size: " + (externalDbFile.length() / 1024) + " KB");
 
-            // Check if it is a valid SQLite database.
-            SQLiteDatabase testDb = null;
-            try {
-                // Open in read-only mode for security
-                testDb = SQLiteDatabase.openDatabase(externalDbFile.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
-                
-                // Check for required tables (read-only, no table creation)
-                boolean hasWifiData = hasTable(testDb, "wifi_data");
-                boolean hasDeviceData = hasTable(testDb, "device_data");
+            // Offer checksum verification before proceeding
+            offerChecksumVerification(uri, externalDbFile);
 
-                if (!hasWifiData && !hasDeviceData) {
-                    testDb.close();
-                    Toast.makeText(this, "Invalid database: No WiFi or Bluetooth data tables found!", Toast.LENGTH_LONG).show();
-                    externalDbFile.delete();
-                    return;
-                }
-                
-                // Count available data
-                int wifiCountTemp = 0;
-                int bluetoothCountTemp = 0;
-                
-                android.database.Cursor cursor = testDb.rawQuery("SELECT COUNT(*) FROM device_data WHERE device_type='WIFI' AND latitude != 0 AND longitude != 0", null);
-                if (cursor.moveToFirst()) wifiCountTemp += cursor.getInt(0);
-                cursor.close();
-                
-                cursor = testDb.rawQuery("SELECT COUNT(*) FROM device_data WHERE device_type='BLUETOOTH' AND latitude != 0 AND longitude != 0", null);
-                if (cursor.moveToFirst()) bluetoothCountTemp = cursor.getInt(0);
-                cursor.close();
-                
-                cursor = testDb.rawQuery("SELECT COUNT(*) FROM wifi_data WHERE latitude != 0 AND longitude != 0", null);
-                if (cursor.moveToFirst()) wifiCountTemp += cursor.getInt(0);
-                cursor.close();
-                
-                testDb.close();
-                
-                //Final variables for Lambda
-                final int wifiCount = wifiCountTemp;
-                final int bluetoothCount = bluetoothCountTemp;
-                
-                // Show confirmation
-                String message = String.format(getString(R.string.load_external_db),
-                                             wifiCount, bluetoothCount);
-
-                android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
-                builder.setTitle(R.string.external_db_as_active)
-                       .setMessage(message)
-                       .setPositiveButton(R.string.yes_activate, (dialog, which) -> {
-                           // Switch to the external database
-                           switchToExternalDatabase(externalDbFile.getAbsolutePath(), wifiCount, bluetoothCount);
-                       })
-                       .setNegativeButton(R.string.cancel, (dialog, which) -> {
-                           // Delete external file
-                           if (externalDbFile.exists()) {
-                               externalDbFile.delete();
-                           }
-                       })
-                       .show();
-                       
-            } catch (Exception e) {
-                if (testDb != null) testDb.close();
-                Toast.makeText(this, "Invalid database file: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                externalDbFile.delete();
-            }
-            
         } catch (Exception e) {
                 Toast.makeText(this, "Error loading the database: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 addLogMessage("Error during DB import: " + e.getMessage());
