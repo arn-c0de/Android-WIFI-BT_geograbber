@@ -167,8 +167,8 @@ public class MapActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                // Daten an JavaScript übergeben wenn Seite geladen ist
-                if (deviceList != null && !deviceList.isEmpty()) {
+                // Daten an JavaScript übergeben wenn Seite geladen ist (auch bei leerer Liste)
+                if (deviceList != null) {
                     injectDeviceData();
                 }
             }
@@ -185,8 +185,8 @@ public class MapActivity extends AppCompatActivity {
         if (!isMapInitialized) {
             loadMapHTML();
         } else {
-            // Bei nachfolgenden Aufrufen nur Daten aktualisieren
-            if (deviceList != null && !deviceList.isEmpty()) {
+            // Bei nachfolgenden Aufrufen nur Daten aktualisieren (auch bei leerer Liste)
+            if (deviceList != null) {
                 injectDeviceData();
             }
         }
