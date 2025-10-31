@@ -92,7 +92,7 @@ public class MainActivity extends AppCompatActivity {
             // Bildschirm immer an lassen
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         } catch (Exception e) {
-            Log.e("MainActivity", "Fehler beim Ausblenden der System-UI: " + e.getMessage());
+            Log.e("MainActivity", "Error hiding system UI: " + e.getMessage());
         }
     }
 
@@ -150,9 +150,9 @@ public class MainActivity extends AppCompatActivity {
             isBluetoothScanningEnabled = !isBluetoothScanningEnabled;
             updateBluetoothToggleButton();
             if (isBluetoothScanningEnabled) {
-                Toast.makeText(this, "Bluetooth-Scanning aktiviert", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Bluetooth scanning enabled", Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, "Bluetooth-Scanning deaktiviert", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "Bluetooth scanning disabled", Toast.LENGTH_SHORT).show();
             }
         });
         updateBluetoothToggleButton();
@@ -209,8 +209,8 @@ public class MainActivity extends AppCompatActivity {
         updateInfoSummary(0, 0);
 
         // LogCat initialisieren
-        addLogMessage("App gestartet - LogCat bereit");
-        addLogMessage("Vollbildmodus aktiviert - Navigationsleiste ausgeblendet");
+    addLogMessage("App started - LogCat ready");
+    addLogMessage("Fullscreen mode enabled - navigation bar hidden");
 
         // Periodischer Scan
         scanRunnable = new Runnable() {
@@ -447,30 +447,30 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startScanning() {
-        // WLAN-Status prüfen
+        // Check WiFi status
         if (!wifiManager.isWifiEnabled()) {
-            statusText.setText("WiFi is disabled - bitte aktivieren!");
-            addLogMessage("FEHLER: WiFi ist deaktiviert");
-            Toast.makeText(this, "Bitte aktiviere WLAN für Scanning", Toast.LENGTH_LONG).show();
+            statusText.setText("WiFi is disabled - please enable!");
+            addLogMessage("ERROR: WiFi is disabled");
+            Toast.makeText(this, "Please enable WiFi for scanning", Toast.LENGTH_LONG).show();
             return;
         }
-        
-        // Berechtigungen prüfen
+
+        // Check permissions
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             statusText.setText("Location permission required");
-            addLogMessage("FEHLER: Standort-Berechtigung fehlt");
+            addLogMessage("ERROR: Location permission missing");
             checkPermissions();
             return;
         }
         isScanning = true;
-        
-        String scanningInfo = "WiFi Scanning läuft";
+
+        String scanningInfo = "WiFi scanning active";
         if (isBluetoothScanningEnabled) {
             scanningInfo += " + Bluetooth";
         }
-        scanningInfo += " - auch im Hintergrund...";
+        scanningInfo += " - also in background...";
         statusText.setText(scanningInfo);
-        addLogMessage("Scanning gestartet: WiFi" + (isBluetoothScanningEnabled ? " + BT" : ""));
+        addLogMessage("Scanning started: WiFi" + (isBluetoothScanningEnabled ? " + BT" : ""));
         
         loadAndDisplayAvailableNetworks();
         
@@ -484,7 +484,7 @@ public class MainActivity extends AppCompatActivity {
         }
         
         startForegroundService(serviceIntent);
-        addLogMessage("Background Service gestartet");
+    addLogMessage("Background service started");
         
         // Starte auch lokales Scanning für UI Updates
         handler.removeCallbacks(scanRunnable);
@@ -496,13 +496,13 @@ public class MainActivity extends AppCompatActivity {
     private void stopScanning() {
         isScanning = false;
         handler.removeCallbacks(scanRunnable);
-        statusText.setText("WiFi Scanning gestoppt");
-        addLogMessage("Scanning gestoppt");
-        
-        // Stoppe Background Service
-        Intent serviceIntent = new Intent(this, ScanService.class);
-        stopService(serviceIntent);
-        addLogMessage("Background Service gestoppt");
+    statusText.setText("WiFi scanning stopped");
+    addLogMessage("Scanning stopped");
+
+    // Stop background service
+    Intent serviceIntent = new Intent(this, ScanService.class);
+    stopService(serviceIntent);
+    addLogMessage("Background service stopped");
         
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             try {
@@ -546,47 +546,47 @@ public class MainActivity extends AppCompatActivity {
                         Log.d("MainActivity", "WiFi scan started successfully");
                     } else {
                         if (!isShowingStoredData) {
-                            statusText.setText("Scan-Start fehlgeschlagen - Android-Limitierung (" + (cachedResults != null ? cachedResults.size() : 0) + " im Cache)");
+                            statusText.setText("Scan start failed - Android limitation (" + (cachedResults != null ? cachedResults.size() : 0) + " in cache)");
                         }
-                        addLogMessage("WiFi Scan fehlgeschlagen - Android-Limitierung");
+                        addLogMessage("WiFi scan failed - Android limitation");
                     }
                 } catch (SecurityException e) {
                     if (!isShowingStoredData) {
-                        statusText.setText("Scan nicht erlaubt - verwende Cache (" + (cachedResults != null ? cachedResults.size() : 0) + ")");
+                        statusText.setText("Scan not allowed - using cache (" + (cachedResults != null ? cachedResults.size() : 0) + ")");
                     }
-                    addLogMessage("WiFi Scan blockiert - Security Exception");
+                    addLogMessage("WiFi scan blocked - Security Exception");
                 }
             } else {
                 long waitTime = (MIN_SCAN_INTERVAL - (currentTime - lastScanTime)) / 1000;
                 if (!isShowingStoredData) {
-                    statusText.setText("Scan-Cooldown aktiv - warte " + waitTime + "s (Cache: " + (cachedResults != null ? cachedResults.size() : 0) + ")");
+                    statusText.setText("Scan cooldown active - waiting " + waitTime + "s (Cache: " + (cachedResults != null ? cachedResults.size() : 0) + ")");
                 }
             }
         } else {
-            statusText.setText("Keine Standort-Berechtigung");
+            statusText.setText("No location permission");
         }
     }
     
     private void startBluetoothScan() {
         if (!isBluetoothScanningEnabled) {
-            return; // Bluetooth-Scanning ist deaktiviert
+            return; // Bluetooth scanning is disabled
         }
         
         if (bluetoothAdapter != null && bluetoothAdapter.isEnabled()) {
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED) {
                 try {
-                    // Vorherige Discovery stoppen falls läuft
+                    // Stop previous discovery if running
                     if (bluetoothAdapter.isDiscovering()) {
                         bluetoothAdapter.cancelDiscovery();
                     }
-                    // Neue Discovery starten
+                    // Start new discovery
                     boolean started = bluetoothAdapter.startDiscovery();
                     if (!started) {
                         Log.w("Bluetooth", "Failed to start Bluetooth discovery");
                     }
                 } catch (SecurityException e) {
                     Log.e("Bluetooth", "SecurityException during Bluetooth scan: " + e.getMessage());
-                    addLogMessage("Bluetooth-Berechtigung fehlt: " + e.getMessage());
+                    addLogMessage("Bluetooth permission missing: " + e.getMessage());
                 }
             } else {
                 Log.w("Bluetooth", "BLUETOOTH_SCAN permission not granted");
@@ -607,7 +607,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             } catch (SecurityException e) {
                 Log.e("Location", "SecurityException getting location: " + e.getMessage());
-                addLogMessage("Standort-Zugriff verweigert: " + e.getMessage());
+                    addLogMessage("Location access denied: " + e.getMessage());
             }
         }
         
@@ -699,7 +699,7 @@ public class MainActivity extends AppCompatActivity {
                 locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000, 0, locationListener);
             } catch (SecurityException e) {
                 Log.e("Location", "SecurityException during location updates: " + e.getMessage());
-                addLogMessage("Standort-Berechtigung fehlt: " + e.getMessage());
+                    addLogMessage("Location permission missing: " + e.getMessage());
             }
         }
     }
@@ -808,7 +808,7 @@ public class MainActivity extends AppCompatActivity {
                                 }
                                 
                                 saveBluetoothDevice(deviceName, deviceAddress, rssi, deviceClass, location);
-                                // Aktualisiere Info-Zusammenfassung
+                                // Update info summary
                                 if (!isShowingStoredData) {
                                     List<ScanResult> currentWifi = wifiManager.getScanResults();
                                     updateInfoSummary(currentWifi != null ? currentWifi.size() : 0, 1);
@@ -818,7 +818,7 @@ public class MainActivity extends AppCompatActivity {
                             Log.d("Bluetooth", "Found device: " + deviceName + " (" + deviceAddress + ") RSSI: " + rssi);
                         } catch (SecurityException e) {
                             Log.e("Bluetooth", "SecurityException accessing Bluetooth device: " + e.getMessage());
-                            addLogMessage("Bluetooth-Zugriff verweigert: " + e.getMessage());
+                            addLogMessage("Bluetooth access denied: " + e.getMessage());
                         }
                     } else {
                         Log.w("Bluetooth", "BLUETOOTH_CONNECT permission not granted");
@@ -1257,7 +1257,7 @@ public class MainActivity extends AppCompatActivity {
     // Externe Datenbank als aktive DB auswählen
     private void selectExternalDatabaseAsActive() {
         if (isScanning) {
-            Toast.makeText(this, "Bitte stoppen Sie zuerst das Scanning!", Toast.LENGTH_LONG).show();
+              Toast.makeText(this, "Please stop scanning first!", Toast.LENGTH_LONG).show();
             return;
         }
         
@@ -1342,19 +1342,19 @@ public class MainActivity extends AppCompatActivity {
                     addLogMessage("Externe DB geladen: " + wifiCount + " WiFi, " + bluetoothCount + " BT");
                     
                 } else {
-                    Toast.makeText(this, "Keine WiFi/Bluetooth-Daten in der Datenbank gefunden!", Toast.LENGTH_LONG).show();
+                        Toast.makeText(this, "No WiFi/Bluetooth data found in the database!", Toast.LENGTH_LONG).show();
                     tempFile.delete();
                 }
                 
             } catch (Exception e) {
                 if (testDb != null) testDb.close();
-                Toast.makeText(this, "Ungültige Datenbank-Datei: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Invalid database file: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 tempFile.delete();
             }
             
         } catch (Exception e) {
-            Toast.makeText(this, "Fehler beim Laden der DB: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            addLogMessage("Fehler beim DB-Import: " + e.getMessage());
+                Toast.makeText(this, "Error loading the database: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                addLogMessage("Error during DB import: " + e.getMessage());
         }
     }
     
@@ -1453,13 +1453,13 @@ public class MainActivity extends AppCompatActivity {
                        
             } catch (Exception e) {
                 if (testDb != null) testDb.close();
-                Toast.makeText(this, "Ungültige Datenbank-Datei: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Invalid database file: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 externalDbFile.delete();
             }
             
         } catch (Exception e) {
-            Toast.makeText(this, "Fehler beim Laden der DB: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            addLogMessage("Fehler beim DB-Import: " + e.getMessage());
+                Toast.makeText(this, "Error loading the database: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                addLogMessage("Error during DB import: " + e.getMessage());
         }
     }
 
@@ -1479,34 +1479,34 @@ public class MainActivity extends AppCompatActivity {
             isUsingExternalDatabase = false;
             currentDatabasePath = null;
             
-            // UI aktualisieren
-            String statusMessage = "Externe Daten in interne DB übertragen - " + wifiCount + " WiFi, " + bluetoothCount + " BT";
+            // Update UI
+                        String statusMessage = "External data transferred to internal DB - " + wifiCount + " WiFi, " + bluetoothCount + " BT";
             statusText.setText(statusMessage);
             
-            // Daten neu laden und anzeigen
+                        // Reload and display data
             if (isShowingStoredData) {
                 showData();
             } else {
                 loadAndDisplayAvailableNetworks();
             }
             
-            // Info-Zusammenfassung aktualisieren
+                        // Update info summary
             updateInfoSummary(0, 0);
             
-            Toast.makeText(this, "Externe Daten wurden in die App-Datenbank übertragen!\nDaten bleiben auch nach App-Neustart erhalten.", Toast.LENGTH_LONG).show();
-            addLogMessage("Externe Daten in interne DB übertragen: " + dbPath);
-            addLogMessage("Übertragene Daten: " + wifiCount + " WiFi, " + bluetoothCount + " BT");
+                        Toast.makeText(this, "External data has been transferred to the app database!\nData will persist after app restart.", Toast.LENGTH_LONG).show();
+                        addLogMessage("External data transferred to internal DB: " + dbPath);
+                        addLogMessage("Transferred data: " + wifiCount + " WiFi, " + bluetoothCount + " BT");
             
-            // Externe DB-Datei löschen (nicht mehr benötigt)
+                        // Delete external DB file (no longer needed)
             java.io.File externalDbFile = new java.io.File(dbPath);
             if (externalDbFile.exists() && externalDbFile.getAbsolutePath().contains(getFilesDir().getAbsolutePath())) {
                 externalDbFile.delete();
-                addLogMessage("Temporäre externe DB-Datei gelöscht");
+                            addLogMessage("Temporary external DB file deleted");
             }
             
         } catch (Exception e) {
-            Toast.makeText(this, "Fehler beim Übertragen der externen DB: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            addLogMessage("Fehler beim DB-Übertrag: " + e.getMessage());
+                        Toast.makeText(this, "Error transferring external DB: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                        addLogMessage("Error during DB transfer: " + e.getMessage());
         }
     }
 
@@ -1613,16 +1613,16 @@ public class MainActivity extends AppCompatActivity {
                 wifiCursor.close();
             }
             
-            addLogMessage("Datenübertrag abgeschlossen:");
-            addLogMessage("• " + copiedWifi + " WiFi-Geräte (device_data)");
-            addLogMessage("• " + copiedBluetooth + " Bluetooth-Geräte");
-            addLogMessage("• " + copiedLegacyWifi + " Legacy WiFi-Einträge");
-            
+            addLogMessage("Data transfer completed:");
+            addLogMessage("• " + copiedWifi + " WiFi devices (device_data)");
+            addLogMessage("• " + copiedBluetooth + " Bluetooth devices");
+            addLogMessage("• " + copiedLegacyWifi + " Legacy WiFi entries");
         } catch (Exception e) {
-            addLogMessage("Fehler beim Kopieren der Daten: " + e.getMessage());
+            addLogMessage("Error while copying data: " + e.getMessage());
             throw e;
         }
-    }
+
+        }
 
     // Hilfsmethoden für Datenbank-Transfer
 
@@ -1660,11 +1660,11 @@ public class MainActivity extends AppCompatActivity {
         }
         oldWifiCursor.close();
         
-        String message = "Geräte in DB: " + deviceCount + 
-                        " (WiFi: " + wifiCount + 
-                        ", Bluetooth: " + bluetoothCount + ")" +
-                        (oldWifiCount > 0 ? " + " + oldWifiCount + " alte WiFi" : "");
-        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    String message = "Devices in DB: " + deviceCount + 
+            " (WiFi: " + wifiCount + 
+            ", Bluetooth: " + bluetoothCount + ")" +
+            (oldWifiCount > 0 ? " + " + oldWifiCount + " old WiFi" : "");
+    Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
 
     @Override
@@ -1683,25 +1683,25 @@ public class MainActivity extends AppCompatActivity {
         database.close();
     }
 
-    // Button-Text je nach Status anpassen
-    private void updateToggleScanButton() {
-        if (toggleScanButton != null) {
-            if (isScanning) {
-                toggleScanButton.setText("WiFi Scanning stoppen");
-            } else {
-                toggleScanButton.setText("WiFi Scanning starten");
+    // Update button text according to status
+        private void updateToggleScanButton() {
+            if (toggleScanButton != null) {
+                if (isScanning) {
+                    toggleScanButton.setText("Stop WiFi scanning");
+                } else {
+                    toggleScanButton.setText("Start WiFi scanning");
+                }
             }
         }
-    }
 
-    // Bluetooth Button-Text je nach Status anpassen
+    // Update Bluetooth button text according to status
     private void updateBluetoothToggleButton() {
         if (bluetoothToggleButton != null) {
             if (isBluetoothScanningEnabled) {
-                bluetoothToggleButton.setText("BT an");
+                    bluetoothToggleButton.setText("BT on");
                 bluetoothToggleButton.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
             } else {
-                bluetoothToggleButton.setText("BT aus");
+                    bluetoothToggleButton.setText("BT off");
                 bluetoothToggleButton.setBackgroundColor(getResources().getColor(android.R.color.holo_red_light));
             }
         }
