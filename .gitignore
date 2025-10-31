@@ -37,6 +37,10 @@ build/
 
 # Logs
 *.log
+# Sensitive/secret files
+.env
+.env.*
+local.properties
 
 # Sensitive data
 secrets.xml
