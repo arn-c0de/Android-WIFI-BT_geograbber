@@ -1,11 +1,10 @@
-
 ![Android](https://img.shields.io/badge/Android-6.0%2B-green)
 ![Platform](https://img.shields.io/badge/platform-Android-lightblue)
 ![Language](https://img.shields.io/badge/language-Java-orange)
 ![License](https://img.shields.io/badge/license-Non--Commercial-orange)
 ![Status](https://img.shields.io/badge/status-Active-success)
 
-📚 **[Documentation](docs/)** · 🚀 **[Database Combiner Guide](docs/quickstart/database_combiner_quickstart.md)** · 🗺️ **[Map Viewer Guide](docs/quickstart/map_viewer_quickstart.md)** · 📁 **[Project Structure](PROJECT_STRUCTURE.md)** · � **[Changelog](CHANGELOG.md)** · 🤝 **[Contributing](CONTRIBUTING.md)** · 🔒 **[Security](SECURITY.md)** · 📜 **[Code of Conduct](CODE_OF_CONDUCT.md)**
+📚 **[Documentation](docs/)** · 🚀 **[Database Combiner Guide](docs/quickstart/database_combiner_quickstart.md)** · 🗺️ **[Map Viewer Guide](docs/quickstart/map_viewer_quickstart.md)** · 📁 **[Project Structure](PROJECT_STRUCTURE.md)** · 📂 **[Detailed Structure](docs/project-structure/PROJECT_STRUCTURE.md)** · � **[Changelog](CHANGELOG.md)** · 🤝 **[Contributing](CONTRIBUTING.md)** · 🔒 **[Security](SECURITY.md)** · 📜 **[Code of Conduct](CODE_OF_CONDUCT.md)**
 
 <div align="left">
   <h1>📡 WiFi & Bluetooth GeoGrabber</h1>
@@ -159,6 +158,30 @@ The screenshot above demonstrates the main scanning interface, live network list
 ---
 
 ## 📦 Installation
+
+
+> **⚠️ Note (October 2025):**
+> 
+> There are currently issues with automatic dependency installation via the setup scripts (`setup.bat` / `setup.sh`) due to network or PyPI problems. This will be fixed soon. In the meantime, you can manually install the required Python packages in your virtual environment:
+>
+> **Manual Installation:**
+> 1. Activate your virtual environment:
+>    - Windows: `venv\Scripts\activate.bat` or `venv\Scripts\Activate.ps1`
+>    - Linux: `source venv/bin/activate`
+> 2. Download the required wheel files for each package (e.g. from https://pypi.org/project/folium/#files and https://pypi.org/project/branca/#files).
+> 3. Install them manually:
+>    ```
+>    pip install path/to/folium-*.whl
+>    pip install path/to/branca-*.whl
+>    pip install geopy
+>    ```
+> 4. If you encounter further dependency errors, download and install those packages in the same way.
+>
+> The setup scripts will be updated soon for improved reliability.
+
+
+
+
 
 ### Option 1: Build from Source (Recommended)
 
@@ -583,6 +606,7 @@ This project is built with the help of:
 - Beta testers for valuable feedback
 
 ---
+
 
 
 <div align="center">
