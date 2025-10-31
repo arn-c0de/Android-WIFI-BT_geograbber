@@ -1,6 +1,7 @@
 ![Android](https://img.shields.io/badge/Android-6.0%2B-green)
 ![Platform](https://img.shields.io/badge/platform-Android-lightblue)
 ![Language](https://img.shields.io/badge/language-Java-orange)
+![Language](https://img.shields.io/badge/language-Python-blue)
 ![License](https://img.shields.io/badge/license-Non--Commercial-orange)
 ![Status](https://img.shields.io/badge/status-Active-success)
 
