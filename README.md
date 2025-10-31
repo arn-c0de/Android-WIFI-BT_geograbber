@@ -359,9 +359,11 @@ python start_plot_gui.py
 │  Data Layer                                              │
 │  ├─ SQLite Database                                     │
 │  ├─ Database Helper                                     │
-│  └─ Data Models                                         │
+│  └─ Data Models   
+                                      │
 └─────────────────────────────────────────────────────────┘
 ```
+- 🔒 **[SHA-256 Checksum Verification](docs/security/SHA256_CHECKSUM_VERIFICATION.md)** – Database integrity & security
 
 ### Technology Stack
 
