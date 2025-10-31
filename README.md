@@ -8,7 +8,7 @@
 
 
 <div align="left" style="display:flex;align-items:center;gap:16px;">
-   <img src="images/logo.png" alt="GeoGrabber Logo" width="48" height="48" style="vertical-align:middle; margin-right:12px;" />
+   <img src="images/logo.png" alt="GeoGrabber Logo" width="96" height="96" style="vertical-align:middle; margin-right:12px;" />
    <h1 style="display:inline-block;vertical-align:middle;">📡 WiFi & Bluetooth GeoGrabber</h1>
 </div>
 
