@@ -880,8 +880,8 @@ public class MapActivity extends AppCompatActivity {
         public void updateDeviceLocation(String deviceAddress, String deviceType, double newLat, double newLon) {
             runOnUiThread(() -> {
                 // Sanitize user input to prevent log injection
-                String safeAddress = deviceAddress == null ? "" : deviceAddress.replaceAll("[\r\n]", " ");
-                String safeType = deviceType == null ? "" : deviceType.replaceAll("[\r\n]", " ");
+                String safeAddress = (deviceAddress == null) ? "" : deviceAddress.replaceAll("[^A-Za-z0-9]", "");
+                String safeType = (deviceType == null) ? "" : deviceType.replaceAll("[^A-Za-z0-9]", "");
                 Toast.makeText(MapActivity.this,
                     "Position updated for " + safeAddress + " -> " +
                     String.format("%.6f, %.6f", newLat, newLon),
