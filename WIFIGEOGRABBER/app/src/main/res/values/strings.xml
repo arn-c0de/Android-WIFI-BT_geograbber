@@ -136,9 +136,10 @@
     <string name="import_encrypted_db">Import Encrypted DB</string>
     <string name="export_encrypted_db">Export Encrypted DB</string>
     <string name="encrypted_db_detected">🔒 Encrypted Database Detected</string>
-    <string name="encrypted_db_detected_message">This database is encrypted. Enter passphrase to import:</string>
+    <string name="encrypted_db_detected_message">This database is encrypted.\n\n⚠️ IMPORTANT:\n1. If you exported the checksum metadata file (.sha256.json), import it FIRST for best compatibility\n2. Enter the ORIGINAL passphrase used during export\n3. Without the metadata file, import may fail even with correct passphrase\n\nAfter successful verification, the data will be imported into your current database.</string>
+<!-- Removed stray </invoke> tag -->
     <string name="encryption_status_indicator">Encryption: %s</string>
-    <string name="encrypted_export_notice">Database exported as encrypted .db file.\n\nTo import, you\'ll need the same passphrase.</string>
+    <string name="encrypted_export_notice">🔒 Database exported as encrypted .db file.\n\n⚠️ IMPORTANT: When importing this database, you MUST use the SAME passphrase that you used to encrypt this app database.\n\nWithout the correct passphrase, the import will fail!</string>
     
     <!-- Encryption Errors -->
     <string name="passphrase_too_short">❌ Passphrase too short (minimum 6 characters)</string>

@@ -246,19 +246,41 @@ public class EncryptionManager {
     }
     
     /**
+     * Derive database key from passphrase with custom salt (for external DB import)
+     * @param passphrase User's passphrase
+     * @param customSalt The salt to use for key derivation
+     * @return Derived database key
+     */
+    public String deriveKeyWithCustomSalt(char[] passphrase, byte[] customSalt) throws Exception {
+        return deriveKey(passphrase, customSalt);
+    }
+
+    /**
+     * Get the current salt used by this app instance
+     * @return Salt bytes or null if not set
+     */
+    public byte[] getCurrentSalt() {
+        String saltStr = prefs.getString(KEY_SALT, null);
+        if (saltStr == null) {
+            return null;
+        }
+        return Base64.decode(saltStr, Base64.NO_WRAP);
+    }
+
+    /**
      * Derive database key from passphrase using PBKDF2
      */
     private String deriveKey(char[] passphrase, byte[] salt) throws Exception {
         // Simple derivation - in production, use PBKDF2WithHmacSHA256
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         digest.update(salt);
-        
+
         byte[] passphraseBytes = new String(passphrase).getBytes(StandardCharsets.UTF_8);
         digest.update(passphraseBytes);
         Arrays.fill(passphraseBytes, (byte) 0); // Clear sensitive data
-        
+
         byte[] hash = digest.digest();
-        
+
         // Convert to hex string (64 characters for SQLCipher)
         StringBuilder hexString = new StringBuilder();
         for (byte b : hash) {
@@ -266,7 +288,7 @@ public class EncryptionManager {
             if (hex.length() == 1) hexString.append('0');
             hexString.append(hex);
         }
-        
+
         return hexString.toString();
     }
     

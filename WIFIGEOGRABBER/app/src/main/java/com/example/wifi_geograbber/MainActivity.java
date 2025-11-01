@@ -89,6 +89,7 @@ public class MainActivity extends AppCompatActivity {
     // Store import data temporarily during checksum verification
     private android.net.Uri pendingImportUri = null;
     private java.io.File pendingImportFile = null;
+    private byte[] pendingEncryptionSalt = null;  // Salt from metadata for encrypted DB import
 
     // Helper methods for database operations that work with both types
     private Cursor dbRawQuery(String sql, String[] selectionArgs) {
@@ -105,62 +106,66 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void dbExecSQL(String sql) {
+    private void dbExecSQL(String sql) throws Exception {
+        if (database == null) {
+            throw new Exception("Database is null");
+        }
+
         try {
-            if (database == null) return;
             if (isDatabaseEncrypted) {
-                ((net.sqlcipher.database.SQLiteDatabase) database).execSQL(sql);
+                net.sqlcipher.database.SQLiteDatabase db = (net.sqlcipher.database.SQLiteDatabase) database;
+                if (!db.isOpen()) {
+                    throw new Exception("Encrypted database is not open");
+                }
+                if (db.isReadOnly()) {
+                    throw new Exception("Encrypted database is readonly");
+                }
+                db.execSQL(sql);
             } else {
-                ((android.database.sqlite.SQLiteDatabase) database).execSQL(sql);
+                android.database.sqlite.SQLiteDatabase db = (android.database.sqlite.SQLiteDatabase) database;
+                if (!db.isOpen()) {
+                    throw new Exception("Database is not open");
+                }
+                if (db.isReadOnly()) {
+                    throw new Exception("Database is readonly");
+                }
+                db.execSQL(sql);
             }
         } catch (Exception e) {
             android.util.Log.e("MainActivity", "Error in dbExecSQL: " + e.getMessage(), e);
-            if (e.getMessage() != null && e.getMessage().contains("readonly database")) {
-                Toast.makeText(this, "Database is readonly. Please restart the app.", Toast.LENGTH_LONG).show();
-            }
+            throw e; // Re-throw exception so caller can handle it
         }
     }
 
-    private void dbExecSQL(String sql, Object[] bindArgs) {
-        try {
-            if (database == null) {
-                android.util.Log.w("MainActivity", "Database is null in dbExecSQL with args");
-                return;
-            }
+    private void dbExecSQL(String sql, Object[] bindArgs) throws Exception {
+        if (database == null) {
+            throw new Exception("Database is null in dbExecSQL with args");
+        }
 
+        try {
             // Check if database is readonly before attempting write
             if (isDatabaseEncrypted) {
                 net.sqlcipher.database.SQLiteDatabase db = (net.sqlcipher.database.SQLiteDatabase) database;
                 if (!db.isOpen()) {
-                    android.util.Log.w("MainActivity", "Encrypted database is not open in dbExecSQL with args");
-                    return;
+                    throw new Exception("Encrypted database is not open in dbExecSQL with args");
                 }
                 if (db.isReadOnly()) {
-                    android.util.Log.w("MainActivity", "Encrypted database is readonly in dbExecSQL with args - skipping write operation");
-                    Toast.makeText(this, "Database is readonly. Please restart the app.", Toast.LENGTH_LONG).show();
-                    return;
+                    throw new Exception("Encrypted database is readonly in dbExecSQL with args");
                 }
                 db.execSQL(sql, bindArgs);
             } else {
                 android.database.sqlite.SQLiteDatabase db = (android.database.sqlite.SQLiteDatabase) database;
                 if (!db.isOpen()) {
-                    android.util.Log.w("MainActivity", "Database is not open in dbExecSQL with args");
-                    return;
+                    throw new Exception("Database is not open in dbExecSQL with args");
                 }
                 if (db.isReadOnly()) {
-                    android.util.Log.w("MainActivity", "Database is readonly in dbExecSQL with args - skipping write operation");
-                    Toast.makeText(this, "Database is readonly. Please restart the app.", Toast.LENGTH_LONG).show();
-                    return;
+                    throw new Exception("Database is readonly in dbExecSQL with args");
                 }
                 db.execSQL(sql, bindArgs);
             }
         } catch (Exception e) {
             android.util.Log.e("MainActivity", "Error in dbExecSQL with args: " + e.getMessage(), e);
-            if (e.getMessage() != null && e.getMessage().contains("readonly database")) {
-                Toast.makeText(this, "Database is readonly. Please restart the app.", Toast.LENGTH_LONG).show();
-            } else if (e.getMessage() != null && e.getMessage().contains("not a database")) {
-                Toast.makeText(this, "Database corrupted. Please clear data or reinstall.", Toast.LENGTH_LONG).show();
-            }
+            throw e; // Re-throw exception so caller can handle it
         }
     }
 
@@ -1026,66 +1031,70 @@ public class MainActivity extends AppCompatActivity {
     private void saveData(List<ScanResult> results, Location location) {
         List<String> dataList = new ArrayList<>();
         for (ScanResult result : results) {
-            String capabilities = result.capabilities;
-            String encryption = "open";
-            if (capabilities != null && !capabilities.equals("") && !capabilities.equals("[]")) {
-                if (capabilities.contains("WEP") || capabilities.contains("WPA") || capabilities.contains("EAP")) {
-                    encryption = "encrypted";
-                }
-            }
-            
-            // Extract extended WiFi data
-            int frequency = result.frequency;
-            int channel = getWiFiChannel(frequency);
-            String wifiStandard = getWiFiStandard(result);
-            String vendorInfo = getVendorOUI(result.BSSID);
-            int channelWidth = getChannelWidth(result);
-            int centerFreq0 = 0;
-            int centerFreq1 = 0;
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                centerFreq0 = result.centerFreq0;
-                centerFreq1 = result.centerFreq1;
-            }
-            int maxSpeed = estimateMaxSpeed(result);
-            
-            // Only check the wifi_data table to see if the BSSID already exists.
-            Cursor cursor = dbRawQuery("SELECT signal_strength FROM wifi_data WHERE bssid = ?", new String[]{result.BSSID});
-            boolean update = false;
-            if (cursor != null) {
-                if (cursor.moveToFirst()) {
-                    int oldSignal = cursor.getInt(0);
-                    if (result.level > oldSignal) {
-                        update = true;
+            try {
+                String capabilities = result.capabilities;
+                String encryption = "open";
+                if (capabilities != null && !capabilities.equals("") && !capabilities.equals("[]")) {
+                    if (capabilities.contains("WEP") || capabilities.contains("WPA") || capabilities.contains("EAP")) {
+                        encryption = "encrypted";
                     }
                 }
-                cursor.close();
+
+                // Extract extended WiFi data
+                int frequency = result.frequency;
+                int channel = getWiFiChannel(frequency);
+                String wifiStandard = getWiFiStandard(result);
+                String vendorInfo = getVendorOUI(result.BSSID);
+                int channelWidth = getChannelWidth(result);
+                int centerFreq0 = 0;
+                int centerFreq1 = 0;
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    centerFreq0 = result.centerFreq0;
+                    centerFreq1 = result.centerFreq1;
+                }
+                int maxSpeed = estimateMaxSpeed(result);
+
+                // Only check the wifi_data table to see if the BSSID already exists.
+                Cursor cursor = dbRawQuery("SELECT signal_strength FROM wifi_data WHERE bssid = ?", new String[]{result.BSSID});
+                boolean update = false;
+                if (cursor != null) {
+                    if (cursor.moveToFirst()) {
+                        int oldSignal = cursor.getInt(0);
+                        if (result.level > oldSignal) {
+                            update = true;
+                        }
+                    }
+                    cursor.close();
+                }
+
+                // Store WiFi data only in the wifi_data table
+                if (update) {
+                    dbExecSQL("UPDATE wifi_data SET ssid=?, signal_strength=?, encryption=?, latitude=?, longitude=?, timestamp=?, frequency=?, channel=?, capabilities=?, wifi_standard=?, vendor_info=?, channel_width=?, center_freq0=?, center_freq1=?, max_connection_speed=? WHERE bssid=?",
+                            new Object[]{result.SSID, result.level, encryption, location.getLatitude(), location.getLongitude(), System.currentTimeMillis(), frequency, channel, capabilities, wifiStandard, vendorInfo, channelWidth, centerFreq0, centerFreq1, maxSpeed, result.BSSID});
+                } else if (!existsInDb(result.BSSID)) {
+                    dbExecSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp, frequency, channel, capabilities, wifi_standard, vendor_info, channel_width, center_freq0, center_freq1, max_connection_speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            new Object[]{result.SSID, result.BSSID, result.level, encryption, location.getLatitude(), location.getLongitude(), System.currentTimeMillis(), frequency, channel, capabilities, wifiStandard, vendorInfo, channelWidth, centerFreq0, centerFreq1, maxSpeed});
+                }
+
+                // Additionally, store the WiFi device information in device_data for motion analysis.
+                saveWifiDeviceForMovementTracking(result.SSID, result.BSSID, result.level, encryption, location, frequency, channel, wifiStandard, vendorInfo, channelWidth, maxSpeed);
+
+                String data = "SSID: " + result.SSID +
+                        ", BSSID: " + result.BSSID +
+                        ", Signal: " + result.level + " dBm" +
+                        ", Freq: " + frequency + " MHz" +
+                        ", Ch: " + channel +
+                        ", Standard: " + wifiStandard +
+                        ", " + encryption +
+                        ", Speed: " + maxSpeed + " Mbps" +
+                        ", Vendor: " + vendorInfo +
+                        ", ChWidth: " + channelWidth + " MHz" +
+                        ", Lat: " + String.format("%.4f", location.getLatitude()) +
+                        ", Lon: " + String.format("%.4f", location.getLongitude());
+                dataList.add(data);
+            } catch (Exception e) {
+                android.util.Log.e("MainActivity", "Error saving WiFi network: " + e.getMessage(), e);
             }
-            
-            // Store WiFi data only in the wifi_data table
-            if (update) {
-                dbExecSQL("UPDATE wifi_data SET ssid=?, signal_strength=?, encryption=?, latitude=?, longitude=?, timestamp=?, frequency=?, channel=?, capabilities=?, wifi_standard=?, vendor_info=?, channel_width=?, center_freq0=?, center_freq1=?, max_connection_speed=? WHERE bssid=?",
-                        new Object[]{result.SSID, result.level, encryption, location.getLatitude(), location.getLongitude(), System.currentTimeMillis(), frequency, channel, capabilities, wifiStandard, vendorInfo, channelWidth, centerFreq0, centerFreq1, maxSpeed, result.BSSID});
-            } else if (!existsInDb(result.BSSID)) {
-                dbExecSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp, frequency, channel, capabilities, wifi_standard, vendor_info, channel_width, center_freq0, center_freq1, max_connection_speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        new Object[]{result.SSID, result.BSSID, result.level, encryption, location.getLatitude(), location.getLongitude(), System.currentTimeMillis(), frequency, channel, capabilities, wifiStandard, vendorInfo, channelWidth, centerFreq0, centerFreq1, maxSpeed});
-            }
-            
-            // Additionally, store the WiFi device information in device_data for motion analysis.
-            saveWifiDeviceForMovementTracking(result.SSID, result.BSSID, result.level, encryption, location, frequency, channel, wifiStandard, vendorInfo, channelWidth, maxSpeed);
-            
-            String data = "SSID: " + result.SSID +
-                    ", BSSID: " + result.BSSID +
-                    ", Signal: " + result.level + " dBm" +
-                    ", Freq: " + frequency + " MHz" +
-                    ", Ch: " + channel +
-                    ", Standard: " + wifiStandard +
-                    ", " + encryption +
-                    ", Speed: " + maxSpeed + " Mbps" +
-                    ", Vendor: " + vendorInfo +
-                    ", ChWidth: " + channelWidth + " MHz" +
-                    ", Lat: " + String.format("%.4f", location.getLatitude()) +
-                    ", Lon: " + String.format("%.4f", location.getLongitude());
-            dataList.add(data);
         }
         statusText.setText(String.format(getString(R.string.data_saved), results.size()));
         addLogMessage(String.format(getString(R.string.data_saved), results.size()));
@@ -1098,121 +1107,129 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void saveBluetoothDevice(String deviceName, String deviceAddress, int rssi, String deviceClass, Location location) {
-        // Check if a Bluetooth device already exists and has a better signal strength.
-        Cursor cursor = dbRawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'BLUETOOTH'", new String[]{deviceAddress});
-        boolean update = false;
-        boolean exists = false;
-        double lastLat = 0, lastLon = 0;
-        long lastTimestamp = 0;
-        
-        if (cursor != null) {
-            if (cursor.moveToFirst()) {
-                exists = true;
-                int oldSignal = cursor.getInt(0);
-                lastLat = cursor.getDouble(1);
-                lastLon = cursor.getDouble(2);
-                lastTimestamp = cursor.getLong(3);
-                
-                if (rssi > oldSignal) {
-                    update = true;
+        try {
+            // Check if a Bluetooth device already exists and has a better signal strength.
+            Cursor cursor = dbRawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'BLUETOOTH'", new String[]{deviceAddress});
+            boolean update = false;
+            boolean exists = false;
+            double lastLat = 0, lastLon = 0;
+            long lastTimestamp = 0;
+
+            if (cursor != null) {
+                if (cursor.moveToFirst()) {
+                    exists = true;
+                    int oldSignal = cursor.getInt(0);
+                    lastLat = cursor.getDouble(1);
+                    lastLon = cursor.getDouble(2);
+                    lastTimestamp = cursor.getLong(3);
+
+                    if (rssi > oldSignal) {
+                        update = true;
+                    }
                 }
+                cursor.close();
             }
-            cursor.close();
-        }
-        
-        if (update || !exists) {
-            double currentLat = location.getLatitude();
-            double currentLon = location.getLongitude();
-            long currentTimestamp = System.currentTimeMillis();
-            
-            // Calculate movement distance if previous position exists
-            Double movementDistance = null;
-            if (exists && lastLat != 0 && lastLon != 0) {
-                movementDistance = calculateDistance(lastLat, lastLon, currentLat, currentLon);
-            }
-            
-            if (update) {
-                // Update with movement data
-                if (movementDistance != null) {
-                    dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
-                            "last_seen_latitude=latitude, last_seen_longitude=longitude, last_seen_timestamp=timestamp, " +
-                            "latitude=?, longitude=?, timestamp=?, movement_distance=? " +
-                            "WHERE device_address=? AND device_type='BLUETOOTH'",
-                            new Object[]{deviceName, rssi, deviceClass, currentLat, currentLon, currentTimestamp, movementDistance, deviceAddress});
+
+            if (update || !exists) {
+                double currentLat = location.getLatitude();
+                double currentLon = location.getLongitude();
+                long currentTimestamp = System.currentTimeMillis();
+
+                // Calculate movement distance if previous position exists
+                Double movementDistance = null;
+                if (exists && lastLat != 0 && lastLon != 0) {
+                    movementDistance = calculateDistance(lastLat, lastLon, currentLat, currentLon);
+                }
+
+                if (update) {
+                    // Update with movement data
+                    if (movementDistance != null) {
+                        dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
+                                "last_seen_latitude=latitude, last_seen_longitude=longitude, last_seen_timestamp=timestamp, " +
+                                "latitude=?, longitude=?, timestamp=?, movement_distance=? " +
+                                "WHERE device_address=? AND device_type='BLUETOOTH'",
+                                new Object[]{deviceName, rssi, deviceClass, currentLat, currentLon, currentTimestamp, movementDistance, deviceAddress});
+                    } else {
+                        dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, latitude=?, longitude=?, timestamp=? WHERE device_address=? AND device_type='BLUETOOTH'",
+                                new Object[]{deviceName, rssi, deviceClass, currentLat, currentLon, currentTimestamp, deviceAddress});
+                    }
                 } else {
-                    dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, latitude=?, longitude=?, timestamp=? WHERE device_address=? AND device_type='BLUETOOTH'",
-                            new Object[]{deviceName, rssi, deviceClass, currentLat, currentLon, currentTimestamp, deviceAddress});
+                    // New entry
+                    dbExecSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                            new Object[]{deviceName, deviceAddress, "BLUETOOTH", rssi, deviceClass, currentLat, currentLon, currentTimestamp});
                 }
-            } else {
-                // New entry
-                dbExecSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        new Object[]{deviceName, deviceAddress, "BLUETOOTH", rssi, deviceClass, currentLat, currentLon, currentTimestamp});
             }
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Error saving Bluetooth device: " + e.getMessage(), e);
         }
     }
     
     // Save/update WiFi device for motion analysis in the device_data table
-    private void saveWifiDeviceForMovementTracking(String ssid, String bssid, int signal, String encryption, Location location, 
+    private void saveWifiDeviceForMovementTracking(String ssid, String bssid, int signal, String encryption, Location location,
                                                   int frequency, int channel, String standard, String vendor, int channelWidth, int maxSpeed) {
-        // Check if the WiFi device already exists in device_data.
-        Cursor cursor = dbRawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'WIFI'", new String[]{bssid});
-        boolean update = false;
-        boolean exists = false;
-        double lastLat = 0, lastLon = 0;
-        long lastTimestamp = 0;
-        
-        if (cursor != null) {
-            if (cursor.moveToFirst()) {
-                exists = true;
-                int oldSignal = cursor.getInt(0);
-                lastLat = cursor.getDouble(1);
-                lastLon = cursor.getDouble(2);
-                lastTimestamp = cursor.getLong(3);
-                
-                if (signal > oldSignal) {
-                    update = true;
+        try {
+            // Check if the WiFi device already exists in device_data.
+            Cursor cursor = dbRawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'WIFI'", new String[]{bssid});
+            boolean update = false;
+            boolean exists = false;
+            double lastLat = 0, lastLon = 0;
+            long lastTimestamp = 0;
+
+            if (cursor != null) {
+                if (cursor.moveToFirst()) {
+                    exists = true;
+                    int oldSignal = cursor.getInt(0);
+                    lastLat = cursor.getDouble(1);
+                    lastLon = cursor.getDouble(2);
+                    lastTimestamp = cursor.getLong(3);
+
+                    if (signal > oldSignal) {
+                        update = true;
+                    }
                 }
+                cursor.close();
             }
-            cursor.close();
-        }
-        
-        if (update || !exists) {
-            double currentLat = location.getLatitude();
-            double currentLon = location.getLongitude();
-            long currentTimestamp = System.currentTimeMillis();
-            
-            // Calculate movement distance if previous position exists
-            Double movementDistance = null;
-            if (exists && lastLat != 0 && lastLon != 0) {
-                movementDistance = calculateDistance(lastLat, lastLon, currentLat, currentLon);
-            }
-            
-            if (update) {
-                // Update with movement data
-                if (movementDistance != null) {
-                    dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
-                            "frequency=?, channel=?, wifi_standard=?, vendor_info=?, channel_width=?, max_connection_speed=?, " +
-                            "last_seen_latitude=latitude, last_seen_longitude=longitude, last_seen_timestamp=timestamp, " +
-                            "latitude=?, longitude=?, timestamp=?, movement_distance=? " +
-                            "WHERE device_address=? AND device_type='WIFI'",
-                            new Object[]{ssid, signal, encryption, frequency, channel, standard, vendor, channelWidth, maxSpeed, 
-                                       currentLat, currentLon, currentTimestamp, movementDistance, bssid});
+
+            if (update || !exists) {
+                double currentLat = location.getLatitude();
+                double currentLon = location.getLongitude();
+                long currentTimestamp = System.currentTimeMillis();
+
+                // Calculate movement distance if previous position exists
+                Double movementDistance = null;
+                if (exists && lastLat != 0 && lastLon != 0) {
+                    movementDistance = calculateDistance(lastLat, lastLon, currentLat, currentLon);
+                }
+
+                if (update) {
+                    // Update with movement data
+                    if (movementDistance != null) {
+                        dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
+                                "frequency=?, channel=?, wifi_standard=?, vendor_info=?, channel_width=?, max_connection_speed=?, " +
+                                "last_seen_latitude=latitude, last_seen_longitude=longitude, last_seen_timestamp=timestamp, " +
+                                "latitude=?, longitude=?, timestamp=?, movement_distance=? " +
+                                "WHERE device_address=? AND device_type='WIFI'",
+                                new Object[]{ssid, signal, encryption, frequency, channel, standard, vendor, channelWidth, maxSpeed,
+                                           currentLat, currentLon, currentTimestamp, movementDistance, bssid});
+                    } else {
+                        dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
+                                "frequency=?, channel=?, wifi_standard=?, vendor_info=?, channel_width=?, max_connection_speed=?, " +
+                                "latitude=?, longitude=?, timestamp=? " +
+                                "WHERE device_address=? AND device_type='WIFI'",
+                                new Object[]{ssid, signal, encryption, frequency, channel, standard, vendor, channelWidth, maxSpeed,
+                                           currentLat, currentLon, currentTimestamp, bssid});
+                    }
                 } else {
-                    dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
-                            "frequency=?, channel=?, wifi_standard=?, vendor_info=?, channel_width=?, max_connection_speed=?, " +
-                            "latitude=?, longitude=?, timestamp=? " +
-                            "WHERE device_address=? AND device_type='WIFI'",
-                            new Object[]{ssid, signal, encryption, frequency, channel, standard, vendor, channelWidth, maxSpeed, 
-                                       currentLat, currentLon, currentTimestamp, bssid});
+                    // New entry
+                    dbExecSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, " +
+                            "frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed, " +
+                            "latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            new Object[]{ssid, bssid, "WIFI", signal, encryption, frequency, channel, standard, vendor, channelWidth, maxSpeed,
+                                       currentLat, currentLon, currentTimestamp});
                 }
-            } else {
-                // New entry
-                dbExecSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, " +
-                        "frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed, " +
-                        "latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        new Object[]{ssid, bssid, "WIFI", signal, encryption, frequency, channel, standard, vendor, channelWidth, maxSpeed, 
-                                   currentLat, currentLon, currentTimestamp});
             }
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Error saving WiFi device for movement tracking: " + e.getMessage(), e);
         }
     }
 
@@ -1545,12 +1562,33 @@ public class MainActivity extends AppCompatActivity {
             // Wait 500ms to ensure ScanService is fully stopped
             new android.os.Handler().postDelayed(() -> {
                 try {
-                    dbExecSQL("DELETE FROM wifi_data");
-                    dbExecSQL("DELETE FROM device_data");
-                    Toast.makeText(this, R.string.all_networks_deleted, Toast.LENGTH_SHORT).show();
-                    // Refresh the display to show empty data
-                    showData();
-                    android.util.Log.d("MainActivity", "Database cleared successfully");
+                    android.util.Log.d("MainActivity", "Starting database clear operation");
+
+                    // Begin transaction for atomic operation
+                    dbBeginTransaction();
+
+                    try {
+                        // Delete all data
+                        dbExecSQL("DELETE FROM wifi_data");
+                        android.util.Log.d("MainActivity", "Deleted wifi_data");
+
+                        dbExecSQL("DELETE FROM device_data");
+                        android.util.Log.d("MainActivity", "Deleted device_data");
+
+                        // Mark transaction as successful
+                        dbSetTransactionSuccessful();
+
+                        android.util.Log.d("MainActivity", "Database cleared successfully - transaction committed");
+                        Toast.makeText(this, R.string.all_networks_deleted, Toast.LENGTH_SHORT).show();
+
+                        // Refresh the display to show empty data
+                        showData();
+
+                    } finally {
+                        // End transaction (commits if successful, rolls back otherwise)
+                        dbEndTransaction();
+                    }
+
                 } catch (Exception e) {
                     android.util.Log.e("MainActivity", "Error clearing database: " + e.getMessage(), e);
                     Toast.makeText(this, "Error clearing database: " + e.getMessage(), Toast.LENGTH_LONG).show();
@@ -1572,12 +1610,17 @@ public class MainActivity extends AppCompatActivity {
                 "BENEFITS:\n" +
                 "• Verify file integrity during import\n" +
                 "• Detect tampering or corruption\n" +
-                "• Establish trust for file sharing\n\n" +
+                "• Establish trust for file sharing\n" +
+                (isDatabaseEncrypted ? "• Store encryption salt for portable import\n" : "") +
+                "\n" +
                 "METADATA INCLUDES:\n" +
                 "• SHA-256 checksum\n" +
                 "• Original filename\n" +
                 "• File size\n" +
-                "• Export timestamp\n\n" +
+                "• Export timestamp\n" +
+                (isDatabaseEncrypted ? "• Encryption salt (for import)\n" : "") +
+                "\n" +
+                (isDatabaseEncrypted ? "🔐 IMPORTANT: For encrypted databases, the metadata file is REQUIRED for import on other devices!\n\n" : "") +
                 "The metadata will be saved as a .json file that you can share alongside the database file.";
 
         builder.setMessage(message);
@@ -1684,10 +1727,22 @@ public class MainActivity extends AppCompatActivity {
             String originalFilename = metadata.optString("filename", "unknown");
             long originalFileSize = metadata.optLong("fileSize", -1);
 
+            // Extract encryption metadata if present
+            boolean isEncrypted = metadata.optBoolean("encrypted", false);
+            String encryptionSaltBase64 = metadata.optString("encryptionSalt", null);
+
             addLogMessage("Checksum metadata loaded:");
             addLogMessage("  Algorithm: " + algorithm);
             addLogMessage("  Filename: " + originalFilename);
             addLogMessage("  Expected checksum: " + expectedChecksum);
+            if (isEncrypted) {
+                addLogMessage("  Encryption: Enabled");
+                if (encryptionSaltBase64 != null) {
+                    // Store salt for later use during passphrase entry
+                    pendingEncryptionSalt = android.util.Base64.decode(encryptionSaltBase64, android.util.Base64.NO_WRAP);
+                    addLogMessage("  Encryption salt extracted from metadata");
+                }
+            }
 
             // Verify algorithm
             if (!"SHA-256".equals(algorithm)) {
@@ -1746,6 +1801,7 @@ public class MainActivity extends AppCompatActivity {
     private void clearPendingImport() {
         pendingImportUri = null;
         pendingImportFile = null;
+        pendingEncryptionSalt = null;
     }
 
     // Show checksum mismatch error
@@ -2302,6 +2358,18 @@ public class MainActivity extends AppCompatActivity {
             metadata.put("timestamp", System.currentTimeMillis());
             metadata.put("exportedBy", "WiFi GeoGrabber v" + APP_VERSION);
 
+            // Include encryption metadata if database is encrypted
+            metadata.put("encrypted", isDatabaseEncrypted);
+            if (isDatabaseEncrypted && encryptionManager != null) {
+                byte[] salt = encryptionManager.getCurrentSalt();
+                if (salt != null) {
+                    // Store salt as Base64 for portability
+                    String saltBase64 = android.util.Base64.encodeToString(salt, android.util.Base64.NO_WRAP);
+                    metadata.put("encryptionSalt", saltBase64);
+                    addLogMessage("Including encryption salt in metadata for portable import");
+                }
+            }
+
             return metadata.toString(2); // Pretty print with indent of 2
         } catch (Exception e) {
             addLogMessage("ERROR: Failed to create metadata: " + e.getMessage());
@@ -2410,7 +2478,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // Copies all data from the external database to the internal database.
-    private void copyDataFromExternalToInternal(SQLiteDatabase externalDb) {
+    private void copyDataFromExternalToInternal(SQLiteDatabase externalDb) throws Exception {
         int copiedWifi = 0;
         int copiedBluetooth = 0;
         int copiedLegacyWifi = 0;
@@ -3352,26 +3420,43 @@ public class MainActivity extends AppCompatActivity {
             android.app.ProgressDialog progressDialog;
             int wifiCount = 0;
             int bluetoothCount = 0;
-            
+            String derivedKey = null;  // Store derived key for later use
+
             @Override
             protected void onPreExecute() {
                 progressDialog = android.app.ProgressDialog.show(
-                    MainActivity.this, 
+                    MainActivity.this,
                     "Importing Database",
-                    "Verifying encrypted database...", 
+                    "Verifying encrypted database...",
                     true
                 );
             }
-            
+
             @Override
             protected Boolean doInBackground(Void... params) {
                 net.sqlcipher.database.SQLiteDatabase testDb = null;
                 try {
-                    // Try to open encrypted database with passphrase
                     net.sqlcipher.database.SQLiteDatabase.loadLibs(MainActivity.this);
-                    testDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
-                        encryptedDbFile.getAbsolutePath(), passphrase, null, 
-                        net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY);
+
+                    // If we have salt from metadata, derive the key properly
+                    if (pendingEncryptionSalt != null) {
+                        Log.i("MainActivity", "Using encryption salt from metadata to derive key");
+                        char[] passphraseChars = passphrase.toCharArray();
+                        derivedKey = encryptionManager.deriveKeyWithCustomSalt(passphraseChars, pendingEncryptionSalt);
+                        java.util.Arrays.fill(passphraseChars, '\0');  // Clear passphrase from memory
+
+                        // Open database with derived key
+                        testDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                            encryptedDbFile.getAbsolutePath(), derivedKey, null,
+                            net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY);
+                    } else {
+                        // Fallback: Try raw passphrase (backwards compatibility)
+                        Log.i("MainActivity", "No salt in metadata - trying raw passphrase");
+                        derivedKey = passphrase;
+                        testDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                            encryptedDbFile.getAbsolutePath(), passphrase, null,
+                            net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY);
+                    }
                     
                     // Check for required tables
                     boolean hasWifiData = hasEncryptedTable(testDb, "wifi_data");
@@ -3426,7 +3511,7 @@ public class MainActivity extends AppCompatActivity {
                     );
                     
                     confirmBuilder.setPositiveButton("Import", (d, w) -> {
-                        performEncryptedDatabaseImport(encryptedDbFile, passphrase, wifiCount, bluetoothCount);
+                        performEncryptedDatabaseImport(encryptedDbFile, derivedKey, wifiCount, bluetoothCount);
                     });
                     
                     confirmBuilder.setNegativeButton(R.string.cancel, (d, w) -> {
@@ -3437,6 +3522,7 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     Toast.makeText(MainActivity.this, R.string.wrong_passphrase, Toast.LENGTH_LONG).show();
                     encryptedDbFile.delete();
+                    pendingEncryptionSalt = null;  // Clear pending salt on failure
                 }
             }
         }.execute();
@@ -3489,12 +3575,15 @@ public class MainActivity extends AppCompatActivity {
             @Override
             protected void onPostExecute(Boolean success) {
                 progressDialog.dismiss();
-                
+
+                // Clear pending encryption salt after import completes
+                pendingEncryptionSalt = null;
+
                 if (success) {
-                    Toast.makeText(MainActivity.this, 
-                        "✓ Imported " + wifiCount + " WiFi + " + bluetoothCount + " BT devices", 
+                    Toast.makeText(MainActivity.this,
+                        "✓ Imported " + wifiCount + " WiFi + " + bluetoothCount + " BT devices",
                         Toast.LENGTH_LONG).show();
-                    
+
                     // Refresh display
                     if (isShowingStoredData) {
                         showData();
