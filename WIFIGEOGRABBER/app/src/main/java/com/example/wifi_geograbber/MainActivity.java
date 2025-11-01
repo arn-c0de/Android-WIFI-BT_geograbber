@@ -51,6 +51,12 @@ public class MainActivity extends AppCompatActivity {
     private LocationManager locationManager;
     private BluetoothAdapter bluetoothAdapter;
     private SQLiteDatabase database;
+    
+    // Database encryption support
+    private EncryptionManager encryptionManager;
+    private DatabaseEncryptionHelper encryptedDbHelper;
+    private boolean isDatabaseEncrypted = false;
+    
     private TextView statusText;
     private TextView infoSummary;
     private TextView logcatText;
@@ -133,6 +139,9 @@ public class MainActivity extends AppCompatActivity {
         // Activate full-screen mode - hide the navigation bar (after setContentView!)
         hideSystemUI();
 
+        // Initialize encryption manager
+        encryptionManager = new EncryptionManager(this);
+
         // initialization
         statusText = findViewById(R.id.status_text);
         infoSummary = findViewById(R.id.info_summary);
@@ -181,9 +190,8 @@ public class MainActivity extends AppCompatActivity {
         // Check location services and display dialog if necessary.
         checkLocationServicesEnabled();
 
-        // Initialize database
-        DatabaseHelper dbHelper = new DatabaseHelper(this);
-        database = dbHelper.getWritableDatabase();
+        // Initialize database with encryption support
+        initializeDatabase();
 
         // Check permissions
         checkPermissions();
@@ -1194,7 +1202,8 @@ public class MainActivity extends AppCompatActivity {
             getString(R.string.save_db_as_file),
             getString(R.string.delete_database),
             getString(R.string.show_network_count),
-            getString(R.string.import_external_db)
+            getString(R.string.import_external_db),
+            getString(R.string.encryption_settings)
         };
         
         builder.setItems(items, (dialog, which) -> {
@@ -1210,6 +1219,9 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 case 3: // Import external DB
                     selectExternalDatabaseAsActive();
+                    break;
+                case 4: // Encryption settings
+                    showEncryptionSettingsDialog();
                     break;
             }
         });
@@ -2400,7 +2412,25 @@ public class MainActivity extends AppCompatActivity {
         }
         
         stopScanning();
+        
+        // Clear encryption passphrase from memory
+        if (encryptionManager != null) {
+            encryptionManager.clearPassphrase();
+        }
+        if (encryptedDbHelper != null) {
+            encryptedDbHelper.clearPassphrase();
+        }
+        
         database.close();
+    }
+    
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Clear passphrase from memory when app goes to background
+        if (encryptionManager != null) {
+            encryptionManager.clearPassphrase();
+        }
     }
 
     // Update button text according to status
@@ -2425,6 +2455,519 @@ public class MainActivity extends AppCompatActivity {
                 bluetoothToggleButton.setBackgroundColor(getResources().getColor(android.R.color.holo_red_light));
             }
         }
+    }
+    
+    // ====================================================================
+    //  DATABASE ENCRYPTION METHODS
+    // ====================================================================
+    
+    /**
+     * Initialize database with encryption support
+     */
+    private void initializeDatabase() {
+        // Check if encryption is enabled
+        if (encryptionManager.isEncryptionEnabled()) {
+            isDatabaseEncrypted = true;
+            
+            // Check if passphrase is cached
+            if (!encryptionManager.isPassphraseCached()) {
+                // Show unlock dialog
+                showUnlockDialog();
+            } else {
+                // Open encrypted database
+                initializeEncryptedDatabase();
+            }
+        } else {
+            // Check if this is first launch
+            if (!encryptionManager.isPassphraseSet()) {
+                // Show first-launch encryption prompt
+                showFirstLaunchEncryptionDialog();
+            }
+            
+            // Use standard database
+            DatabaseHelper dbHelper = new DatabaseHelper(this);
+            database = dbHelper.getWritableDatabase();
+        }
+    }
+    
+    /**
+     * Initialize encrypted database
+     */
+    private void initializeEncryptedDatabase() {
+        String dbKey = encryptionManager.getCachedDatabaseKey();
+        if (dbKey != null) {
+            encryptedDbHelper = new DatabaseEncryptionHelper(this, dbKey);
+            database = encryptedDbHelper.openEncryptedDatabase();
+            
+            if (database == null) {
+                Toast.makeText(this, "Failed to open encrypted database", Toast.LENGTH_LONG).show();
+                finish();
+            }
+        } else {
+            Toast.makeText(this, R.string.database_locked, Toast.LENGTH_LONG).show();
+            finish();
+        }
+    }
+    
+    /**
+     * Show first-launch encryption prompt
+     */
+    private void showFirstLaunchEncryptionDialog() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle(R.string.first_launch_encryption_title);
+        builder.setMessage(R.string.first_launch_encryption_message);
+        builder.setCancelable(false);
+        
+        builder.setPositiveButton(R.string.enable_now, (dialog, which) -> {
+            showSetupEncryptionDialog();
+        });
+        
+        builder.setNegativeButton(R.string.maybe_later, (dialog, which) -> {
+            // Continue with unencrypted database
+        });
+        
+        builder.show();
+    }
+    
+    /**
+     * Show encryption setup dialog
+     */
+    private void showSetupEncryptionDialog() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle(R.string.setup_encryption_title);
+        builder.setMessage(R.string.setup_encryption_message);
+        
+        // Create custom layout for passphrase input
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+        
+        final android.widget.EditText passphraseInput = new android.widget.EditText(this);
+        passphraseInput.setHint(R.string.passphrase_hint);
+        passphraseInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | 
+                                     android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        layout.addView(passphraseInput);
+        
+        final android.widget.EditText confirmInput = new android.widget.EditText(this);
+        confirmInput.setHint(R.string.confirm_passphrase_hint);
+        confirmInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | 
+                                   android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        layout.addView(confirmInput);
+        
+        android.widget.CheckBox showPassphraseBox = new android.widget.CheckBox(this);
+        showPassphraseBox.setText(R.string.show_passphrase);
+        showPassphraseBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            int inputType = isChecked ? 
+                android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD :
+                android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD;
+            passphraseInput.setInputType(inputType);
+            confirmInput.setInputType(inputType);
+        });
+        layout.addView(showPassphraseBox);
+        
+        builder.setView(layout);
+        
+        builder.setPositiveButton(R.string.set_passphrase, (dialog, which) -> {
+            String passphrase = passphraseInput.getText().toString();
+            String confirm = confirmInput.getText().toString();
+            
+            if (passphrase.length() < 6) {
+                Toast.makeText(this, R.string.passphrase_too_short, Toast.LENGTH_LONG).show();
+                showSetupEncryptionDialog(); // Show again
+                return;
+            }
+            
+            if (!passphrase.equals(confirm)) {
+                Toast.makeText(this, R.string.passphrases_dont_match, Toast.LENGTH_LONG).show();
+                showSetupEncryptionDialog(); // Show again
+                return;
+            }
+            
+            // Set up encryption
+            setupEncryption(passphrase.toCharArray());
+        });
+        
+        builder.setNegativeButton(R.string.cancel, null);
+        builder.show();
+    }
+    
+    /**
+     * Set up encryption with passphrase
+     */
+    private void setupEncryption(final char[] passphrase) {
+        new android.os.AsyncTask<Void, Void, Boolean>() {
+            android.app.ProgressDialog progressDialog;
+            
+            @Override
+            protected void onPreExecute() {
+                progressDialog = android.app.ProgressDialog.show(
+                    MainActivity.this, 
+                    getString(R.string.migration_title),
+                    getString(R.string.migration_in_progress), 
+                    true
+                );
+            }
+            
+            @Override
+            protected Boolean doInBackground(Void... params) {
+                try {
+                    // Setup encryption manager
+                    if (!encryptionManager.setupEncryption(passphrase)) {
+                        return false;
+                    }
+                    
+                    // Get database paths
+                    String unencryptedPath = getDatabasePath("wifi_scanner.db").getAbsolutePath();
+                    String encryptedPath = getDatabasePath("wifi_scanner_encrypted.db").getAbsolutePath();
+                    
+                    // Get encryption key
+                    String dbKey = encryptionManager.getCachedDatabaseKey();
+                    
+                    if (dbKey == null) {
+                        return false;
+                    }
+                    
+                    // Close current database if open
+                    if (database != null) {
+                        database.close();
+                    }
+                    
+                    // Check if unencrypted database exists
+                    java.io.File unencryptedFile = new java.io.File(unencryptedPath);
+                    if (unencryptedFile.exists() && unencryptedFile.length() > 0) {
+                        // Migrate database
+                        boolean success = DatabaseEncryptionHelper.migrateToEncrypted(
+                            MainActivity.this, unencryptedPath, encryptedPath, dbKey);
+                        
+                        if (success) {
+                            // Delete unencrypted database
+                            unencryptedFile.delete();
+                            
+                            // Rename encrypted database
+                            new java.io.File(encryptedPath).renameTo(unencryptedFile);
+                        }
+                        
+                        return success;
+                    } else {
+                        // No existing database, just create encrypted one
+                        encryptedDbHelper = new DatabaseEncryptionHelper(MainActivity.this, dbKey);
+                        SQLiteDatabase db = encryptedDbHelper.openEncryptedDatabase();
+                        if (db != null) {
+                            db.close();
+                            return true;
+                        }
+                        return false;
+                    }
+                    
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Encryption setup error", e);
+                    return false;
+                }
+            }
+            
+            @Override
+            protected void onPostExecute(Boolean success) {
+                progressDialog.dismiss();
+                
+                if (success) {
+                    Toast.makeText(MainActivity.this, R.string.migration_success, 
+                                  Toast.LENGTH_LONG).show();
+                    isDatabaseEncrypted = true;
+                    initializeEncryptedDatabase();
+                } else {
+                    Toast.makeText(MainActivity.this, R.string.migration_failed, 
+                                  Toast.LENGTH_LONG).show();
+                    encryptionManager.disableEncryption();
+                    
+                    // Fall back to standard database
+                    DatabaseHelper dbHelper = new DatabaseHelper(MainActivity.this);
+                    database = dbHelper.getWritableDatabase();
+                }
+            }
+        }.execute();
+    }
+    
+    /**
+     * Show unlock dialog
+     */
+    private void showUnlockDialog() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle(R.string.unlock_database_title);
+        builder.setMessage(R.string.unlock_database_message);
+        builder.setCancelable(false);
+        
+        final android.widget.EditText input = new android.widget.EditText(this);
+        input.setHint(R.string.passphrase_hint);
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | 
+                           android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+        layout.addView(input);
+        
+        builder.setView(layout);
+        
+        builder.setPositiveButton(R.string.unlock, (dialog, which) -> {
+            String passphrase = input.getText().toString();
+            
+            if (encryptionManager.unlockWithPassphrase(passphrase.toCharArray())) {
+                initializeEncryptedDatabase();
+                Toast.makeText(this, "✓ Database unlocked", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, R.string.wrong_passphrase, Toast.LENGTH_LONG).show();
+                finish(); // Close app on wrong passphrase
+            }
+        });
+        
+        builder.show();
+    }
+    
+    /**
+     * Show encryption settings dialog
+     */
+    private void showEncryptionSettingsDialog() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle(R.string.encryption_settings);
+        
+        String status = encryptionManager.isEncryptionEnabled() ? 
+            getString(R.string.encryption_enabled) : getString(R.string.encryption_disabled);
+        
+        String[] options = encryptionManager.isEncryptionEnabled() ? 
+            new String[]{getString(R.string.change_passphrase), getString(R.string.disable_encryption)} :
+            new String[]{getString(R.string.enable_encryption)};
+        
+        builder.setMessage(getString(R.string.encryption_status) + ": " + status + "\n\n" + "Options:");
+        
+        builder.setItems(options, (dialog, which) -> {
+            if (encryptionManager.isEncryptionEnabled()) {
+                if (which == 0) {
+                    showChangePassphraseDialog();
+                } else {
+                    showDisableEncryptionDialog();
+                }
+            } else {
+                showSetupEncryptionDialog();
+            }
+        });
+        
+        builder.setNegativeButton(R.string.cancel, null);
+        builder.show();
+    }
+    
+    /**
+     * Show change passphrase dialog
+     */
+    private void showChangePassphraseDialog() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle(R.string.change_passphrase_title);
+        builder.setMessage(R.string.change_passphrase_message);
+        
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+        
+        final android.widget.EditText currentInput = new android.widget.EditText(this);
+        currentInput.setHint(R.string.current_passphrase_hint);
+        currentInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | 
+                                  android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        layout.addView(currentInput);
+        
+        final android.widget.EditText newInput = new android.widget.EditText(this);
+        newInput.setHint(R.string.new_passphrase_hint);
+        newInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | 
+                              android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        layout.addView(newInput);
+        
+        final android.widget.EditText confirmInput = new android.widget.EditText(this);
+        confirmInput.setHint(R.string.confirm_passphrase_hint);
+        confirmInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | 
+                                   android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        layout.addView(confirmInput);
+        
+        builder.setView(layout);
+        
+        builder.setPositiveButton(R.string.change_passphrase, (dialog, which) -> {
+            String current = currentInput.getText().toString();
+            String newPass = newInput.getText().toString();
+            String confirm = confirmInput.getText().toString();
+            
+            if (newPass.length() < 6) {
+                Toast.makeText(this, R.string.passphrase_too_short, Toast.LENGTH_LONG).show();
+                return;
+            }
+            
+            if (!newPass.equals(confirm)) {
+                Toast.makeText(this, R.string.passphrases_dont_match, Toast.LENGTH_LONG).show();
+                return;
+            }
+            
+            changePassphrase(current.toCharArray(), newPass.toCharArray());
+        });
+        
+        builder.setNegativeButton(R.string.cancel, null);
+        builder.show();
+    }
+    
+    /**
+     * Change encryption passphrase
+     */
+    private void changePassphrase(final char[] oldPassphrase, final char[] newPassphrase) {
+        new android.os.AsyncTask<Void, Void, Boolean>() {
+            android.app.ProgressDialog progressDialog;
+            
+            @Override
+            protected void onPreExecute() {
+                progressDialog = android.app.ProgressDialog.show(
+                    MainActivity.this, 
+                    getString(R.string.change_passphrase_title),
+                    "Re-encrypting database...", 
+                    true
+                );
+            }
+            
+            @Override
+            protected Boolean doInBackground(Void... params) {
+                try {
+                    // Change passphrase in encryption manager
+                    if (!encryptionManager.changePassphrase(oldPassphrase, newPassphrase)) {
+                        return false;
+                    }
+                    
+                    // Get old and new keys
+                    String newKey = encryptionManager.getCachedDatabaseKey();
+                    
+                    // Reconstruct old key for database re-encryption
+                    EncryptionManager tempManager = new EncryptionManager(MainActivity.this);
+                    if (!tempManager.unlockWithPassphrase(oldPassphrase)) {
+                        return false;
+                    }
+                    String oldKey = tempManager.getCachedDatabaseKey();
+                    tempManager.clearPassphrase();
+                    
+                    // Change database encryption key
+                    String dbPath = getDatabasePath("wifi_scanner.db").getAbsolutePath();
+                    
+                    // Close database
+                    if (database != null) {
+                        database.close();
+                    }
+                    
+                    boolean success = DatabaseEncryptionHelper.changeEncryptionKey(
+                        dbPath, oldKey, newKey);
+                    
+                    return success;
+                    
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Error changing passphrase", e);
+                    return false;
+                }
+            }
+            
+            @Override
+            protected void onPostExecute(Boolean success) {
+                progressDialog.dismiss();
+                
+                if (success) {
+                    Toast.makeText(MainActivity.this, R.string.encryption_key_changed, 
+                                  Toast.LENGTH_LONG).show();
+                    // Reinitialize database with new key
+                    initializeEncryptedDatabase();
+                } else {
+                    Toast.makeText(MainActivity.this, R.string.encryption_key_change_failed, 
+                                  Toast.LENGTH_LONG).show();
+                }
+            }
+        }.execute();
+    }
+    
+    /**
+     * Show disable encryption dialog
+     */
+    private void showDisableEncryptionDialog() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle(R.string.disable_encryption_title);
+        builder.setMessage(R.string.disable_encryption_message);
+        
+        builder.setPositiveButton(R.string.yes_disable, (dialog, which) -> {
+            disableEncryption();
+        });
+        
+        builder.setNegativeButton(R.string.cancel, null);
+        builder.show();
+    }
+    
+    /**
+     * Disable encryption (decrypt database)
+     */
+    private void disableEncryption() {
+        new android.os.AsyncTask<Void, Void, Boolean>() {
+            android.app.ProgressDialog progressDialog;
+            
+            @Override
+            protected void onPreExecute() {
+                progressDialog = android.app.ProgressDialog.show(
+                    MainActivity.this, 
+                    getString(R.string.disable_encryption_title),
+                    getString(R.string.decryption_in_progress), 
+                    true
+                );
+            }
+            
+            @Override
+            protected Boolean doInBackground(Void... params) {
+                try {
+                    String encryptedPath = getDatabasePath("wifi_scanner.db").getAbsolutePath();
+                    String unencryptedPath = getDatabasePath("wifi_scanner_unencrypted.db").getAbsolutePath();
+                    
+                    String dbKey = encryptionManager.getCachedDatabaseKey();
+                    
+                    // Close database
+                    if (database != null) {
+                        database.close();
+                    }
+                    
+                    // Decrypt database
+                    boolean success = DatabaseEncryptionHelper.decryptDatabase(
+                        MainActivity.this, encryptedPath, unencryptedPath, dbKey);
+                    
+                    if (success) {
+                        // Delete encrypted database
+                        new java.io.File(encryptedPath).delete();
+                        
+                        // Rename unencrypted database
+                        new java.io.File(unencryptedPath).renameTo(new java.io.File(encryptedPath));
+                        
+                        // Disable encryption in manager
+                        encryptionManager.disableEncryption();
+                    }
+                    
+                    return success;
+                    
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Error disabling encryption", e);
+                    return false;
+                }
+            }
+            
+            @Override
+            protected void onPostExecute(Boolean success) {
+                progressDialog.dismiss();
+                
+                if (success) {
+                    Toast.makeText(MainActivity.this, R.string.decryption_success, 
+                                  Toast.LENGTH_LONG).show();
+                    isDatabaseEncrypted = false;
+                    
+                    // Reinitialize with standard database
+                    DatabaseHelper dbHelper = new DatabaseHelper(MainActivity.this);
+                    database = dbHelper.getWritableDatabase();
+                } else {
+                    Toast.makeText(MainActivity.this, R.string.decryption_failed, 
+                                  Toast.LENGTH_LONG).show();
+                }
+            }
+        }.execute();
     }
 
     // Database Helper Class

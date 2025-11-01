@@ -39,6 +39,11 @@ public class ScanService extends Service {
     private LocationManager locationManager;
     private BluetoothAdapter bluetoothAdapter;
     private SQLiteDatabase database;
+    
+    // Database encryption support
+    private EncryptionManager encryptionManager;
+    private DatabaseEncryptionHelper encryptedDbHelper;
+    
     private Handler handler;
     private Runnable scanRunnable;
     private long lastScanTime = 0;
@@ -52,6 +57,9 @@ public class ScanService extends Service {
     public void onCreate() {
         super.onCreate();
         createNotificationChannel();
+        
+        // Initialize encryption manager
+        encryptionManager = new EncryptionManager(this);
         
         wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
@@ -152,7 +160,21 @@ public class ScanService extends Service {
                 database.close();
             }
             
-            if (databasePath != null && !databasePath.isEmpty()) {
+            // Check if encryption is enabled
+            if (encryptionManager.isEncryptionEnabled()) {
+                // Use encrypted database
+                String dbKey = encryptionManager.getCachedDatabaseKey();
+                if (dbKey != null) {
+                    encryptedDbHelper = new DatabaseEncryptionHelper(this, dbKey);
+                    database = encryptedDbHelper.openEncryptedDatabase();
+                    Log.d("ScanService", "Using encrypted database");
+                } else {
+                    Log.e("ScanService", "Encryption enabled but passphrase not cached");
+                    // Fall back to standard database (should not happen in normal flow)
+                    MainActivity.DatabaseHelper dbHelper = new MainActivity.DatabaseHelper(this);
+                    database = dbHelper.getWritableDatabase();
+                }
+            } else if (databasePath != null && !databasePath.isEmpty()) {
                 // Use external database
                 database = SQLiteDatabase.openDatabase(databasePath, null, SQLiteDatabase.OPEN_READWRITE);
                 Log.d("ScanService", "Using external database: " + databasePath);

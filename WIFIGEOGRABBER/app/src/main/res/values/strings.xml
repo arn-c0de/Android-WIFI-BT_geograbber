@@ -76,4 +76,82 @@
 
     <!-- Location Messages -->
     <string name="centering_on_location">Centering on your location</string>
+    
+    <!-- Database Encryption -->
+    <string name="encryption_settings">🔐 Database Encryption</string>
+    <string name="enable_encryption">Enable Database Encryption</string>
+    <string name="disable_encryption">Disable Encryption</string>
+    <string name="change_passphrase">Change Passphrase</string>
+    <string name="encryption_status">Encryption Status</string>
+    <string name="encryption_enabled">🔒 Encrypted</string>
+    <string name="encryption_disabled">🔓 Not Encrypted</string>
+    <string name="encryption_locked">🔒 Locked</string>
+    <string name="encryption_unlocked">🔓 Unlocked</string>
+    
+    <!-- Encryption Setup Dialog -->
+    <string name="setup_encryption_title">Enable Database Encryption?</string>
+    <string name="setup_encryption_message">Protect your scan data with AES-256 encryption.\n\n✓ Prevents unauthorized access\n✓ Protects GPS + network data\n✓ Secure passphrase required\n\nYour existing database will be migrated to encrypted format.</string>
+    <string name="set_passphrase">Set Passphrase</string>
+    <string name="skip">Skip</string>
+    
+    <!-- Passphrase Input Dialog -->
+    <string name="enter_passphrase_title">Enter Passphrase</string>
+    <string name="enter_passphrase_message">Create a strong passphrase (minimum 6 characters):</string>
+    <string name="confirm_passphrase">Confirm Passphrase</string>
+    <string name="passphrase_hint">Enter passphrase</string>
+    <string name="confirm_passphrase_hint">Confirm passphrase</string>
+    <string name="show_passphrase">Show passphrase</string>
+    
+    <!-- Unlock Database Dialog -->
+    <string name="unlock_database_title">Unlock Database</string>
+    <string name="unlock_database_message">Enter your passphrase to access the encrypted database:</string>
+    <string name="unlock">Unlock</string>
+    <string name="wrong_passphrase">❌ Wrong passphrase. Access denied.</string>
+    
+    <!-- Change Passphrase Dialog -->
+    <string name="change_passphrase_title">Change Encryption Passphrase</string>
+    <string name="change_passphrase_message">Enter your current and new passphrase:</string>
+    <string name="current_passphrase">Current Passphrase</string>
+    <string name="new_passphrase">New Passphrase</string>
+    <string name="current_passphrase_hint">Enter current passphrase</string>
+    <string name="new_passphrase_hint">Enter new passphrase</string>
+    
+    <!-- Migration Dialog -->
+    <string name="migration_title">Migrate to Encrypted Database</string>
+    <string name="migration_message">Your database will be encrypted with the passphrase you provided.\n\n⚠️ This process:\n• Creates encrypted copy\n• Deletes unencrypted database\n• Cannot be reversed without passphrase\n\nContinue?</string>
+    <string name="migrate">Migrate</string>
+    <string name="migration_in_progress">Encrypting database…</string>
+    <string name="migration_success">✓ Database encrypted successfully!</string>
+    <string name="migration_failed">❌ Migration failed. Database remains unencrypted.</string>
+    
+    <!-- Disable Encryption Dialog -->
+    <string name="disable_encryption_title">Disable Encryption?</string>
+    <string name="disable_encryption_message">⚠️ WARNING: This will decrypt your database!\n\n• Data will be stored in plaintext\n• Anyone with file access can read it\n• Privacy protection will be removed\n\nAre you sure?</string>
+    <string name="yes_disable">Yes, Disable</string>
+    <string name="decryption_in_progress">Decrypting database…</string>
+    <string name="decryption_success">✓ Database decrypted. Encryption disabled.</string>
+    <string name="decryption_failed">❌ Decryption failed.</string>
+    
+    <!-- Import/Export Encrypted Database -->
+    <string name="import_encrypted_db">Import Encrypted DB</string>
+    <string name="export_encrypted_db">Export Encrypted DB</string>
+    <string name="encrypted_db_detected">🔒 Encrypted Database Detected</string>
+    <string name="encrypted_db_detected_message">This database is encrypted. Enter passphrase to import:</string>
+    <string name="encryption_status_indicator">Encryption: %s</string>
+    <string name="encrypted_export_notice">Database exported as encrypted .db file.\n\nTo import, you\'ll need the same passphrase.</string>
+    
+    <!-- Encryption Errors -->
+    <string name="passphrase_too_short">❌ Passphrase too short (minimum 6 characters)</string>
+    <string name="passphrases_dont_match">❌ Passphrases don\'t match</string>
+    <string name="encryption_setup_failed">❌ Failed to set up encryption</string>
+    <string name="database_locked">🔒 Database is locked. Please unlock first.</string>
+    <string name="invalid_passphrase">❌ Invalid passphrase</string>
+    <string name="encryption_key_change_failed">❌ Failed to change passphrase</string>
+    <string name="encryption_key_changed">✓ Passphrase changed successfully</string>
+    
+    <!-- First Launch Encryption Prompt -->
+    <string name="first_launch_encryption_title">Welcome to GeoGrabber!</string>
+    <string name="first_launch_encryption_message">Would you like to enable database encryption to protect your scan data?\n\n🔐 Recommended for privacy and security</string>
+    <string name="enable_now">Enable Now</string>
+    <string name="maybe_later">Maybe Later</string>
 </resources>
