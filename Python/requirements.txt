@@ -1,3 +1,4 @@
 folium
 geopy
 python-dotenv>=1.0.0
+pysqlcipher3

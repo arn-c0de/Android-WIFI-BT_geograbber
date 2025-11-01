@@ -215,12 +215,80 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
     
     /**
      * Open encrypted database with passphrase
+     * Automatically creates a new database if file doesn't exist or is corrupted
      */
     public SQLiteDatabase openEncryptedDatabase() {
+        File dbFile = context.getDatabasePath(DATABASE_NAME);
+        
         try {
-            return getWritableDatabase(passphrase);
+            boolean dbExists = dbFile.exists() && dbFile.length() > 0;
+            
+            Log.d(TAG, "Opening encrypted database at: " + dbFile.getAbsolutePath());
+            Log.d(TAG, "Database file exists: " + dbExists + 
+                     (dbExists ? ", size: " + dbFile.length() + " bytes" : ""));
+            
+            SQLiteDatabase db = getWritableDatabase(passphrase);
+            
+            if (db != null) {
+                // Verify the database is accessible
+                try {
+                    Cursor cursor = db.rawQuery("SELECT SQLITE_VERSION()", null);
+                    if (cursor != null) {
+                        cursor.moveToFirst();
+                        String version = cursor.getString(0);
+                        Log.d(TAG, "Successfully opened encrypted database, SQLite version: " + version);
+                        cursor.close();
+                    }
+                } catch (Exception verifyError) {
+                    Log.e(TAG, "Error verifying database after open", verifyError);
+                }
+            }
+            
+            return db;
         } catch (Exception e) {
-            Log.e(TAG, "Error opening encrypted database", e);
+            Log.e(TAG, "Error opening encrypted database: " + e.getMessage(), e);
+            
+            // If database is corrupted or doesn't exist, delete and create new one
+            if (e.getMessage() != null && e.getMessage().contains("file is not a database")) {
+                Log.w(TAG, "Database file corrupted or incompatible. Creating new database...");
+                
+                try {
+                    // Delete corrupted database file and associated files
+                    if (dbFile.exists()) {
+                        Log.d(TAG, "Deleting corrupted database file");
+                        dbFile.delete();
+                    }
+                    
+                    // Delete journal files
+                    File journalFile = new File(dbFile.getAbsolutePath() + "-journal");
+                    if (journalFile.exists()) {
+                        journalFile.delete();
+                    }
+                    
+                    File walFile = new File(dbFile.getAbsolutePath() + "-wal");
+                    if (walFile.exists()) {
+                        walFile.delete();
+                    }
+                    
+                    File shmFile = new File(dbFile.getAbsolutePath() + "-shm");
+                    if (shmFile.exists()) {
+                        shmFile.delete();
+                    }
+                    
+                    Log.d(TAG, "Creating new encrypted database...");
+                    // Try to create new database
+                    SQLiteDatabase newDb = getWritableDatabase(passphrase);
+                    
+                    if (newDb != null) {
+                        Log.d(TAG, "New encrypted database created successfully");
+                        return newDb;
+                    }
+                    
+                } catch (Exception createError) {
+                    Log.e(TAG, "Failed to create new database after corruption", createError);
+                }
+            }
+            
             return null;
         }
     }

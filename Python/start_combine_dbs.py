@@ -1,6 +1,7 @@
 import sqlite3
+import sys
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import filedialog, messagebox, ttk, simpledialog
 import os
 import shutil
 import math
@@ -8,10 +9,23 @@ import hashlib
 import json
 from datetime import datetime
 
+# Add scripts directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts'))
+
+# Import encryption helper
+try:
+    from database_encryption import DatabaseEncryption, SQLCIPHER_AVAILABLE
+    ENCRYPTION_SUPPORT = True
+except ImportError:
+    ENCRYPTION_SUPPORT = False
+    print("Warning: Database encryption module not found. Encrypted databases cannot be opened.")
+
 class DatabaseCombiner:
     def __init__(self):
         self.main_db_path = None
         self.source_db_paths = []
+        self.main_db_passphrase = None  # Store passphrase for main DB
+        self.source_db_passphrases = {}  # Store passphrases for source DBs {path: passphrase}
         self.setup_gui()
     
     def setup_gui(self):
@@ -177,6 +191,43 @@ class DatabaseCombiner:
         self.log_text.see(tk.END)
         self.root.update()
     
+    def open_database_connection(self, db_path, passphrase=None):
+        """Opens a database connection (encrypted or unencrypted)"""
+        if not ENCRYPTION_SUPPORT:
+            # Fallback to standard SQLite
+            return sqlite3.connect(db_path)
+        
+        db_enc = DatabaseEncryption(db_path)
+        
+        if db_enc.is_database_encrypted():
+            self.log(f"🔒 Database is encrypted: {os.path.basename(db_path)}")
+            
+            # Check if passphrase provided
+            if not passphrase:
+                passphrase = simpledialog.askstring(
+                    "Database Encrypted",
+                    f"Database is encrypted:\n{os.path.basename(db_path)}\n\nPlease enter passphrase:",
+                    show='*'
+                )
+                
+                if not passphrase:
+                    self.log(f"❌ No passphrase provided for {os.path.basename(db_path)}")
+                    return None
+            
+            # Try to connect
+            if db_enc.connect_encrypted(passphrase):
+                self.log(f"✓ Encrypted database opened: {os.path.basename(db_path)}")
+                return db_enc.get_connection()
+            else:
+                self.log(f"❌ Wrong passphrase for {os.path.basename(db_path)}")
+                return None
+        else:
+            # Unencrypted database
+            if db_enc.connect_unencrypted():
+                return db_enc.get_connection()
+            else:
+                return None
+    
     def select_main_db(self):
         """Selects the Main Database"""
         initial_dir = os.path.dirname(os.path.abspath(__file__))
@@ -257,6 +308,39 @@ class DatabaseCombiner:
             
             self.main_db_path = file_path
             self.main_db_var.set(file_path)
+            
+            # Check if database is encrypted and prompt for passphrase
+            if ENCRYPTION_SUPPORT:
+                db_enc = DatabaseEncryption(file_path)
+                if db_enc.is_database_encrypted():
+                    self.log("🔒 Main database is encrypted")
+                    
+                    passphrase = simpledialog.askstring(
+                        "Database Encrypted",
+                        f"Main database is encrypted:\n{os.path.basename(file_path)}\n\nPlease enter passphrase:",
+                        show='*'
+                    )
+                    
+                    if not passphrase:
+                        self.log("❌ No passphrase provided")
+                        messagebox.showerror("Error", "Cannot use encrypted database without passphrase!")
+                        self.main_db_path = None
+                        self.main_db_var.set("")
+                        return
+                    
+                    # Verify passphrase
+                    if db_enc.connect_encrypted(passphrase):
+                        self.main_db_passphrase = passphrase
+                        db_enc.close()
+                        self.log("✓ Passphrase verified for main database")
+                    else:
+                        self.log("❌ Wrong passphrase")
+                        messagebox.showerror("Error", "Wrong passphrase!")
+                        self.main_db_path = None
+                        self.main_db_var.set("")
+                        self.main_db_passphrase = None
+                        return
+            
             self.log(f"Main DB selected: {os.path.basename(file_path)}")
     
     def add_source_db(self):
@@ -344,7 +428,35 @@ class DatabaseCombiner:
                             if not continue_anyway:
                                 continue
             
+            # Check if database is encrypted and prompt for passphrase
+            source_passphrase = None
+            if ENCRYPTION_SUPPORT:
+                db_enc = DatabaseEncryption(file_path)
+                if db_enc.is_database_encrypted():
+                    self.log(f"🔒 Source database is encrypted: {os.path.basename(file_path)}")
+                    
+                    source_passphrase = simpledialog.askstring(
+                        "Database Encrypted",
+                        f"Source database is encrypted:\n{os.path.basename(file_path)}\n\nPlease enter passphrase:",
+                        show='*'
+                    )
+                    
+                    if not source_passphrase:
+                        self.log(f"❌ No passphrase provided for {os.path.basename(file_path)}")
+                        messagebox.showerror("Error", "Cannot use encrypted database without passphrase!")
+                        continue
+                    
+                    # Verify passphrase
+                    if db_enc.connect_encrypted(source_passphrase):
+                        db_enc.close()
+                        self.log(f"✓ Passphrase verified for {os.path.basename(file_path)}")
+                    else:
+                        self.log(f"❌ Wrong passphrase for {os.path.basename(file_path)}")
+                        messagebox.showerror("Error", f"Wrong passphrase for {os.path.basename(file_path)}!")
+                        continue
+            
             self.source_db_paths.append(file_path)
+            self.source_db_passphrases[file_path] = source_passphrase  # Store passphrase (None if unencrypted)
             self.source_listbox.insert(tk.END, file_path)
             self.log(f"Source DB added: {os.path.basename(file_path)}")
     
@@ -354,12 +466,16 @@ class DatabaseCombiner:
         if selection:
             index = selection[0]
             removed_path = self.source_db_paths.pop(index)
+            # Also remove passphrase if exists
+            if removed_path in self.source_db_passphrases:
+                del self.source_db_passphrases[removed_path]
             self.source_listbox.delete(index)
             self.log(f"Source DB removed: {os.path.basename(removed_path)}")
     
     def clear_source_dbs(self):
         """Removes all Source Databases"""
         self.source_db_paths.clear()
+        self.source_db_passphrases.clear()  # Also clear all passphrases
         self.source_listbox.delete(0, tk.END)
         self.log("All Source DBs removed")
     
@@ -437,10 +553,14 @@ class DatabaseCombiner:
         except Exception as e:
             return False, f"Error during verification: {str(e)}"
     
-    def get_table_info(self, db_path):
-        """Gets information about the tables in the database"""
+    def get_table_info(self, db_path, passphrase=None):
+        """Gets information about the tables in the database (supports encryption)"""
         try:
-            conn = sqlite3.connect(db_path)
+            conn = self.open_database_connection(db_path, passphrase)
+            if not conn:
+                self.log(f"Failed to open database: {os.path.basename(db_path)}")
+                return None
+            
             cursor = conn.cursor()
 
             # Check available tables
@@ -482,7 +602,7 @@ class DatabaseCombiner:
         if not self.source_db_paths:
             # Only analyze Main DB
             self.log("=== ANALYSIS STARTED (Main DB only) ===")
-            main_info = self.get_table_info(self.main_db_path)
+            main_info = self.get_table_info(self.main_db_path, self.main_db_passphrase)
             if main_info:
                 self.log(f"Main DB: {main_info['device_count']} Device entries, {main_info['wifi_count']} WiFi entries")
                 self.log(f"Tables: {', '.join(main_info['tables'])}")
@@ -494,7 +614,7 @@ class DatabaseCombiner:
 
         # Analyze Main DB
         self.log("Analyzing Main Database...")
-        main_info = self.get_table_info(self.main_db_path)
+        main_info = self.get_table_info(self.main_db_path, self.main_db_passphrase)
         if main_info:
             self.log(f"Main DB: {main_info['device_count']} Device entries, {main_info['wifi_count']} WiFi entries")
             self.log(f"Tables: {', '.join(main_info['tables'])}")
@@ -505,7 +625,8 @@ class DatabaseCombiner:
 
         for i, source_path in enumerate(self.source_db_paths):
             self.log(f"Analyzing Source DB {i+1}/{len(self.source_db_paths)}...")
-            source_info = self.get_table_info(source_path)
+            source_passphrase = self.source_db_passphrases.get(source_path)
+            source_info = self.get_table_info(source_path, source_passphrase)
             if source_info:
                 self.log(f"{os.path.basename(source_path)}: {source_info['device_count']} Device, {source_info['wifi_count']} WiFi")
                 total_source_devices += source_info['device_count']
@@ -515,11 +636,15 @@ class DatabaseCombiner:
         self.log(f"Total to process: {total_source_devices} Device entries, {total_source_wifi} WiFi entries")
         self.status_var.set("Analysis completed - Ready for merge")
     
-    def load_devices_from_db(self, db_path):
-        """Loads all devices from a database"""
+    def load_devices_from_db(self, db_path, passphrase=None):
+        """Loads all devices from a database (supports encryption)"""
         devices = []
         try:
-            conn = sqlite3.connect(db_path)
+            conn = self.open_database_connection(db_path, passphrase)
+            if not conn:
+                self.log(f"Failed to open database: {os.path.basename(db_path)}")
+                return []
+            
             cursor = conn.cursor()
 
             # Load from device_data table - ONLY BLUETOOTH, since WiFi is in wifi_data

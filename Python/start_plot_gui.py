@@ -2,12 +2,25 @@ import sqlite3
 import folium
 from folium import plugins
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog
 import os
+import sys
 import webbrowser
 import tempfile
 import json
 import hashlib
+
+# Add scripts directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'scripts'))
+
+# Import encryption helper
+try:
+    from database_encryption import DatabaseEncryption, SQLCIPHER_AVAILABLE
+    ENCRYPTION_SUPPORT = True
+except ImportError:
+    ENCRYPTION_SUPPORT = False
+    print("Warning: Database encryption module not found. Encrypted databases cannot be opened.")
+
 
 def calculate_sha256_checksum(file_path):
     """Calculates SHA-256 checksum for a file"""
@@ -268,10 +281,51 @@ def select_database_file():
     root.destroy()
     return file_path
 
-def load_wifi_data(db_path):
-    """Loads WiFi and Bluetooth data from the SQLite database"""
+def load_wifi_data(db_path, passphrase=None):
+    """Loads WiFi and Bluetooth data from the SQLite database (encrypted or unencrypted)"""
     try:
-        conn = sqlite3.connect(db_path)
+        # Check if encryption is supported
+        if ENCRYPTION_SUPPORT:
+            db_enc = DatabaseEncryption(db_path)
+            
+            # Check if database is encrypted
+            if db_enc.is_database_encrypted():
+                print("🔒 Database is encrypted (SQLCipher format)")
+                
+                # If no passphrase provided, prompt for it
+                if not passphrase:
+                    root = tk.Tk()
+                    root.withdraw()
+                    
+                    passphrase = simpledialog.askstring(
+                        "Database Encrypted",
+                        "This database is encrypted.\nPlease enter your passphrase:",
+                        show='*'
+                    )
+                    
+                    root.destroy()
+                    
+                    if not passphrase:
+                        messagebox.showerror("Error", "No passphrase provided. Cannot open encrypted database.")
+                        return []
+                
+                # Connect with encryption
+                if not db_enc.connect_encrypted(passphrase):
+                    messagebox.showerror("Error", "Wrong passphrase or corrupted database!")
+                    return []
+                
+                conn = db_enc.get_connection()
+            else:
+                # Unencrypted database
+                print("Database is unencrypted (standard SQLite)")
+                if not db_enc.connect_unencrypted():
+                    messagebox.showerror("Error", "Failed to open database!")
+                    return []
+                conn = db_enc.get_connection()
+        else:
+            # No encryption support, try standard SQLite
+            conn = sqlite3.connect(db_path)
+        
         cursor = conn.cursor()
 
         # Check first if the new device_data table exists
@@ -641,10 +695,30 @@ def load_wifi_data(db_path):
         messagebox.showerror("Database Error", f"Error loading database: {str(e)}")
         return []
 
-def update_device_location_in_db(db_path, device_address, device_type, new_lat, new_lon):
-    """Updates the GPS coordinates of a device in the database"""
+def update_device_location_in_db(db_path, device_address, device_type, new_lat, new_lon, passphrase=None):
+    """Updates the GPS coordinates of a device in the database (encrypted or unencrypted)"""
     try:
-        conn = sqlite3.connect(db_path)
+        # Check if encryption is supported and database is encrypted
+        if ENCRYPTION_SUPPORT:
+            db_enc = DatabaseEncryption(db_path)
+            
+            if db_enc.is_database_encrypted():
+                if not passphrase:
+                    print("Warning: Cannot update encrypted database without passphrase")
+                    return False
+                
+                if not db_enc.connect_encrypted(passphrase):
+                    print("Error: Wrong passphrase for encrypted database")
+                    return False
+                
+                conn = db_enc.get_connection()
+            else:
+                if not db_enc.connect_unencrypted():
+                    return False
+                conn = db_enc.get_connection()
+        else:
+            conn = sqlite3.connect(db_path)
+        
         cursor = conn.cursor()
 
         # Check which tables exist
@@ -2124,8 +2198,8 @@ def create_wifi_map(device_data, db_filename, db_path=None):
     device_map.get_root().html.add_child(folium.Element(legend_highlight_js))
     return device_map
 
-def process_pending_location_updates(db_path):
-    """Processes pending location updates from temporary file"""
+def process_pending_location_updates(db_path, passphrase=None):
+    """Processes pending location updates from temporary file (with encryption support)"""
     import json, os, tempfile
     try:
         print("Checking for pending location updates...")
@@ -2157,7 +2231,8 @@ def process_pending_location_updates(db_path):
                     update['address'],
                     update['type'],
                     update['latitude'],
-                    update['longitude']
+                    update['longitude'],
+                    passphrase  # Pass passphrase for encrypted databases
                 )
                 if success:
                     successful_updates += 1
@@ -2188,12 +2263,47 @@ def main():
         return
 
     print(f"Loading database: {os.path.basename(db_path)}")
+    
+    # Check if database is encrypted and get passphrase
+    passphrase = None
+    if ENCRYPTION_SUPPORT:
+        db_enc = DatabaseEncryption(db_path)
+        if db_enc.is_database_encrypted():
+            print("🔒 Database is encrypted")
+            
+            root = tk.Tk()
+            root.withdraw()
+            
+            passphrase = simpledialog.askstring(
+                "Database Encrypted",
+                "This database is encrypted.\nPlease enter your passphrase:",
+                show='*'
+            )
+            
+            root.destroy()
+            
+            if not passphrase:
+                print("No passphrase provided. Cannot open encrypted database.")
+                messagebox.showerror("Error", "No passphrase provided!")
+                return
+            
+            # Test passphrase
+            if not db_enc.connect_encrypted(passphrase):
+                print("Wrong passphrase!")
+                messagebox.showerror("Error", "Wrong passphrase or corrupted database!")
+                return
+            db_enc.close()
+            print("✓ Passphrase verified successfully")
 
-    # Process pending location updates
-    process_pending_location_updates(db_path)
+    # Process pending location updates (with passphrase if needed)
+    if passphrase:
+        # Need to update process_pending_location_updates to accept passphrase
+        process_pending_location_updates(db_path, passphrase)
+    else:
+        process_pending_location_updates(db_path)
 
-    # Load device data (WiFi + Bluetooth)
-    device_data = load_wifi_data(db_path)
+    # Load device data (WiFi + Bluetooth) with passphrase
+    device_data = load_wifi_data(db_path, passphrase)
 
     if not device_data:
         print("No valid device data found.")

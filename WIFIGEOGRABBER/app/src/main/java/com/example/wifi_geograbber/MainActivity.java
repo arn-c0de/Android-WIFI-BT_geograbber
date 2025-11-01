@@ -1036,18 +1036,20 @@ public class MainActivity extends AppCompatActivity {
         double lastLat = 0, lastLon = 0;
         long lastTimestamp = 0;
         
-        if (cursor.moveToFirst()) {
-            exists = true;
-            int oldSignal = cursor.getInt(0);
-            lastLat = cursor.getDouble(1);
-            lastLon = cursor.getDouble(2);
-            lastTimestamp = cursor.getLong(3);
-            
-            if (rssi > oldSignal) {
-                update = true;
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                exists = true;
+                int oldSignal = cursor.getInt(0);
+                lastLat = cursor.getDouble(1);
+                lastLon = cursor.getDouble(2);
+                lastTimestamp = cursor.getLong(3);
+                
+                if (rssi > oldSignal) {
+                    update = true;
+                }
             }
+            cursor.close();
         }
-        cursor.close();
         
         if (update || !exists) {
             double currentLat = location.getLatitude();
@@ -1090,18 +1092,20 @@ public class MainActivity extends AppCompatActivity {
         double lastLat = 0, lastLon = 0;
         long lastTimestamp = 0;
         
-        if (cursor.moveToFirst()) {
-            exists = true;
-            int oldSignal = cursor.getInt(0);
-            lastLat = cursor.getDouble(1);
-            lastLon = cursor.getDouble(2);
-            lastTimestamp = cursor.getLong(3);
-            
-            if (signal > oldSignal) {
-                update = true;
+        if (cursor != null) {
+            if (cursor.moveToFirst()) {
+                exists = true;
+                int oldSignal = cursor.getInt(0);
+                lastLat = cursor.getDouble(1);
+                lastLon = cursor.getDouble(2);
+                lastTimestamp = cursor.getLong(3);
+                
+                if (signal > oldSignal) {
+                    update = true;
+                }
             }
+            cursor.close();
         }
-        cursor.close();
         
         if (update || !exists) {
             double currentLat = location.getLatitude();
@@ -1146,6 +1150,7 @@ public class MainActivity extends AppCompatActivity {
     // Auxiliary function: Checks if BSSID is already in the database.
     private boolean existsInDb(String bssid) {
         Cursor cursor = dbRawQuery("SELECT 1 FROM wifi_data WHERE bssid = ? LIMIT 1", new String[]{bssid});
+        if (cursor == null) return false;
         boolean exists = cursor.moveToFirst();
         cursor.close();
         return exists;
@@ -1153,6 +1158,7 @@ public class MainActivity extends AppCompatActivity {
 
     private boolean existsInDeviceDb(String deviceAddress, String deviceType) {
         Cursor cursor = dbRawQuery("SELECT 1 FROM device_data WHERE device_address = ? AND device_type = ? LIMIT 1", new String[]{deviceAddress, deviceType});
+        if (cursor == null) return false;
         boolean exists = cursor.moveToFirst();
         cursor.close();
         return exists;
@@ -1165,91 +1171,94 @@ public class MainActivity extends AppCompatActivity {
         // Show new device_data data first
 
         Cursor deviceCursor = dbRawQuery("SELECT * FROM device_data ORDER BY device_type, device_name", null);
-        if (deviceCursor.moveToFirst()) {
-            int nameIdx = deviceCursor.getColumnIndexOrThrow("device_name");
-            int addressIdx = deviceCursor.getColumnIndexOrThrow("device_address");
-            int typeIdx = deviceCursor.getColumnIndexOrThrow("device_type");
-            int signalIdx = deviceCursor.getColumnIndexOrThrow("signal_strength");
-            int latIdx = deviceCursor.getColumnIndexOrThrow("latitude");
-            int lonIdx = deviceCursor.getColumnIndexOrThrow("longitude");
-            int timeIdx = deviceCursor.getColumnIndexOrThrow("timestamp");
-            
-            // Extended WiFi fields
-            int freqIdx = deviceCursor.getColumnIndex("frequency");
-            int channelIdx = deviceCursor.getColumnIndex("channel");
-            int wifiStandardIdx = deviceCursor.getColumnIndex("wifi_standard");
-            int vendorIdx = deviceCursor.getColumnIndex("vendor_info");
-            int channelWidthIdx = deviceCursor.getColumnIndex("channel_width");
-            int maxSpeedIdx = deviceCursor.getColumnIndex("max_connection_speed");
-            
-            do {
-                String type = deviceCursor.getString(typeIdx);
-                String data;
+        if (deviceCursor != null) {
+            if (deviceCursor.moveToFirst()) {
+                int nameIdx = deviceCursor.getColumnIndexOrThrow("device_name");
+                int addressIdx = deviceCursor.getColumnIndexOrThrow("device_address");
+                int typeIdx = deviceCursor.getColumnIndexOrThrow("device_type");
+                int signalIdx = deviceCursor.getColumnIndexOrThrow("signal_strength");
+                int latIdx = deviceCursor.getColumnIndexOrThrow("latitude");
+                int lonIdx = deviceCursor.getColumnIndexOrThrow("longitude");
+                int timeIdx = deviceCursor.getColumnIndexOrThrow("timestamp");
                 
-                if ("WIFI".equals(type) && freqIdx >= 0) {
-                    // Advanced WiFi display
-                    int frequency = freqIdx >= 0 ? deviceCursor.getInt(freqIdx) : 0;
-                    int channel = channelIdx >= 0 ? deviceCursor.getInt(channelIdx) : 0;
-                    String wifiStandard = wifiStandardIdx >= 0 ? deviceCursor.getString(wifiStandardIdx) : "N/A";
-                    String vendor = vendorIdx >= 0 ? deviceCursor.getString(vendorIdx) : "Unknown";
-                    int channelWidth = channelWidthIdx >= 0 ? deviceCursor.getInt(channelWidthIdx) : 0;
-                    int maxSpeed = maxSpeedIdx >= 0 ? deviceCursor.getInt(maxSpeedIdx) : 0;
+                // Extended WiFi fields
+                int freqIdx = deviceCursor.getColumnIndex("frequency");
+                int channelIdx = deviceCursor.getColumnIndex("channel");
+                int wifiStandardIdx = deviceCursor.getColumnIndex("wifi_standard");
+                int vendorIdx = deviceCursor.getColumnIndex("vendor_info");
+                int channelWidthIdx = deviceCursor.getColumnIndex("channel_width");
+                int maxSpeedIdx = deviceCursor.getColumnIndex("max_connection_speed");
+                
+                do {
+                    String type = deviceCursor.getString(typeIdx);
+                    String data;
                     
-                    data = "[WIFI] " + deviceCursor.getString(nameIdx) +
-                            ", Addr: " + deviceCursor.getString(addressIdx) +
-                            ", Signal: " + deviceCursor.getInt(signalIdx) + " dBm" +
-                            ", Freq: " + frequency + " MHz" +
-                            ", Ch: " + channel +
-                            ", Standard: " + wifiStandard +
-                            ", Speed: " + maxSpeed + " Mbps" +
-                            ", Vendor: " + vendor +
-                            ", ChWidth: " + channelWidth + " MHz" +
-                            ", Lat: " + String.format("%.4f", deviceCursor.getDouble(latIdx)) +
-                            ", Lon: " + String.format("%.4f", deviceCursor.getDouble(lonIdx));
-                } else {
-                    // Standard display for Bluetooth and old WiFi data
-                    data = "[" + type + "] " + deviceCursor.getString(nameIdx) +
-                            ", Addr: " + deviceCursor.getString(addressIdx) +
-                            ", Signal: " + deviceCursor.getInt(signalIdx) +
-                            ", Lat: " + String.format("%.4f", deviceCursor.getDouble(latIdx)) +
-                            ", Lon: " + String.format("%.4f", deviceCursor.getDouble(lonIdx)) +
-                            ", Time: " + deviceCursor.getLong(timeIdx);
-                }
-                dataList.add(data);
-            } while (deviceCursor.moveToNext());
+                    if ("WIFI".equals(type) && freqIdx >= 0) {
+                        // Advanced WiFi display
+                        int frequency = freqIdx >= 0 ? deviceCursor.getInt(freqIdx) : 0;
+                        int channel = channelIdx >= 0 ? deviceCursor.getInt(channelIdx) : 0;
+                        String wifiStandard = wifiStandardIdx >= 0 ? deviceCursor.getString(wifiStandardIdx) : "N/A";
+                        String vendor = vendorIdx >= 0 ? deviceCursor.getString(vendorIdx) : "Unknown";
+                        int channelWidth = channelWidthIdx >= 0 ? deviceCursor.getInt(channelWidthIdx) : 0;
+                        int maxSpeed = maxSpeedIdx >= 0 ? deviceCursor.getInt(maxSpeedIdx) : 0;
+                        
+                        data = "[WIFI] " + deviceCursor.getString(nameIdx) +
+                                ", Addr: " + deviceCursor.getString(addressIdx) +
+                                ", Signal: " + deviceCursor.getInt(signalIdx) + " dBm" +
+                                ", Freq: " + frequency + " MHz" +
+                                ", Ch: " + channel +
+                                ", Standard: " + wifiStandard +
+                                ", Speed: " + maxSpeed + " Mbps" +
+                                ", Vendor: " + vendor +
+                                ", ChWidth: " + channelWidth + " MHz" +
+                                ", Lat: " + String.format("%.4f", deviceCursor.getDouble(latIdx)) +
+                                ", Lon: " + String.format("%.4f", deviceCursor.getDouble(lonIdx));
+                    } else {
+                        // Standard display for Bluetooth and old WiFi data
+                        data = "[" + type + "] " + deviceCursor.getString(nameIdx) +
+                                ", Addr: " + deviceCursor.getString(addressIdx) +
+                                ", Signal: " + deviceCursor.getInt(signalIdx) +
+                                ", Lat: " + String.format("%.4f", deviceCursor.getDouble(latIdx)) +
+                                ", Lon: " + String.format("%.4f", deviceCursor.getDouble(lonIdx)) +
+                                ", Time: " + deviceCursor.getLong(timeIdx);
+                    }
+                    dataList.add(data);
+                } while (deviceCursor.moveToNext());
+            }
+            deviceCursor.close();
         }
-        deviceCursor.close();
         
         // If there are still old WiFi data files that have not been migrated
         Cursor wifiCursor = dbRawQuery("SELECT * FROM wifi_data WHERE bssid NOT IN (SELECT device_address FROM device_data WHERE device_type = 'WIFI')", null);
-        if (wifiCursor.moveToFirst()) {
-            int ssidIdx = wifiCursor.getColumnIndexOrThrow("ssid");
-            int bssidIdx = wifiCursor.getColumnIndexOrThrow("bssid");
-            int signalIdx = wifiCursor.getColumnIndexOrThrow("signal_strength");
-            int latIdx = wifiCursor.getColumnIndexOrThrow("latitude");
-            int lonIdx = wifiCursor.getColumnIndexOrThrow("longitude");
-            int timeIdx = wifiCursor.getColumnIndexOrThrow("timestamp");
-            
-            // Check if extended fields are available.
-            int freqIdx = wifiCursor.getColumnIndex("frequency");
-            int channelIdx = wifiCursor.getColumnIndex("channel");
-            int wifiStandardIdx = wifiCursor.getColumnIndex("wifi_standard");
-            int vendorIdx = wifiCursor.getColumnIndex("vendor_info");
-            int channelWidthIdx = wifiCursor.getColumnIndex("channel_width");
-            int maxSpeedIdx = wifiCursor.getColumnIndex("max_connection_speed");
-            
-            do {
-                String data;
-                if (freqIdx >= 0) {
-                    // Enhanced WiFi display for migrated legacy data
-                    int frequency = wifiCursor.getInt(freqIdx);
-                    int channel = channelIdx >= 0 ? wifiCursor.getInt(channelIdx) : 0;
-                    String wifiStandard = wifiStandardIdx >= 0 ? wifiCursor.getString(wifiStandardIdx) : "N/A";
-                    String vendor = vendorIdx >= 0 ? wifiCursor.getString(vendorIdx) : "Unknown";
-                    int channelWidth = channelWidthIdx >= 0 ? wifiCursor.getInt(channelWidthIdx) : 0;
-                    int maxSpeed = maxSpeedIdx >= 0 ? wifiCursor.getInt(maxSpeedIdx) : 0;
-                    
-                    data = "[WIFI-LEGACY] " + wifiCursor.getString(ssidIdx) +
+        if (wifiCursor != null) {
+            if (wifiCursor.moveToFirst()) {
+                int ssidIdx = wifiCursor.getColumnIndexOrThrow("ssid");
+                int bssidIdx = wifiCursor.getColumnIndexOrThrow("bssid");
+                int signalIdx = wifiCursor.getColumnIndexOrThrow("signal_strength");
+                int latIdx = wifiCursor.getColumnIndexOrThrow("latitude");
+                int lonIdx = wifiCursor.getColumnIndexOrThrow("longitude");
+                int timeIdx = wifiCursor.getColumnIndexOrThrow("timestamp");
+                
+                // Check if extended fields are available.
+                int freqIdx = wifiCursor.getColumnIndex("frequency");
+                int channelIdx = wifiCursor.getColumnIndex("channel");
+                int wifiStandardIdx = wifiCursor.getColumnIndex("wifi_standard");
+                int vendorIdx = wifiCursor.getColumnIndex("vendor_info");
+                int channelWidthIdx = wifiCursor.getColumnIndex("channel_width");
+                int maxSpeedIdx = wifiCursor.getColumnIndex("max_connection_speed");
+                
+                do {
+                    String data;
+                    if (freqIdx >= 0) {
+                        // Enhanced WiFi display for migrated legacy data
+                        int frequency = wifiCursor.getInt(freqIdx);
+                        int channel = channelIdx >= 0 ? wifiCursor.getInt(channelIdx) : 0;
+                        String wifiStandard = wifiStandardIdx >= 0 ? wifiCursor.getString(wifiStandardIdx) : "N/A";
+                        String vendor = vendorIdx >= 0 ? wifiCursor.getString(vendorIdx) : "Unknown";
+                        int channelWidth = channelWidthIdx >= 0 ? wifiCursor.getInt(channelWidthIdx) : 0;
+                        int maxSpeed = maxSpeedIdx >= 0 ? wifiCursor.getInt(maxSpeedIdx) : 0;
+                        
+                        data = "[WIFI-LEGACY] " + wifiCursor.getString(ssidIdx) +
                             ", BSSID: " + wifiCursor.getString(bssidIdx) +
                             ", Signal: " + wifiCursor.getInt(signalIdx) + " dBm" +
                             ", Freq: " + frequency + " MHz" +
@@ -1260,19 +1269,20 @@ public class MainActivity extends AppCompatActivity {
                             ", ChWidth: " + channelWidth + " MHz" +
                             ", Lat: " + String.format("%.4f", wifiCursor.getDouble(latIdx)) +
                             ", Lon: " + String.format("%.4f", wifiCursor.getDouble(lonIdx));
-                } else {
-                    // Old display for really old data without extended fields
-                    data = "[WIFI-OLD] " + wifiCursor.getString(ssidIdx) +
-                            ", BSSID: " + wifiCursor.getString(bssidIdx) +
-                            ", Signal: " + wifiCursor.getInt(signalIdx) + " dBm" +
-                            ", Lat: " + String.format("%.4f", wifiCursor.getDouble(latIdx)) +
-                            ", Lon: " + String.format("%.4f", wifiCursor.getDouble(lonIdx)) +
-                            ", Time: " + wifiCursor.getLong(timeIdx);
-                }
-                dataList.add(data);
-            } while (wifiCursor.moveToNext());
+                    } else {
+                        // Old display for really old data without extended fields
+                        data = "[WIFI-OLD] " + wifiCursor.getString(ssidIdx) +
+                                ", BSSID: " + wifiCursor.getString(bssidIdx) +
+                                ", Signal: " + wifiCursor.getInt(signalIdx) + " dBm" +
+                                ", Lat: " + String.format("%.4f", wifiCursor.getDouble(latIdx)) +
+                                ", Lon: " + String.format("%.4f", wifiCursor.getDouble(lonIdx)) +
+                                ", Time: " + wifiCursor.getLong(timeIdx);
+                    }
+                    dataList.add(data);
+                } while (wifiCursor.moveToNext());
+            }
+            wifiCursor.close();
         }
-        wifiCursor.close();
         
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, dataList);
         dataListView.setAdapter(adapter);
@@ -1451,10 +1461,98 @@ public class MainActivity extends AppCompatActivity {
 
     // Delete DB
     private void clearDatabase() {
-        dbExecSQL("DELETE FROM wifi_data");
-        dbExecSQL("DELETE FROM device_data");
-        Toast.makeText(this, R.string.all_networks_deleted, Toast.LENGTH_SHORT).show();
-        showData();
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("Delete Database");
+        builder.setMessage("What would you like to do?\n\n" +
+                "• Clear Data: Remove all entries but keep database structure\n" +
+                "• Delete Database: Completely remove database file (requires app restart)");
+        
+        builder.setPositiveButton("Clear Data", (dialog, which) -> {
+            // Just clear the data in the tables
+            dbExecSQL("DELETE FROM wifi_data");
+            dbExecSQL("DELETE FROM device_data");
+            Toast.makeText(this, R.string.all_networks_deleted, Toast.LENGTH_SHORT).show();
+            showData();
+        });
+        
+        builder.setNegativeButton("Delete Database", (dialog, which) -> {
+            // Actually delete the database file
+            deleteDatabaseFile();
+        });
+        
+        builder.setNeutralButton("Cancel", null);
+        builder.show();
+    }
+    
+    /**
+     * Actually delete the database file from disk
+     */
+    private void deleteDatabaseFile() {
+        android.app.AlertDialog.Builder confirmBuilder = new android.app.AlertDialog.Builder(this);
+        confirmBuilder.setTitle("⚠️ Delete Database File");
+        confirmBuilder.setMessage("This will permanently delete the database file!\n\n" +
+                "• All WiFi and Bluetooth data will be lost\n" +
+                "• App will restart after deletion\n" +
+                "• A new empty database will be created\n\n" +
+                "Are you sure?");
+        
+        confirmBuilder.setPositiveButton("Yes, Delete", (dialog, which) -> {
+            try {
+                // Close database connection
+                if (database != null) {
+                    dbClose();
+                    database = null;
+                }
+                
+                // Get database file path
+                String dbName = "wifi_scanner.db";
+                java.io.File dbFile = getDatabasePath(dbName);
+                
+                // Delete main database file
+                boolean deleted = false;
+                if (dbFile.exists()) {
+                    deleted = dbFile.delete();
+                    Log.d("MainActivity", "Database file deleted: " + deleted);
+                }
+                
+                // Delete associated files (journal, wal, shm)
+                java.io.File journalFile = new java.io.File(dbFile.getAbsolutePath() + "-journal");
+                if (journalFile.exists()) {
+                    journalFile.delete();
+                }
+                
+                java.io.File walFile = new java.io.File(dbFile.getAbsolutePath() + "-wal");
+                if (walFile.exists()) {
+                    walFile.delete();
+                }
+                
+                java.io.File shmFile = new java.io.File(dbFile.getAbsolutePath() + "-shm");
+                if (shmFile.exists()) {
+                    shmFile.delete();
+                }
+                
+                if (deleted) {
+                    Toast.makeText(this, "✓ Database deleted. App will restart...", Toast.LENGTH_LONG).show();
+                    
+                        // Restart app after short delay
+                        new android.os.Handler().postDelayed(() -> {
+                            Intent intent = new Intent(this, MainActivity.class);
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                            finishAffinity();
+                            startActivity(intent);
+                        }, 2000);
+                } else {
+                    Toast.makeText(this, "Failed to delete database file", Toast.LENGTH_LONG).show();
+                }
+                
+            } catch (Exception e) {
+                Log.e("MainActivity", "Error deleting database: " + e.getMessage(), e);
+                Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            }
+        });
+        
+        confirmBuilder.setNegativeButton("Cancel", null);
+        confirmBuilder.show();
     }
 
     // Offer to export checksum metadata file
@@ -2465,34 +2563,42 @@ public class MainActivity extends AppCompatActivity {
         // Count devices from the new device_data table
         Cursor deviceCursor = dbRawQuery("SELECT COUNT(*) FROM device_data", null);
         int deviceCount = 0;
-        if (deviceCursor.moveToFirst()) {
-            deviceCount = deviceCursor.getInt(0);
+        if (deviceCursor != null) {
+            if (deviceCursor.moveToFirst()) {
+                deviceCount = deviceCursor.getInt(0);
+            }
+            deviceCursor.close();
         }
-        deviceCursor.close();
         
         // Count WiFi devices
         Cursor wifiCursor = dbRawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'WIFI'", null);
         int wifiCount = 0;
-        if (wifiCursor.moveToFirst()) {
-            wifiCount = wifiCursor.getInt(0);
+        if (wifiCursor != null) {
+            if (wifiCursor.moveToFirst()) {
+                wifiCount = wifiCursor.getInt(0);
+            }
+            wifiCursor.close();
         }
-        wifiCursor.close();
         
         // Count Bluetooth devices
         Cursor bluetoothCursor = dbRawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'BLUETOOTH'", null);
         int bluetoothCount = 0;
-        if (bluetoothCursor.moveToFirst()) {
-            bluetoothCount = bluetoothCursor.getInt(0);
+        if (bluetoothCursor != null) {
+            if (bluetoothCursor.moveToFirst()) {
+                bluetoothCount = bluetoothCursor.getInt(0);
+            }
+            bluetoothCursor.close();
         }
-        bluetoothCursor.close();
         
         // Count old WiFi data
         Cursor oldWifiCursor = dbRawQuery("SELECT COUNT(*) FROM wifi_data", null);
         int oldWifiCount = 0;
-        if (oldWifiCursor.moveToFirst()) {
-            oldWifiCount = oldWifiCursor.getInt(0);
+        if (oldWifiCursor != null) {
+            if (oldWifiCursor.moveToFirst()) {
+                oldWifiCount = oldWifiCursor.getInt(0);
+            }
+            oldWifiCursor.close();
         }
-        oldWifiCursor.close();
         
     String message = "Devices in DB: " + deviceCount + 
             " (WiFi: " + wifiCount + 
@@ -2573,6 +2679,10 @@ public class MainActivity extends AppCompatActivity {
             
             // Check if passphrase is cached
             if (!encryptionManager.isPassphraseCached()) {
+                // Hide data view until unlocked
+                if (dataListView != null) {
+                    dataListView.setVisibility(View.GONE);
+                }
                 // Show unlock dialog
                 showUnlockDialog();
             } else {
@@ -2615,6 +2725,7 @@ public class MainActivity extends AppCompatActivity {
     
     /**
      * Initialize encrypted database
+     * Automatically handles corrupted databases by recreating them
      */
     private void initializeEncryptedDatabase() {
         String dbKey = encryptionManager.getCachedDatabaseKey();
@@ -2623,8 +2734,13 @@ public class MainActivity extends AppCompatActivity {
             database = encryptedDbHelper.openEncryptedDatabase();
             
             if (database == null) {
-                Toast.makeText(this, "Failed to open encrypted database", Toast.LENGTH_LONG).show();
+                // This should not happen anymore as openEncryptedDatabase() auto-recovers
+                // But if it does, it means wrong passphrase
+                Log.e("MainActivity", "Failed to open encrypted database even after auto-recovery");
+                Toast.makeText(this, R.string.wrong_passphrase, Toast.LENGTH_LONG).show();
                 finish();
+            } else {
+                Log.d("MainActivity", "Encrypted database opened successfully");
             }
         } else {
             Toast.makeText(this, R.string.database_locked, Toast.LENGTH_LONG).show();
@@ -2773,13 +2889,31 @@ public class MainActivity extends AppCompatActivity {
                         return success;
                     } else {
                         // No existing database, just create encrypted one
+                        Log.d("MainActivity", "No existing database found, creating new encrypted database");
+                        
+                        // Make sure there's no corrupted database file
+                        if (unencryptedFile.exists()) {
+                            Log.d("MainActivity", "Deleting empty/corrupted database file");
+                            unencryptedFile.delete();
+                        }
+                        
                         encryptedDbHelper = new DatabaseEncryptionHelper(MainActivity.this, dbKey);
                         net.sqlcipher.database.SQLiteDatabase db = encryptedDbHelper.openEncryptedDatabase();
+                        
                         if (db != null) {
+                            Log.d("MainActivity", "New encrypted database created successfully");
+                            // Force onCreate to be called by accessing a table
+                            try {
+                                db.execSQL("SELECT COUNT(*) FROM wifi_data");
+                            } catch (Exception e) {
+                                Log.d("MainActivity", "onCreate will be called automatically");
+                            }
                             db.close();
                             return true;
+                        } else {
+                            Log.e("MainActivity", "Failed to create new encrypted database");
+                            return false;
                         }
-                        return false;
                     }
                     
                 } catch (Exception e) {
@@ -2816,9 +2950,23 @@ public class MainActivity extends AppCompatActivity {
      * Show unlock dialog
      */
     private void showUnlockDialog() {
+        showUnlockDialog(0); // Start with 0 attempts
+    }
+    
+    /**
+     * Show unlock dialog with retry capability
+     * @param attemptCount Number of failed attempts
+     */
+    private void showUnlockDialog(final int attemptCount) {
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
         builder.setTitle(R.string.unlock_database_title);
-        builder.setMessage(R.string.unlock_database_message);
+        
+        // Show attempt count if not first attempt
+        String message = getString(R.string.unlock_database_message);
+        if (attemptCount > 0) {
+            message += "\n\n❌ Wrong passphrase! Attempt " + (attemptCount + 1) + "/5";
+        }
+        builder.setMessage(message);
         builder.setCancelable(false);
         
         final android.widget.EditText input = new android.widget.EditText(this);
@@ -2838,12 +2986,30 @@ public class MainActivity extends AppCompatActivity {
             
             if (encryptionManager.unlockWithPassphrase(passphrase.toCharArray())) {
                 initializeEncryptedDatabase();
+                // Show data view after successful unlock
+                if (dataListView != null) {
+                    dataListView.setVisibility(View.VISIBLE);
+                }
                 Toast.makeText(this, "✓ Database unlocked", Toast.LENGTH_SHORT).show();
             } else {
-                Toast.makeText(this, R.string.wrong_passphrase, Toast.LENGTH_LONG).show();
-                finish(); // Close app on wrong passphrase
+                // Wrong passphrase - allow retry
+                int newAttemptCount = attemptCount + 1;
+                
+                if (newAttemptCount >= 5) {
+                    // Too many attempts - close app
+                    Toast.makeText(this, "Too many failed attempts. App will close.", Toast.LENGTH_LONG).show();
+                    finish();
+                } else {
+                    // Show dialog again with retry
+                    showUnlockDialog(newAttemptCount);
+                }
             }
         });
+        
+        // Add cancel button after first attempt
+        if (attemptCount > 0) {
+            builder.setNegativeButton(R.string.cancel, (dialog, which) -> finish());
+        }
         
         builder.show();
     }
@@ -3499,3 +3665,4 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 }
+
