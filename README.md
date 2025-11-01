@@ -26,14 +26,14 @@
    <b>Current Version: v1.0.3</b>
 </div>
 
-   ---
+---
 
    > **Project Status Notice**
    >
    > This is a very early stage of the program. While it is already functional, it is based on an older project that I have recently resumed. Therefore, extensive refactoring and further development are still required. Expect ongoing changes and improvements as work continues.
 
 
-  ---
+---
 
 ### ⚠️ Python Integration Notice (early 1.0.3)
 The two Python tools are not yet fully compatible with the new encrypted databases.  
@@ -41,7 +41,7 @@ Additional development is required to implement full SQLCipher support and key h
 
 ➡️ If you need to work **without encryption**, please use **version 1.0.2**.
 
-
+---
 
 ## 🤝 Contribute to GeoGrabber!
 
