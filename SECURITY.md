@@ -122,6 +122,19 @@ GeoGrabber is designed for **local operation**. If exposed publicly (e.g. via ex
 - Do not share exported databases publicly
 - Use strong passwords for encrypted files
 
+## Exported Data & PC Tools Mitigation
+
+- All exported database files (.db) are fully encrypted using SQLCipher (AES-256) and require the correct passphrase to access.
+- The exported sha256.json metadata file contains only the checksum, encryption salt, and file info—no sensitive data or passphrase.
+- Without the passphrase, exported .db files cannot be opened, viewed, or modified, even with PC tools.
+- PC tools currently do not support encrypted database files; unauthorized access is not possible unless the passphrase is known.
+- CSV/JSON exports (if used) are not encrypted—avoid sharing these formats publicly if they contain sensitive data.
+
+**Mitigation Summary:**
+- Exported .db files are protected by strong encryption and passphrase authentication.
+- Only share sha256.json and .db files with trusted parties and never disclose the passphrase.
+- For additional protection, avoid exporting or sharing unencrypted CSV/JSON files.
+
 ### Bluetooth/WiFi Risks
 
 - **Device spoofing**: Malicious devices may appear in scans

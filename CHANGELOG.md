@@ -123,4 +123,9 @@ All notable changes to this project will be documented in this file.
 
 ---
 
+<!--
+Issue #6 (Exported data/PC tools security):
+App database exports (.db) are fully encrypted with SQLCipher and require a passphrase. The exported sha256.json contains only metadata and encryption salt, not sensitive data. Without the passphrase, exported data cannot be accessed or manipulated. PC tools are currently not relevant, as they cannot open encrypted .db files. This issue can be considered resolved for app exports.
+-->
+
 **Older versions and changes will be added as the project evolves.**

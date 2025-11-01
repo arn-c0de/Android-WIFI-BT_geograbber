@@ -68,6 +68,7 @@ public class MainActivity extends AppCompatActivity {
     private Button toggleScanButton, showButton, moreButton, bluetoothToggleButton, mapButton;
     private View securityOverlay;  // Black overlay to hide content during passphrase entry
     private boolean isNavigatingInternally = false;  // Flag to track internal navigation (e.g., to MapActivity)
+    private boolean isUnlockDialogShowing = false;  // Flag to prevent multiple unlock dialogs
     private Handler handler;
     private Runnable scanRunnable;
     private boolean isScanning = false;
@@ -493,15 +494,18 @@ public class MainActivity extends AppCompatActivity {
         // Reset internal navigation flag when returning to MainActivity
         isNavigatingInternally = false;
         
-        // If database is encrypted and needs unlock, show black overlay
+        // Check if database needs to be unlocked
         if (encryptionManager != null && encryptionManager.isEncryptionEnabled() && 
-            !encryptionManager.isPassphraseCached()) {
+            !encryptionManager.isPassphraseCached() && !isUnlockDialogShowing) {
+            // Show overlay and unlock dialog
             if (securityOverlay != null) {
                 securityOverlay.setVisibility(View.VISIBLE);
                 securityOverlay.bringToFront();
             }
-        } else {
-            // Hide overlay if passphrase is cached or encryption is not enabled
+            isUnlockDialogShowing = true;
+            showUnlockDialog();
+        } else if (encryptionManager != null && encryptionManager.isPassphraseCached()) {
+            // Hide overlay if passphrase is cached
             if (securityOverlay != null) {
                 securityOverlay.setVisibility(View.GONE);
             }
@@ -3017,8 +3021,11 @@ public class MainActivity extends AppCompatActivity {
                 if (dataListView != null) {
                     dataListView.setVisibility(View.GONE);
                 }
-                // Show unlock dialog
-                showUnlockDialog();
+                // Show unlock dialog only if not already showing
+                if (!isUnlockDialogShowing) {
+                    isUnlockDialogShowing = true;
+                    showUnlockDialog();
+                }
             } else {
                 // Open encrypted database
                 initializeEncryptedDatabase();
@@ -3340,8 +3347,9 @@ public class MainActivity extends AppCompatActivity {
             String passphrase = input.getText().toString();
             
             if (encryptionManager.unlockWithPassphrase(passphrase.toCharArray())) {
-                // Successful unlock - reset failed attempts
+                // Successful unlock - reset failed attempts and dialog flag
                 encryptionManager.resetFailedAttempts();
+                isUnlockDialogShowing = false;
                 
                 // Hide security overlay - show app content
                 if (securityOverlay != null) {
@@ -3388,6 +3396,7 @@ public class MainActivity extends AppCompatActivity {
                 
                 // Check if database should be wiped
                 if (encryptionManager.shouldWipeDatabase()) {
+                    isUnlockDialogShowing = false;
                     Toast.makeText(this, "⚠️ Too many failed attempts. Database will be wiped for security.", 
                                   Toast.LENGTH_LONG).show();
                     
@@ -3410,14 +3419,22 @@ public class MainActivity extends AppCompatActivity {
                 Toast.makeText(this, "✗ Wrong passphrase. " + remaining + " attempts remaining.", 
                               Toast.LENGTH_LONG).show();
                 
-                // Show dialog again with retry
-                showUnlockDialog(newAttemptCount);
+                // Reset flag to allow showing dialog again
+                isUnlockDialogShowing = false;
+                
+                // Show dialog again with retry after a short delay
+                new android.os.Handler().postDelayed(() -> {
+                    if (!encryptionManager.isPassphraseCached()) {
+                        showUnlockDialog(newAttemptCount);
+                    }
+                }, 500);
             }
         });
         
         // Always show "Exit" button to allow user to close app
         builder.setNegativeButton("Exit", (dialog, which) -> {
-            // Keep overlay visible and close app
+            // Reset dialog flag and close app
+            isUnlockDialogShowing = false;
             Toast.makeText(this, "App closed", Toast.LENGTH_SHORT).show();
             finish();
         });
