@@ -1149,8 +1149,14 @@ public class MainActivity extends AppCompatActivity {
                 android.util.Log.e("MainActivity", "Error saving WiFi network: " + e.getMessage(), e);
             }
         }
-        statusText.setText(String.format(getString(R.string.data_saved), results.size()));
-        addLogMessage(String.format(getString(R.string.data_saved), results.size()));
+    // Only show the count if the database is decrypted
+        if (isDatabaseEncrypted && database != null) {
+            statusText.setText(String.format(getString(R.string.data_saved), results.size()));
+            addLogMessage(String.format(getString(R.string.data_saved), results.size()));
+        } else {
+            statusText.setText(String.format(getString(R.string.data_saved), 0));
+            addLogMessage(String.format(getString(R.string.data_saved), 0));
+        }
         // Display current networks directly - only when not in Show Data mode
         if (!isShowingStoredData) {
             ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, dataList);
@@ -1441,7 +1447,8 @@ public class MainActivity extends AppCompatActivity {
             getString(R.string.delete_database),
             getString(R.string.show_network_count),
             getString(R.string.import_external_db),
-            getString(R.string.encryption_settings)
+            getString(R.string.encryption_settings),
+            "Close App"
         };
         
         builder.setItems(items, (dialog, which) -> {
@@ -1460,6 +1467,9 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 case 4: // Encryption settings
                     showEncryptionSettingsDialog();
+                    break;
+                case 5: // Close App
+                    finishAffinity();
                     break;
             }
         });
