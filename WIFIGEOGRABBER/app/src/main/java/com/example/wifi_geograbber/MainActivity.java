@@ -3865,6 +3865,7 @@ public class MainActivity extends AppCompatActivity {
             int wifiCount = 0;
             int bluetoothCount = 0;
             String derivedKey = null;  // Store derived key for later use
+            String originalPassphrase = passphrase;  // Store original passphrase for caching
 
             @Override
             protected void onPreExecute() {
@@ -3992,7 +3993,7 @@ public class MainActivity extends AppCompatActivity {
                     );
                     
                     confirmBuilder.setPositiveButton("Import", (d, w) -> {
-                        performEncryptedDatabaseImport(encryptedDbFile, derivedKey, wifiCount, bluetoothCount);
+                        performEncryptedDatabaseImport(encryptedDbFile, derivedKey, originalPassphrase, wifiCount, bluetoothCount);
                     });
                     
                     confirmBuilder.setNegativeButton(R.string.cancel, (d, w) -> {
@@ -4016,7 +4017,8 @@ public class MainActivity extends AppCompatActivity {
      * Perform actual encrypted database import (copy data)
      */
     private void performEncryptedDatabaseImport(final java.io.File encryptedDbFile, 
-                                                final String passphrase, 
+                                                final String derivedKey,
+                                                final String originalPassphrase, 
                                                 final int wifiCount, 
                                                 final int bluetoothCount) {
         new android.os.AsyncTask<Void, Void, Boolean>() {
@@ -4068,7 +4070,7 @@ public class MainActivity extends AppCompatActivity {
                     // Open encrypted external database
                     net.sqlcipher.database.SQLiteDatabase.loadLibs(MainActivity.this);
                     externalDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
-                        encryptedDbFile.getAbsolutePath(), passphrase, null, 
+                        encryptedDbFile.getAbsolutePath(), derivedKey, null, 
                         net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY);
                     
                     Log.i("Import", "Starting import from encrypted database...");
@@ -4135,6 +4137,13 @@ public class MainActivity extends AppCompatActivity {
                     // Hide security overlay after successful import
                     if (securityOverlay != null) {
                         securityOverlay.setVisibility(View.GONE);
+                    }
+                    
+                    // Cache passphrase in encryptionManager so MapActivity can access the database
+                    if (encryptionManager != null && encryptionManager.isEncryptionEnabled()) {
+                        encryptionManager.unlockWithPassphrase(originalPassphrase.toCharArray());
+                        Log.i("MainActivity", "Passphrase cached after import - MapActivity can now access DB");
+                        addLogMessage("🔑 Passphrase cached - Map access enabled");
                     }
                     
                     Toast.makeText(MainActivity.this,
