@@ -67,6 +67,7 @@ public class MainActivity extends AppCompatActivity {
     private ListView dataListView;
     private Button toggleScanButton, showButton, moreButton, bluetoothToggleButton, mapButton;
     private View securityOverlay;  // Black overlay to hide content during passphrase entry
+    private boolean isNavigatingInternally = false;  // Flag to track internal navigation (e.g., to MapActivity)
     private Handler handler;
     private Runnable scanRunnable;
     private boolean isScanning = false;
@@ -314,12 +315,15 @@ public class MainActivity extends AppCompatActivity {
         // Create security overlay (black screen to hide content)
         securityOverlay = new View(this);
         securityOverlay.setBackgroundColor(android.graphics.Color.BLACK);
-        securityOverlay.setLayoutParams(new android.view.ViewGroup.LayoutParams(
-            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        securityOverlay.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
+            android.widget.FrameLayout.LayoutParams.MATCH_PARENT
         ));
         securityOverlay.setVisibility(View.GONE);
-        ((android.view.ViewGroup) getWindow().getDecorView().getRootView()).addView(securityOverlay);
+        securityOverlay.setElevation(1000); // Ensure it's on top
+        // Add to this activity's content view only (not global DecorView)
+        android.widget.FrameLayout contentView = findViewById(android.R.id.content);
+        contentView.addView(securityOverlay);
         
         wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
@@ -434,6 +438,9 @@ public class MainActivity extends AppCompatActivity {
 
         // Map button
         mapButton.setOnClickListener(v -> {
+            // Set flag to indicate internal navigation
+            isNavigatingInternally = true;
+            
             Intent mapIntent = new Intent(MainActivity.this, MapActivity.class);
             
             // We now always use the internal database for the map
@@ -483,12 +490,20 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         
+        // Reset internal navigation flag when returning to MainActivity
+        isNavigatingInternally = false;
+        
         // If database is encrypted and needs unlock, show black overlay
         if (encryptionManager != null && encryptionManager.isEncryptionEnabled() && 
             !encryptionManager.isPassphraseCached()) {
             if (securityOverlay != null) {
                 securityOverlay.setVisibility(View.VISIBLE);
                 securityOverlay.bringToFront();
+            }
+        } else {
+            // Hide overlay if passphrase is cached or encryption is not enabled
+            if (securityOverlay != null) {
+                securityOverlay.setVisibility(View.GONE);
             }
         }
     }
@@ -2901,19 +2916,28 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        // Do NOT clear passphrase here - onPause is called when navigating to MapActivity
+        // Passphrase will be cleared in onStop() when app actually goes to background
+    }
+    
+    @Override
+    protected void onStop() {
+        super.onStop();
         // Clear passphrase when app goes to background for security
         // EXCEPT when scanning is active - then keep passphrase to allow background writes
-        if (encryptionManager != null && encryptionManager.isEncryptionEnabled()) {
-            if (!isScanning) {
-                // Only clear if NOT scanning
-                encryptionManager.clearPassphrase();
-                Log.i("MainActivity", "Passphrase cleared (not scanning)");
-            } else {
-                Log.i("MainActivity", "Passphrase kept in cache (scanning active)");
+        // EXCEPT when navigating internally to MapActivity - keep passphrase for internal navigation
+        
+        if (encryptionManager != null && encryptionManager.isEncryptionEnabled() && 
+            !isScanning && !isNavigatingInternally) {
+            encryptionManager.clearPassphrase();
+            if (encryptedDbHelper != null) {
+                encryptedDbHelper.clearPassphrase();
             }
-        }
-        if (encryptedDbHelper != null && !isScanning) {
-            encryptedDbHelper.clearPassphrase();
+            Log.i("MainActivity", "Passphrase cleared (app in background, not scanning)");
+        } else if (isScanning) {
+            Log.i("MainActivity", "Passphrase kept in cache (background scanning active)");
+        } else if (isNavigatingInternally) {
+            Log.i("MainActivity", "Passphrase kept in cache (internal navigation to MapActivity)");
         }
     }
 
