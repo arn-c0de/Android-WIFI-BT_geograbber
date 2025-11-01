@@ -245,6 +245,14 @@ cd Android_WIFI_BT_GEOGRABBER
 2. **Enable Location** – Ensure GPS is enabled for accurate coordinates
 3. **Enable Bluetooth** – Required for Bluetooth device scanning
 
+### 🔐 Secret Management
+
+For API key management, environment variables, and security best practices:
+- **Quick Setup**: [Secret Management Quick Start](./SECRET_MANAGEMENT_QUICKSTART.md) (5-minute guide)
+- **Full Documentation**: [Secret Management Guide](./docs/security/SECRET_MANAGEMENT.md)
+
+**Note**: Currently, the project works 100% offline and requires no API keys. The secret management system is provided for future extensibility.
+
 ---
 
 ## 💡 Usage
