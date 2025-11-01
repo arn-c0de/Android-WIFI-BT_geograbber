@@ -66,6 +66,7 @@ public class MainActivity extends AppCompatActivity {
     private ScrollView logcatScrollView;
     private ListView dataListView;
     private Button toggleScanButton, showButton, moreButton, bluetoothToggleButton, mapButton;
+    private View securityOverlay;  // Black overlay to hide content during passphrase entry
     private Handler handler;
     private Runnable scanRunnable;
     private boolean isScanning = false;
@@ -309,6 +310,17 @@ public class MainActivity extends AppCompatActivity {
         bluetoothToggleButton = findViewById(R.id.bluetooth_toggle_button);
         showButton = findViewById(R.id.show_button);
         mapButton = findViewById(R.id.map_button);
+        
+        // Create security overlay (black screen to hide content)
+        securityOverlay = new View(this);
+        securityOverlay.setBackgroundColor(android.graphics.Color.BLACK);
+        securityOverlay.setLayoutParams(new android.view.ViewGroup.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        securityOverlay.setVisibility(View.GONE);
+        ((android.view.ViewGroup) getWindow().getDecorView().getRootView()).addView(securityOverlay);
+        
         wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
         locationManager = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
         handler = new Handler();
@@ -364,6 +376,14 @@ public class MainActivity extends AppCompatActivity {
 
         // Check location services and display dialog if necessary.
         checkLocationServicesEnabled();
+
+        // If database is encrypted and needs unlock, show black overlay IMMEDIATELY
+        if (encryptionManager.isEncryptionEnabled() && !encryptionManager.isPassphraseCached()) {
+            if (securityOverlay != null) {
+                securityOverlay.setVisibility(View.VISIBLE);
+                securityOverlay.bringToFront();
+            }
+        }
 
         // Initialize database with encryption support
         initializeDatabase();
@@ -457,6 +477,20 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         };
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        
+        // If database is encrypted and needs unlock, show black overlay
+        if (encryptionManager != null && encryptionManager.isEncryptionEnabled() && 
+            !encryptionManager.isPassphraseCached()) {
+            if (securityOverlay != null) {
+                securityOverlay.setVisibility(View.VISIBLE);
+                securityOverlay.bringToFront();
+            }
+        }
     }
 
     // LogCat functions
@@ -734,13 +768,22 @@ public class MainActivity extends AppCompatActivity {
     private void stopScanning() {
         isScanning = false;
         handler.removeCallbacks(scanRunnable);
-    statusText.setText("WiFi scanning stopped");
-    addLogMessage("Scanning stopped");
+        statusText.setText("WiFi scanning stopped");
+        addLogMessage("Scanning stopped");
 
-    // Stop background service
-    Intent serviceIntent = new Intent(this, ScanService.class);
-    stopService(serviceIntent);
-    addLogMessage("Background service stopped");
+        // Stop background service
+        Intent serviceIntent = new Intent(this, ScanService.class);
+        stopService(serviceIntent);
+        addLogMessage("Background service stopped");
+        
+        // Clear passphrase from cache when scanning stops (if app is in background)
+        if (!isInForeground() && encryptionManager != null && encryptionManager.isEncryptionEnabled()) {
+            encryptionManager.clearPassphrase();
+            if (encryptedDbHelper != null) {
+                encryptedDbHelper.clearPassphrase();
+            }
+            Log.i("MainActivity", "Passphrase cleared after scan stopped");
+        }
         
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             try {
@@ -750,6 +793,16 @@ public class MainActivity extends AppCompatActivity {
             }
         }
         updateToggleScanButton();
+    }
+    
+    /**
+     * Check if app is currently in foreground
+     */
+    private boolean isInForeground() {
+        android.app.ActivityManager.RunningAppProcessInfo appProcessInfo = new android.app.ActivityManager.RunningAppProcessInfo();
+        android.app.ActivityManager.getMyMemoryState(appProcessInfo);
+        return (appProcessInfo.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND ||
+                appProcessInfo.importance == android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE);
     }
 
     private void startWifiScan() {
@@ -1469,6 +1522,10 @@ public class MainActivity extends AppCompatActivity {
                     showEncryptionSettingsDialog();
                     break;
                 case 5: // Close App
+                    // Clear passphrase from cache before closing
+                    if (encryptionManager != null) {
+                        encryptionManager.clearPassphrase();
+                    }
                     finishAffinity();
                     break;
             }
@@ -2844,9 +2901,20 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        // DO NOT clear passphrase here - it would break MapActivity!
-        // Passphrase will be cleared in onDestroy() when app is actually closing
-        // This allows MapActivity to access the encrypted database
+        // Clear passphrase when app goes to background for security
+        // EXCEPT when scanning is active - then keep passphrase to allow background writes
+        if (encryptionManager != null && encryptionManager.isEncryptionEnabled()) {
+            if (!isScanning) {
+                // Only clear if NOT scanning
+                encryptionManager.clearPassphrase();
+                Log.i("MainActivity", "Passphrase cleared (not scanning)");
+            } else {
+                Log.i("MainActivity", "Passphrase kept in cache (scanning active)");
+            }
+        }
+        if (encryptedDbHelper != null && !isScanning) {
+            encryptedDbHelper.clearPassphrase();
+        }
     }
 
     // Update button text according to status
@@ -2915,6 +2983,12 @@ public class MainActivity extends AppCompatActivity {
 
             // Check if passphrase is cached
             if (!encryptionManager.isPassphraseCached()) {
+                // Show black overlay immediately
+                if (securityOverlay != null) {
+                    securityOverlay.setVisibility(View.VISIBLE);
+                    securityOverlay.bringToFront();
+                }
+                
                 // Hide data view until unlocked
                 if (dataListView != null) {
                     dataListView.setVisibility(View.GONE);
@@ -3209,6 +3283,12 @@ public class MainActivity extends AppCompatActivity {
      * @param attemptCount Number of failed attempts
      */
     private void showUnlockDialog(final int attemptCount) {
+        // Show security overlay to hide app content
+        if (securityOverlay != null) {
+            securityOverlay.setVisibility(View.VISIBLE);
+            securityOverlay.bringToFront();
+        }
+        
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
         builder.setTitle(R.string.unlock_database_title);
         
@@ -3236,6 +3316,14 @@ public class MainActivity extends AppCompatActivity {
             String passphrase = input.getText().toString();
             
             if (encryptionManager.unlockWithPassphrase(passphrase.toCharArray())) {
+                // Successful unlock - reset failed attempts
+                encryptionManager.resetFailedAttempts();
+                
+                // Hide security overlay - show app content
+                if (securityOverlay != null) {
+                    securityOverlay.setVisibility(View.GONE);
+                }
+                
                 initializeEncryptedDatabase();
                 // Show data view after successful unlock
                 if (dataListView != null) {
@@ -3271,24 +3359,48 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
             } else {
-                // Wrong passphrase - allow retry
+                // Wrong passphrase - increment failed attempts
+                encryptionManager.incrementFailedAttempts();
+                
+                // Check if database should be wiped
+                if (encryptionManager.shouldWipeDatabase()) {
+                    Toast.makeText(this, "⚠️ Too many failed attempts. Database will be wiped for security.", 
+                                  Toast.LENGTH_LONG).show();
+                    
+                    // Keep overlay visible during wipe
+                    // Wipe database after short delay
+                    new android.os.Handler().postDelayed(() -> {
+                        resetEncryption();
+                        // Overlay will be removed after reset shows new setup dialog
+                        if (securityOverlay != null) {
+                            securityOverlay.setVisibility(View.GONE);
+                        }
+                    }, 2000);
+                    return;
+                }
+                
+                // Show remaining attempts
+                int remaining = encryptionManager.getRemainingAttempts();
                 int newAttemptCount = attemptCount + 1;
                 
-                if (newAttemptCount >= 5) {
-                    // Too many attempts - close app
-                    Toast.makeText(this, "Too many failed attempts. App will close.", Toast.LENGTH_LONG).show();
-                    finish();
-                } else {
-                    // Show dialog again with retry
-                    showUnlockDialog(newAttemptCount);
-                }
+                Toast.makeText(this, "✗ Wrong passphrase. " + remaining + " attempts remaining.", 
+                              Toast.LENGTH_LONG).show();
+                
+                // Show dialog again with retry
+                showUnlockDialog(newAttemptCount);
             }
         });
         
         // Add cancel button after first attempt
         if (attemptCount > 0) {
-            builder.setNegativeButton(R.string.cancel, (dialog, which) -> finish());
+            builder.setNegativeButton(R.string.cancel, (dialog, which) -> {
+                // Keep overlay visible and close app
+                finish();
+            });
         }
+        
+        // Don't allow dismissal without action (keep overlay visible)
+        builder.setCancelable(false);
         
         builder.show();
     }

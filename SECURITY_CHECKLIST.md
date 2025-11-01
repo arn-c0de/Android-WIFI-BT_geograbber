@@ -156,6 +156,29 @@ git log --all --full-history --source -- \
 
 ---
 
+## 🛡️ Attack Vectors & Risk Triage
+
+Even with zero-knowledge encryption, some practical attack vectors remain. Here is a risk triage for developers:
+
+**1. Critical**
+- Weak passphrase: Highest risk, brute-force attacks possible. → Use strong, long passwords!
+- Device malware: Can capture passphrase directly. → Protect your device from malware!
+
+**2. High**
+- Root/Jailbreak: Allows access to memory and bypassing app protections.
+- Physical access: Unlocked device = direct data access.
+
+**3. Medium**
+- Insecure backups: Unencrypted backups may contain the database in plaintext.
+- Insecure app updates: Tampered app versions could steal the passphrase.
+
+**4. Low**
+- Side-channel attacks: Very rare and technically complex.
+- Timing/power analysis: Practically irrelevant for mobile apps.
+
+**Recommendation:**
+Use a strong passphrase, protect your device from malware and rooting, encrypt backups, only install trusted app updates, and do not leave your device unattended.
+
 ## 🛠️ Fix .gitignore Not Working
 
 If files are still tracked despite being in .gitignore:

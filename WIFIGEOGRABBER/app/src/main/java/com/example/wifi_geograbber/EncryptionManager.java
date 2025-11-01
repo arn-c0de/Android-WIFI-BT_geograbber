@@ -44,8 +44,10 @@ public class EncryptionManager {
     private static final String KEY_ENCRYPTION_ENABLED = "encryption_enabled";
     private static final String KEY_SALT = "passphrase_salt";
     private static final String KEY_IV = "encryption_iv";
+    private static final String KEY_FAILED_ATTEMPTS = "failed_attempts";
     
     private static final int GCM_TAG_LENGTH = 128;
+    private static final int MAX_FAILED_ATTEMPTS = 5;
     
     private final Context context;
     private final SharedPreferences prefs;
@@ -419,6 +421,43 @@ public class EncryptionManager {
             Log.e(TAG, "Error getting/creating key", e);
             return null;
         }
+    }
+    
+    /**
+     * Increment failed passphrase attempts counter
+     */
+    public void incrementFailedAttempts() {
+        int attempts = prefs.getInt(KEY_FAILED_ATTEMPTS, 0);
+        prefs.edit().putInt(KEY_FAILED_ATTEMPTS, attempts + 1).apply();
+        Log.w(TAG, "Failed attempts: " + (attempts + 1) + "/" + MAX_FAILED_ATTEMPTS);
+    }
+    
+    /**
+     * Reset failed attempts counter (after successful unlock)
+     */
+    public void resetFailedAttempts() {
+        prefs.edit().putInt(KEY_FAILED_ATTEMPTS, 0).apply();
+    }
+    
+    /**
+     * Get current number of failed attempts
+     */
+    public int getFailedAttempts() {
+        return prefs.getInt(KEY_FAILED_ATTEMPTS, 0);
+    }
+    
+    /**
+     * Get remaining attempts before database wipe
+     */
+    public int getRemainingAttempts() {
+        return Math.max(0, MAX_FAILED_ATTEMPTS - getFailedAttempts());
+    }
+    
+    /**
+     * Check if database should be wiped due to too many failed attempts
+     */
+    public boolean shouldWipeDatabase() {
+        return getFailedAttempts() >= MAX_FAILED_ATTEMPTS;
     }
     
     /**
