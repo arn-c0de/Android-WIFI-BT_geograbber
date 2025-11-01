@@ -631,7 +631,7 @@ This application is provided **"AS IS"** for educational and research purposes o
 |----------------|------|
 | 🐛 **Issues** | [GitHub Issues](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/issues) |
 | 💬 **Discussions** | [GitHub Discussions](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/discussions) |
-| 📧 **Email** |  |
+| 📧 **Email** | arn-c0de@protonmail.com |
 | 🌐 **Website** |  |
 
 ---
