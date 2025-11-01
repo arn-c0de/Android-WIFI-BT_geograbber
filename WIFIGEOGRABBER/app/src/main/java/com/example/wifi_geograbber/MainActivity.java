@@ -44,11 +44,11 @@ public class MainActivity extends AppCompatActivity {
     /**
      * =============================
      *   CODE VERSION MARKER
-     *   APP_VERSION: 1.0.2
+     *   APP_VERSION: 1.0.3
      * =============================
      * Use this variable to visually distinguish code versions.
      */
-    public static final String APP_VERSION = "1.0.2";
+    public static final String APP_VERSION = "1.0.3";
     private WifiManager wifiManager;
     private LocationManager locationManager;
     private BluetoothAdapter bluetoothAdapter;
@@ -909,6 +909,13 @@ public class MainActivity extends AppCompatActivity {
         }
 
         infoSummary.setText(infoText);
+    }
+
+    /**
+     * Update total networks count display (after import, etc.)
+     */
+    private void updateTotalNetworksCount() {
+        updateInfoSummary(0, 0);
     }
 
     private void startLocationUpdates() {
@@ -2430,15 +2437,18 @@ public class MainActivity extends AppCompatActivity {
                     // DEBUG: Log derived key for troubleshooting
                     String cachedKey = encryptionManager.getCachedDatabaseKey();
                     if (cachedKey != null) {
-                        // Log full key for debugging
+                        // Log key preview only (first 2 + last 2 chars for security)
+                        String keyPreview = cachedKey.length() > 4 ? 
+                            cachedKey.substring(0, 2) + "..." + cachedKey.substring(cachedKey.length() - 2) : 
+                            "**";
                         Log.i("EXPORT_DEBUG", "═══════════════════════════════════════");
                         Log.i("EXPORT_DEBUG", "DATABASE EXPORT - ENCRYPTION INFO");
                         Log.i("EXPORT_DEBUG", "═══════════════════════════════════════");
                         Log.i("EXPORT_DEBUG", "Salt (Base64): " + saltBase64);
-                        Log.i("EXPORT_DEBUG", "Derived Key (hex): " + cachedKey);
+                        Log.i("EXPORT_DEBUG", "Derived Key Preview: " + keyPreview);
                         Log.i("EXPORT_DEBUG", "Key Length: " + cachedKey.length() + " chars");
                         Log.i("EXPORT_DEBUG", "═══════════════════════════════════════");
-                        addLogMessage("🔑 Export Key: " + cachedKey);
+                        addLogMessage("🔑 Export Key: " + keyPreview + " (length: " + cachedKey.length() + ")");
                     }
                 }
             }
@@ -3530,17 +3540,21 @@ public class MainActivity extends AppCompatActivity {
                         // SQLCipher expects hex keys in the format: x'<hex-string>'
                         derivedKey = "x'" + hexKey + "'";
                         
-                        // Log full key for debugging BEFORE attempting to open database
-                        Log.i("IMPORT_DEBUG", "Derived Key (hex): " + hexKey);
+                        // Log key preview only (first 2 + last 2 chars for security)
+                        String keyPreview = hexKey.length() > 4 ? 
+                            hexKey.substring(0, 2) + "..." + hexKey.substring(hexKey.length() - 2) : 
+                            "**";
+                        Log.i("IMPORT_DEBUG", "Derived Key Preview: " + keyPreview);
                         Log.i("IMPORT_DEBUG", "Key Length: " + hexKey.length() + " chars");
                         Log.i("IMPORT_DEBUG", "═══════════════════════════════════════");
                         
                         // Log to UI (must be done on UI thread)
-                        final String keyForLog = hexKey;
+                        final String keyPreviewForLog = keyPreview;
+                        final int keyLength = hexKey.length();
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                addLogMessage("🔑 Import Key: " + keyForLog);
+                                addLogMessage("🔑 Import Key: " + keyPreviewForLog + " (length: " + keyLength + ")");
                             }
                         });
                         
@@ -3692,13 +3706,17 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(MainActivity.this,
                         "✓ Imported " + wifiCount + " WiFi + " + bluetoothCount + " BT devices",
                         Toast.LENGTH_LONG).show();
+                    addLogMessage("✓ Import completed: " + wifiCount + " WiFi + " + bluetoothCount + " BT");
 
-                    // Refresh display
-                    if (isShowingStoredData) {
-                        showData();
-                    }
+                    // Update total networks count
+                    updateTotalNetworksCount();
+
+                    // Refresh display - always show data after import
+                    isShowingStoredData = true;
+                    showData();
                 } else {
                     Toast.makeText(MainActivity.this, "Import failed", Toast.LENGTH_LONG).show();
+                    addLogMessage("✗ Import failed");
                 }
             }
         }.execute();
