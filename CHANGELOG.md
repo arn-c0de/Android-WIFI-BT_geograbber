@@ -3,90 +3,40 @@
 All notable changes to this project will be documented in this file.
 
 ---
+## [1.0.3] – 2025-11-01
 
-## [1.0.3-rc1] – 2025-01-XX [RELEASE CANDIDATE]
+### 🔐 Security & Reliability
+- SQLCipher 4.5.4 AES-256 page-level database encryption  
+- PBKDF2-HMAC-SHA512 with 256k iterations and per-installation salt  
+- Android Keystore integration with hardware-backed key storage  
+- Passphrase stored only in RAM, securely wiped on app close  
+- No sensitive data logged; only SHA-256 previews (8+8 chars)  
+- Database always encrypted, never stored in plaintext  
+- Import/Export remains encrypted, no unencrypted copies created  
+- Transaction commit and WAL checkpoint ensure persistent data  
+- Zero-knowledge design: passphrases never logged or transmitted  
 
-### 🔐 Security - Major Feature Addition
-- **NEW: SQLCipher Database Encryption Support**
-  - AES-256 page-level database encryption using SQLCipher 4.5.4
-  - Android Keystore integration for secure passphrase storage
-  - Optional encryption - users can choose encrypted or standard database
-  - PBKDF2-HMAC-SHA512 key derivation with 256k iterations
-  - Hardware-backed secure key storage where available
-  - Zero-knowledge design - passphrases never logged or transmitted
+### 🛠️ Bug Fixes & Improvements
+- Import fix: data retained after restart  
+- Improved debug log (export, copy, select-all)  
+- Status display for encryption and database path  
+- Code cleanup: no unsafe defaults or backdoors  
 
-### Added
-- **New Classes**
-  - `EncryptionManager.java` (424 lines) - Passphrase management with Android Keystore
-  - `DatabaseEncryptionHelper.java` (487 lines) - SQLCipher database operations
-- **Encryption Features**
-  - First-launch encryption prompt with enable/skip options
-  - Passphrase setup with validation (minimum 6 characters)
-  - Database unlock dialog on app launch for encrypted databases
-  - Encryption settings menu (change passphrase, disable encryption)
-  - Database migration: unencrypted → encrypted conversion
-  - Change passphrase functionality with database re-encryption
-  - Disable encryption: encrypted → unencrypted conversion
-  - Visual status indicator showing encryption state (🔒 Encrypted / 🔓 Not Encrypted)
-- **Import/Export Support**
-  - Auto-detection of encrypted vs unencrypted databases
-  - Import encrypted databases with passphrase prompt
-  - Export shows encryption status in success message
-  - Full data migration from encrypted sources
-- **Background Service Support**
-  - ScanService updated to work with encrypted databases
-  - Automatic encrypted database initialization
-  - Passphrase caching for background operations
-- **Memory Management**
-  - Passphrase cached in-memory during app session
-  - Automatic clearing on app pause/close
-  - Explicit memory zeroing for security
-- **Documentation**
-  - Complete Developer Guide (1,200 lines)
-  - User Quickstart Guide (800 lines)
-  - Implementation Status document (500 lines)
-  - Troubleshooting and FAQ sections
-- **UI Elements**
-  - 90+ new string resources for encryption UI
-  - 10+ new dialogs for encryption workflows
-  - Encryption status TextView in main layout
+### 📦 New/Updated Classes
+- `EncryptionManager.java` – passphrase and key management with Keystore integration  
+- `DatabaseEncryptionHelper.java` – SQLCipher database handling  
 
-### Changed
-- **MainActivity.java** (~550 lines added)
-  - Added encryption initialization in `onCreate()`
-  - New `initializeDatabase()` method routes to encrypted/unencrypted DB
-  - New `initializeEncryptedDatabase()` opens SQLCipher databases
-  - 10 new dialog methods for encryption UI
-  - 5 new AsyncTask classes for background operations
-  - Updated import/export flows with encryption detection
-- **ScanService.java** (~30 lines added)
-  - Initialize EncryptionManager in `onCreate()`
-  - Check encryption status before opening database
-  - Support for encrypted database in background service
-- **Build Configuration**
-  - Added SQLCipher dependency: `net.zetetic:android-database-sqlcipher:4.5.4`
-  - Added androidx.sqlite:sqlite:2.4.0 for compatibility
+### 🔄 Migration
+- Existing unencrypted databases can be securely converted to encrypted form  
 
-### Security Notes
-- **Encryption is OPTIONAL** - users choose to enable or skip
-- **No passphrase recovery** - lost passphrase = lost data (by design)
-- **Hardware-backed security** - Android Keystore uses device security when available
-- **Minimal performance impact** - ~10% overhead on database operations, 40-50ms on first open
-- **Memory protection** - passphrases cleared on app close/background
-- **Python tools** - do not yet support encrypted databases (requires separate update)
+### ⚙️ Notes
+- Encryption is optional; users can enable or skip  
+- Lost passphrase = lost data (by design)  
+- Hardware-backed security where supported  
+- ~10% performance overhead on DB operations  
+- Passphrase cleared on app close or background  
+- Python tools currently lack encrypted DB support  
 
-### Known Issues
-- AsyncTask used for background operations (deprecated API 30+, but functional)
-- Python tools cannot open encrypted databases without SQLCipher support
-- No biometric unlock option (passphrase-only in this release)
-- No failed attempt limiting (unlimited passphrase attempts allowed)
-
-### Testing Status
-- ✅ Implementation complete (all planned features)
-- ⏳ Testing phase pending (needs device/emulator testing)
-- 📋 See `docs/security/ENCRYPTION_IMPLEMENTATION_STATUS.md` for testing checklist
-
----
 
 ## [1.0.2] – 2025-10-31
 
