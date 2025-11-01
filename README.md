@@ -39,7 +39,7 @@
 The two Python tools are not yet fully compatible with the new encrypted databases.  
 Additional development is required to implement full SQLCipher support and key handling.  
 
-➡️ If you need to work **without encryption**, please use **version 1.0.2**.
+> ➡️ If you need to work **without encryption**, please use **version 1.0.2**.
 
 ---
 
