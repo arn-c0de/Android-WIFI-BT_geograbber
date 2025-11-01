@@ -1642,15 +1642,29 @@ public class MainActivity extends AppCompatActivity {
             addLogMessage("User chose to export checksum metadata");
         });
 
-        builder.setNegativeButton("Skip", (dialog, which) -> {
-            dialog.dismiss();
-            addLogMessage("User skipped checksum metadata export");
-            Toast.makeText(this, "Note: You can verify checksums manually if needed", Toast.LENGTH_SHORT).show();
+        // For encrypted databases, make metadata export mandatory
+        if (isDatabaseEncrypted) {
+            builder.setNegativeButton("Cancel Export", (dialog, which) -> {
+                dialog.dismiss();
+                addLogMessage("User cancelled metadata export for encrypted DB");
+                Toast.makeText(this, "⚠️ Warning: Without metadata file, this database cannot be imported!", Toast.LENGTH_LONG).show();
 
-            // Clear temporary data
-            lastExportedDbChecksum = null;
-            lastExportedDbFilename = null;
-        });
+                // Clear temporary data
+                lastExportedDbChecksum = null;
+                lastExportedDbFilename = null;
+            });
+        } else {
+            // For unencrypted databases, skip is allowed
+            builder.setNegativeButton("Skip", (dialog, which) -> {
+                dialog.dismiss();
+                addLogMessage("User skipped checksum metadata export");
+                Toast.makeText(this, "Note: You can verify checksums manually if needed", Toast.LENGTH_SHORT).show();
+
+                // Clear temporary data
+                lastExportedDbChecksum = null;
+                lastExportedDbFilename = null;
+            });
+        }
 
         builder.setCancelable(false);
         builder.show();
@@ -1659,18 +1673,32 @@ public class MainActivity extends AppCompatActivity {
     // Offer checksum verification during import
     private void offerChecksumVerification(android.net.Uri dbUri, java.io.File dbFile) {
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
-        builder.setTitle("Verify Checksum?");
 
-        String message = "Do you have a checksum metadata file (.sha256.json) for this database?\n\n" +
-                "VERIFICATION BENEFITS:\n" +
-                "• Confirm file hasn't been tampered with\n" +
-                "• Verify file integrity\n" +
-                "• Ensure authentic source\n\n" +
-                "If you don't have a checksum file, you can skip this step. The database will still be validated using other security checks.";
+        // Check if database is encrypted
+        boolean isEncrypted = DatabaseEncryptionHelper.isDatabaseEncrypted(dbFile);
 
-        builder.setMessage(message);
+        if (isEncrypted) {
+            builder.setTitle("🔒 Metadata Required");
+            String message = "This is an ENCRYPTED database!\n\n" +
+                    "⚠️ MANDATORY: You MUST provide the metadata file (.sha256.json) that was exported with this database.\n\n" +
+                    "The metadata contains:\n" +
+                    "• Encryption salt (required for decryption)\n" +
+                    "• Checksum for integrity verification\n\n" +
+                    "WITHOUT the metadata file, import will fail even with the correct passphrase!";
+            builder.setMessage(message);
+        } else {
+            builder.setTitle("Verify Checksum?");
+            String message = "Do you have a checksum metadata file (.sha256.json) for this database?\n\n" +
+                    "VERIFICATION BENEFITS:\n" +
+                    "• Confirm file hasn't been tampered with\n" +
+                    "• Verify file integrity\n" +
+                    "• Ensure authentic source\n\n" +
+                    "If you don't have a checksum file, you can skip this step. The database will still be validated using other security checks.";
+            builder.setMessage(message);
+        }
 
-        builder.setPositiveButton("Yes, Select Checksum File", (dialog, which) -> {
+        String positiveButtonText = isEncrypted ? "Select Metadata File" : "Yes, Select Checksum File";
+        builder.setPositiveButton(positiveButtonText, (dialog, which) -> {
             // Store pending import data
             pendingImportUri = dbUri;
             pendingImportFile = dbFile;
@@ -1681,17 +1709,28 @@ public class MainActivity extends AppCompatActivity {
             intent.setType("application/json");
             startActivityForResult(intent, IMPORT_CHECKSUM_REQUEST_CODE);
 
-            addLogMessage("User chose to verify checksum");
+            addLogMessage(isEncrypted ? "User selected metadata file (required)" : "User chose to verify checksum");
         });
 
-        builder.setNegativeButton("Skip Verification", (dialog, which) -> {
-            dialog.dismiss();
-            addLogMessage("User skipped checksum verification");
-            Toast.makeText(this, "Proceeding without checksum verification", Toast.LENGTH_SHORT).show();
+        // For encrypted databases, skip is not allowed
+        if (isEncrypted) {
+            builder.setNegativeButton("Cancel Import", (dialog, which) -> {
+                dialog.dismiss();
+                dbFile.delete();
+                addLogMessage("User cancelled import - metadata file required for encrypted DB");
+                Toast.makeText(this, "Import cancelled. Encrypted databases require metadata file.", Toast.LENGTH_LONG).show();
+            });
+        } else {
+            // For unencrypted databases, skip is allowed
+            builder.setNegativeButton("Skip Verification", (dialog, which) -> {
+                dialog.dismiss();
+                addLogMessage("User skipped checksum verification");
+                Toast.makeText(this, "Proceeding without checksum verification", Toast.LENGTH_SHORT).show();
 
-            // Continue with import without checksum verification
-            continueImportWithoutChecksum(dbFile);
-        });
+                // Continue with import without checksum verification
+                continueImportWithoutChecksum(dbFile);
+            });
+        }
 
         builder.setCancelable(false);
         builder.show();
@@ -3450,15 +3489,13 @@ public class MainActivity extends AppCompatActivity {
                             encryptedDbFile.getAbsolutePath(), derivedKey, null,
                             net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY);
                     } else {
-                        // Fallback: Try raw passphrase (backwards compatibility)
-                        Log.i("MainActivity", "No salt in metadata - trying raw passphrase");
-                        derivedKey = passphrase;
-                        testDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
-                            encryptedDbFile.getAbsolutePath(), passphrase, null,
-                            net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY);
-                    }
-                    
-                    // Check for required tables
+                    // Fallback: Try raw passphrase (backwards compatibility)
+                    Log.i("MainActivity", "No salt in metadata - trying raw passphrase");
+                    derivedKey = passphrase;
+                    testDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                        encryptedDbFile.getAbsolutePath(), derivedKey, null,
+                        net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY);
+                }                    // Check for required tables
                     boolean hasWifiData = hasEncryptedTable(testDb, "wifi_data");
                     boolean hasDeviceData = hasEncryptedTable(testDb, "device_data");
                     

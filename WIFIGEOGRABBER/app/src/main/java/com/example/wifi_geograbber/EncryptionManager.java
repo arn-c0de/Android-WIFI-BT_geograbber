@@ -16,7 +16,9 @@ import java.util.Arrays;
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
+import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.PBEKeySpec;
 
 /**
  * EncryptionManager - Manages database encryption using Android Keystore
@@ -271,25 +273,22 @@ public class EncryptionManager {
      * Derive database key from passphrase using PBKDF2
      */
     private String deriveKey(char[] passphrase, byte[] salt) throws Exception {
-        // Simple derivation - in production, use PBKDF2WithHmacSHA256
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        digest.update(salt);
-
-        byte[] passphraseBytes = new String(passphrase).getBytes(StandardCharsets.UTF_8);
-        digest.update(passphraseBytes);
-        Arrays.fill(passphraseBytes, (byte) 0); // Clear sensitive data
-
-        byte[] hash = digest.digest();
+        // Use PBKDF2WithHmacSHA1 for key derivation, which is standard
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
+        PBEKeySpec spec = new PBEKeySpec(passphrase, salt, 10000, 256); // 10000 iterations, 256-bit key
+        SecretKey secretKey = factory.generateSecret(spec);
+        byte[] keyBytes = secretKey.getEncoded();
 
         // Convert to hex string (64 characters for SQLCipher)
-        StringBuilder hexString = new StringBuilder();
-        for (byte b : hash) {
+        StringBuilder hexString = new StringBuilder(2 * keyBytes.length);
+        for (byte b : keyBytes) {
             String hex = Integer.toHexString(0xff & b);
-            if (hex.length() == 1) hexString.append('0');
+            if (hex.length() == 1) {
+                hexString.append('0');
+            }
             hexString.append(hex);
         }
-
-        return hexString.toString();
+        return "x'" + hexString.toString() + "'";
     }
     
     /**
