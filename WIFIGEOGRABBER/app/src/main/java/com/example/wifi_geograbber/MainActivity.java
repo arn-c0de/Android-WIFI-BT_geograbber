@@ -4132,6 +4132,11 @@ public class MainActivity extends AppCompatActivity {
                         Log.e("Import", "Error counting imported data: " + e.getMessage());
                     }
                     
+                    // Hide security overlay after successful import
+                    if (securityOverlay != null) {
+                        securityOverlay.setVisibility(View.GONE);
+                    }
+                    
                     Toast.makeText(MainActivity.this,
                         "✓ Imported " + wifiCount + " WiFi + " + bluetoothCount + " BT devices",
                         Toast.LENGTH_LONG).show();
