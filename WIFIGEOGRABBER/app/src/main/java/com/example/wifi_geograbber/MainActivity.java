@@ -2920,16 +2920,31 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        // Do NOT clear passphrase here - onPause is called when navigating to MapActivity
-        // Passphrase will be cleared in onStop() when app actually goes to background
+        
+        // Clear passphrase immediately when app goes to background for security
+        // This prevents timing attacks where user quickly returns to app
+        // EXCEPT when navigating internally to MapActivity - keep passphrase for internal navigation
+        // EXCEPT when scanning is active - then keep passphrase to allow background writes
+        
+        if (encryptionManager != null && encryptionManager.isEncryptionEnabled() && 
+            !isNavigatingInternally && !isScanning) {
+            encryptionManager.clearPassphrase();
+            if (encryptedDbHelper != null) {
+                encryptedDbHelper.clearPassphrase();
+            }
+            Log.i("MainActivity", "Passphrase cleared immediately (onPause, security)");
+        } else if (isNavigatingInternally) {
+            Log.i("MainActivity", "Passphrase kept in cache (internal navigation to MapActivity)");
+        } else if (isScanning) {
+            Log.i("MainActivity", "Passphrase kept in cache (background scanning active)");
+        }
     }
     
     @Override
     protected void onStop() {
         super.onStop();
-        // Clear passphrase when app goes to background for security
-        // EXCEPT when scanning is active - then keep passphrase to allow background writes
-        // EXCEPT when navigating internally to MapActivity - keep passphrase for internal navigation
+        // Additional security: Clear passphrase in onStop as well
+        // This catches cases where onPause didn't clear it (scanning, navigation)
         
         if (encryptionManager != null && encryptionManager.isEncryptionEnabled() && 
             !isScanning && !isNavigatingInternally) {
@@ -2937,11 +2952,7 @@ public class MainActivity extends AppCompatActivity {
             if (encryptedDbHelper != null) {
                 encryptedDbHelper.clearPassphrase();
             }
-            Log.i("MainActivity", "Passphrase cleared (app in background, not scanning)");
-        } else if (isScanning) {
-            Log.i("MainActivity", "Passphrase kept in cache (background scanning active)");
-        } else if (isNavigatingInternally) {
-            Log.i("MainActivity", "Passphrase kept in cache (internal navigation to MapActivity)");
+            Log.i("MainActivity", "Passphrase cleared (onStop, security)");
         }
     }
 
