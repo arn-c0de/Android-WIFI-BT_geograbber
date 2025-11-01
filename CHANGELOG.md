@@ -24,17 +24,36 @@ All notable changes to this project will be documented in this file.
   - `validateExternalDatabase()` - Comprehensive database integrity checks
   - `validateTableSchema()` - Schema structure validation with table name whitelist
   - `sanitizeString()` - Input sanitization for string data
+- **SHA-256 Checksum Verification and Metadata Support in ALL Tools**
+  - Python Map Viewer & Database Combiner: Full support for .sha256.json files
+  - User can select checksum file manually or create new one
+  - Cross-platform verification (Android ↔ Python)
+  - Optional checksum creation after merge, clean, repair
+  - Clear dialogs for verification, creation, and warnings
+- **Database Structure Updates**
+  - Support for new columns: capabilities, center_freq0, center_freq1, is_passpoint_network, operator_friendly_name, venue_name, movement tracking fields
+  - Python tools now fully compatible with latest Android DB schema
+- **Improved GUI Workflows**
+  - Flexible checksum selection and creation dialogs
+  - User can skip, select, or create checksum files as needed
+  - All dialogs translated and internationalized
 
 ### Changed
 - Database import functions now use read-only mode for external databases
 - Import process now uses database transactions with automatic rollback on errors
 - All string inputs from external databases are now sanitized before insertion
 - Numeric values are validated against reasonable ranges before import
+- Python tools: GUI workflow for checksum selection/creation improved
+- Python tools: All database operations now offer checksum creation after completion
+- Documentation: SHA256_CHECKSUM_VERIFICATION.md updated for all platforms
 
 ### Fixed
 - Malicious database files with triggers or views are now rejected
 - Invalid data (coordinates, timestamps, signal strength) is now filtered out during import
 - Database corruption during import is prevented through transaction rollback
+- Python tools: No more forced checksum creation, user always has choice
+- Python tools: Checksum verification now supports manual file selection
+- Python tools: All new DB columns handled correctly
 
 
 ## [1.0.1] – 2025-10-30

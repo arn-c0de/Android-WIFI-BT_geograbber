@@ -7,6 +7,81 @@ import os
 import webbrowser
 import tempfile
 import json
+import hashlib
+
+def calculate_sha256_checksum(file_path):
+    """Calculates SHA-256 checksum for a file"""
+    sha256_hash = hashlib.sha256()
+    try:
+        with open(file_path, "rb") as f:
+            # Read file in chunks to handle large files
+            for byte_block in iter(lambda: f.read(4096), b""):
+                sha256_hash.update(byte_block)
+        return sha256_hash.hexdigest()
+    except Exception as e:
+        print(f"Error calculating checksum: {e}")
+        return None
+
+def create_checksum_metadata(file_path, checksum):
+    """Creates a checksum metadata JSON file"""
+    try:
+        file_size = os.path.getsize(file_path)
+        filename = os.path.basename(file_path)
+        
+        metadata = {
+            "version": "1.0",
+            "algorithm": "SHA-256",
+            "filename": filename,
+            "checksum": checksum,
+            "fileSize": file_size,
+            "timestamp": int(os.path.getmtime(file_path) * 1000),
+            "exportedBy": "WiFi GeoGrabber Python Map Viewer"
+        }
+        
+        return metadata
+    except Exception as e:
+        print(f"Error creating metadata: {e}")
+        return None
+
+def save_checksum_metadata(db_path, metadata):
+    """Saves checksum metadata to a .sha256.json file"""
+    try:
+        checksum_path = db_path + ".sha256.json"
+        with open(checksum_path, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        return checksum_path
+    except Exception as e:
+        print(f"Error saving metadata: {e}")
+        return None
+
+def verify_checksum_from_metadata(db_path, metadata_path):
+    """Verifies database file using checksum metadata"""
+    try:
+        # Read metadata
+        with open(metadata_path, 'r') as f:
+            metadata = json.load(f)
+        
+        # Verify algorithm
+        if metadata.get("algorithm") != "SHA-256":
+            return False, f"Unsupported algorithm: {metadata.get('algorithm')}"
+        
+        # Verify file size
+        actual_size = os.path.getsize(db_path)
+        expected_size = metadata.get("fileSize")
+        if actual_size != expected_size:
+            return False, f"File size mismatch: expected {expected_size} bytes, got {actual_size} bytes"
+        
+        # Calculate and verify checksum
+        actual_checksum = calculate_sha256_checksum(db_path)
+        expected_checksum = metadata.get("checksum")
+        
+        if actual_checksum != expected_checksum:
+            return False, "Checksum verification failed! File may have been modified or corrupted."
+        
+        return True, "Checksum verification successful!"
+        
+    except Exception as e:
+        return False, f"Error during verification: {str(e)}"
 
 def get_vendor_from_oui(bssid):
     """Determines the manufacturer based on the OUI (first 6 characters of the MAC address)"""
@@ -77,7 +152,7 @@ def get_vendor_from_oui(bssid):
     return vendor_db.get(oui_key, f"Unknown ({bssid[:8]})")
 
 def select_database_file():
-    """Opens a file selection dialog for .db files"""
+    """Opens a file selection dialog for .db files with optional checksum verification"""
     root = tk.Tk()
     root.withdraw()  # Hides the main window
 
@@ -89,6 +164,106 @@ def select_database_file():
         initialdir=initial_dir,
         filetypes=[("Database files", "*.db"), ("All files", "*.*")]
     )
+    
+    if not file_path:
+        root.destroy()
+        return None
+    
+    # Check if checksum metadata file exists in same directory
+    checksum_path = file_path + ".sha256.json"
+    if os.path.exists(checksum_path):
+        # Ask user if they want to verify with the found checksum file
+        verify = messagebox.askyesno(
+            "Checksum Verification Available",
+            f"A checksum metadata file was found:\n{os.path.basename(checksum_path)}\n\n"
+            "Would you like to verify the database integrity before loading?",
+            parent=root
+        )
+        
+        if verify:
+            success, message = verify_checksum_from_metadata(file_path, checksum_path)
+            if success:
+                messagebox.showinfo("Verification Success", message, parent=root)
+            else:
+                messagebox.showerror("Verification Failed", 
+                    f"{message}\n\nThe database may have been modified or corrupted.\n"
+                    "Loading is not recommended!",
+                    parent=root)
+                
+                # Ask if user wants to continue anyway
+                continue_anyway = messagebox.askyesno(
+                    "Continue Anyway?",
+                    "Do you want to load the database despite the failed verification?",
+                    parent=root
+                )
+                
+                if not continue_anyway:
+                    root.destroy()
+                    return None
+    else:
+        # No checksum file found automatically, ask if user wants to select one manually
+        select_checksum = messagebox.askyesno(
+            "No Checksum Found",
+            "No checksum metadata file was found automatically.\n\n"
+            "Would you like to select a checksum file manually for verification?",
+            parent=root
+        )
+        
+        if select_checksum:
+            # Let user select checksum file
+            checksum_dir = os.path.dirname(file_path)
+            manual_checksum_path = filedialog.askopenfilename(
+                title="Select Checksum Metadata File",
+                initialdir=checksum_dir,
+                filetypes=[("Checksum files", "*.sha256.json"), ("JSON files", "*.json"), ("All files", "*.*")],
+                parent=root
+            )
+            
+            if manual_checksum_path:
+                print("Verifying with selected checksum file...")
+                success, message = verify_checksum_from_metadata(file_path, manual_checksum_path)
+                if success:
+                    messagebox.showinfo("Verification Success", message, parent=root)
+                else:
+                    messagebox.showerror("Verification Failed", 
+                        f"{message}\n\nThe database may have been modified or corrupted.\n"
+                        "Loading is not recommended!",
+                        parent=root)
+                    
+                    # Ask if user wants to continue anyway
+                    continue_anyway = messagebox.askyesno(
+                        "Continue Anyway?",
+                        "Do you want to load the database despite the failed verification?",
+                        parent=root
+                    )
+                    
+                    if not continue_anyway:
+                        root.destroy()
+                        return None
+        else:
+            # User doesn't want to select a checksum file, ask if they want to create one
+            create = messagebox.askyesno(
+                "Create Checksum?",
+                "Would you like to create a new checksum metadata file for this database?\n\n"
+                "This will help verify the database integrity in the future.",
+                parent=root
+            )
+            
+            if create:
+                print("Calculating SHA-256 checksum...")
+                checksum = calculate_sha256_checksum(file_path)
+                if checksum:
+                    metadata = create_checksum_metadata(file_path, checksum)
+                    if metadata:
+                        saved_path = save_checksum_metadata(file_path, metadata)
+                        if saved_path:
+                            messagebox.showinfo(
+                                "Checksum Created",
+                                f"Checksum metadata saved to:\n{os.path.basename(saved_path)}",
+                                parent=root
+                            )
+                        else:
+                            messagebox.showwarning("Warning", "Failed to save checksum metadata", parent=root)
     
     root.destroy()
     return file_path
@@ -110,10 +285,23 @@ def load_wifi_data(db_path):
             cursor.execute("PRAGMA table_info(device_data)")
             device_columns = [col[1] for col in cursor.fetchall()]
             has_movement_tracking = 'last_seen_latitude' in device_columns
+            has_new_fields = 'capabilities' in device_columns
 
             # Only load Bluetooth data from device_data (WiFi is in wifi_data)
             # Load all Bluetooth devices (including Unknown Device for "Bluetooth" filter)
-            if has_movement_tracking:
+            if has_movement_tracking and has_new_fields:
+                query = """
+                SELECT device_name, device_address, device_type, signal_strength, 
+                       encryption_info, latitude, longitude, timestamp, frequency, 
+                       channel, wifi_standard, vendor_info, channel_width, max_connection_speed,
+                       capabilities, center_freq0, center_freq1, 
+                       is_passpoint_network, operator_friendly_name, venue_name,
+                       last_seen_latitude, last_seen_longitude, last_seen_timestamp, movement_distance
+                FROM device_data 
+                WHERE latitude != 0 AND longitude != 0 AND device_type = 'BLUETOOTH'
+                ORDER BY device_type, signal_strength DESC
+                """
+            elif has_movement_tracking:
                 query = """
                 SELECT device_name, device_address, device_type, signal_strength, 
                        encryption_info, latitude, longitude, timestamp, frequency, 
@@ -138,7 +326,42 @@ def load_wifi_data(db_path):
 
             # Convert to extended format
             for row in device_data:
-                if has_movement_tracking and len(row) >= 18:  # New structure with movement tracking
+                if has_movement_tracking and has_new_fields and len(row) >= 24:  # New structure with all new fields
+                    device_name, device_address, device_type, signal_strength, encryption_info, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed, capabilities, center_freq0, center_freq1, is_passpoint_network, operator_friendly_name, venue_name, last_seen_lat, last_seen_lon, last_seen_timestamp, movement_distance = row
+                    # Use vendor info from DB, if not available derive from MAC
+                    if not vendor_info or vendor_info == "Unknown":
+                        vendor_info = get_vendor_from_oui(device_address)
+                    
+                    all_data.append({
+                        'name': device_name,
+                        'address': device_address,
+                        'type': device_type,
+                        'signal': signal_strength,
+                        'encryption': encryption_info,
+                        'lat': lat,
+                        'lon': lon,
+                        'timestamp': timestamp,
+                        'frequency': frequency,
+                        'channel': channel,
+                        'standard': wifi_standard,
+                        'vendor': vendor_info,
+                        'channel_width': channel_width,
+                        'max_speed': max_speed,
+                        'capabilities': capabilities,
+                        'center_freq0': center_freq0,
+                        'center_freq1': center_freq1,
+                        'is_passpoint': is_passpoint_network,
+                        'operator_name': operator_friendly_name,
+                        'venue_name': venue_name,
+                        'last_seen_lat': last_seen_lat,
+                        'last_seen_lon': last_seen_lon,
+                        'last_seen_timestamp': last_seen_timestamp,
+                        'movement_distance': movement_distance,
+                        'source_table': 'device_data'
+                    })
+                elif has_movement_tracking and len(row) >= 18:  # Structure with movement tracking
+                    device_name, device_address, device_type, signal_strength, encryption_info, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed, last_seen_lat, last_seen_lon, last_seen_timestamp, movement_distance = row
+                elif has_movement_tracking and len(row) >= 18:  # Structure with movement tracking
                     device_name, device_address, device_type, signal_strength, encryption_info, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed, last_seen_lat, last_seen_lon, last_seen_timestamp, movement_distance = row
                     # Use vendor info from DB, if not available derive from MAC
                     if not vendor_info or vendor_info == "Unknown":
@@ -159,6 +382,12 @@ def load_wifi_data(db_path):
                         'vendor': vendor_info,
                         'channel_width': channel_width,
                         'max_speed': max_speed,
+                        'capabilities': None,
+                        'center_freq0': None,
+                        'center_freq1': None,
+                        'is_passpoint': None,
+                        'operator_name': None,
+                        'venue_name': None,
                         'last_seen_lat': last_seen_lat,
                         'last_seen_lon': last_seen_lon,
                         'last_seen_timestamp': last_seen_timestamp,
@@ -186,6 +415,12 @@ def load_wifi_data(db_path):
                         'vendor': vendor_info,
                         'channel_width': channel_width,
                         'max_speed': max_speed,
+                        'capabilities': None,
+                        'center_freq0': None,
+                        'center_freq1': None,
+                        'is_passpoint': None,
+                        'operator_name': None,
+                        'venue_name': None,
                         'last_seen_lat': None,
                         'last_seen_lon': None,
                         'last_seen_timestamp': None,
@@ -211,6 +446,12 @@ def load_wifi_data(db_path):
                         'vendor': vendor_info,
                         'channel_width': None,
                         'max_speed': None,
+                        'capabilities': None,
+                        'center_freq0': None,
+                        'center_freq1': None,
+                        'is_passpoint': None,
+                        'operator_name': None,
+                        'venue_name': None,
                         'last_seen_lat': None,
                         'last_seen_lon': None,
                         'last_seen_timestamp': None,
@@ -228,8 +469,19 @@ def load_wifi_data(db_path):
             cursor.execute("PRAGMA table_info(wifi_data)")
             columns = [column[1] for column in cursor.fetchall()]
             has_extended_fields = 'frequency' in columns
+            has_new_fields = 'capabilities' in columns
             
-            if has_extended_fields:
+            if has_extended_fields and has_new_fields:
+                query = """
+                SELECT ssid, bssid, signal_strength, encryption, 
+                       latitude, longitude, timestamp, frequency, channel, 
+                       wifi_standard, vendor_info, channel_width, max_connection_speed,
+                       capabilities, center_freq0, center_freq1
+                FROM wifi_data 
+                WHERE latitude != 0 AND longitude != 0
+                ORDER BY signal_strength DESC
+                """
+            elif has_extended_fields:
                 query = """
                 SELECT ssid, bssid, signal_strength, encryption, 
                        latitude, longitude, timestamp, frequency, channel, 
@@ -252,32 +504,102 @@ def load_wifi_data(db_path):
 
             # Convert WiFi data
             for row in wifi_data:
-                if has_extended_fields and len(row) >= 13:
+                if has_extended_fields and has_new_fields and len(row) >= 16:
+                    ssid, bssid, signal_strength, encryption, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed, capabilities, center_freq0, center_freq1 = row[:16]
+                    if not vendor_info or vendor_info == "Unknown":
+                        vendor_info = get_vendor_from_oui(bssid)
+                    
+                    all_data.append({
+                        'name': ssid,
+                        'address': bssid,
+                        'type': 'WIFI',
+                        'signal': signal_strength,
+                        'encryption': encryption,
+                        'lat': lat,
+                        'lon': lon,
+                        'timestamp': timestamp,
+                        'frequency': frequency,
+                        'channel': channel,
+                        'standard': wifi_standard,
+                        'vendor': vendor_info,
+                        'channel_width': channel_width,
+                        'max_speed': max_speed,
+                        'capabilities': capabilities,
+                        'center_freq0': center_freq0,
+                        'center_freq1': center_freq1,
+                        'is_passpoint': None,
+                        'operator_name': None,
+                        'venue_name': None,
+                        'last_seen_lat': None,
+                        'last_seen_lon': None,
+                        'last_seen_timestamp': None,
+                        'movement_distance': None,
+                        'source_table': 'wifi_data'
+                    })
+                elif has_extended_fields and len(row) >= 13:
                     ssid, bssid, signal_strength, encryption, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed = row[:13]
                     if not vendor_info or vendor_info == "Unknown":
                         vendor_info = get_vendor_from_oui(bssid)
+                    
+                    all_data.append({
+                        'name': ssid,
+                        'address': bssid,
+                        'type': 'WIFI',
+                        'signal': signal_strength,
+                        'encryption': encryption,
+                        'lat': lat,
+                        'lon': lon,
+                        'timestamp': timestamp,
+                        'frequency': frequency,
+                        'channel': channel,
+                        'standard': wifi_standard,
+                        'vendor': vendor_info,
+                        'channel_width': channel_width,
+                        'max_speed': max_speed,
+                        'capabilities': None,
+                        'center_freq0': None,
+                        'center_freq1': None,
+                        'is_passpoint': None,
+                        'operator_name': None,
+                        'venue_name': None,
+                        'last_seen_lat': None,
+                        'last_seen_lon': None,
+                        'last_seen_timestamp': None,
+                        'movement_distance': None,
+                        'source_table': 'wifi_data'
+                    })
                 else:
                     ssid, bssid, signal_strength, encryption, lat, lon, timestamp = row[:7]
                     frequency = channel = wifi_standard = channel_width = max_speed = None
                     vendor_info = get_vendor_from_oui(bssid)
-                
-                all_data.append({
-                    'name': ssid,
-                    'address': bssid,
-                    'type': 'WIFI',
-                    'signal': signal_strength,
-                    'encryption': encryption,
-                    'lat': lat,
-                    'lon': lon,
-                    'timestamp': timestamp,
-                    'frequency': frequency,
-                    'channel': channel,
-                    'standard': wifi_standard,
-                    'vendor': vendor_info,
-                    'channel_width': channel_width,
-                    'max_speed': max_speed,
-                    'source_table': 'wifi_data'
-                })
+                    
+                    all_data.append({
+                        'name': ssid,
+                        'address': bssid,
+                        'type': 'WIFI',
+                        'signal': signal_strength,
+                        'encryption': encryption,
+                        'lat': lat,
+                        'lon': lon,
+                        'timestamp': timestamp,
+                        'frequency': frequency,
+                        'channel': channel,
+                        'standard': wifi_standard,
+                        'vendor': vendor_info,
+                        'channel_width': channel_width,
+                        'max_speed': max_speed,
+                        'capabilities': None,
+                        'center_freq0': None,
+                        'center_freq1': None,
+                        'is_passpoint': None,
+                        'operator_name': None,
+                        'venue_name': None,
+                        'last_seen_lat': None,
+                        'last_seen_lon': None,
+                        'last_seen_timestamp': None,
+                        'movement_distance': None,
+                        'source_table': 'wifi_data'
+                    })
 
         conn.close()
 

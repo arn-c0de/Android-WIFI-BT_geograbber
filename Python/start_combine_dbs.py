@@ -4,6 +4,8 @@ from tkinter import filedialog, messagebox, ttk
 import os
 import shutil
 import math
+import hashlib
+import json
 from datetime import datetime
 
 class DatabaseCombiner:
@@ -185,6 +187,74 @@ class DatabaseCombiner:
         )
 
         if file_path:
+            # Check if checksum metadata file exists in same directory
+            checksum_path = file_path + ".sha256.json"
+            if os.path.exists(checksum_path):
+                # Ask user if they want to verify with the found checksum file
+                verify = messagebox.askyesno(
+                    "Checksum Verification Available",
+                    f"A checksum metadata file was found:\n{os.path.basename(checksum_path)}\n\n"
+                    "Would you like to verify the database integrity?"
+                )
+                
+                if verify:
+                    self.log("Verifying checksum...")
+                    success, message = self.verify_checksum_from_metadata(file_path, checksum_path)
+                    if success:
+                        self.log(message)
+                        messagebox.showinfo("Verification Success", message)
+                    else:
+                        self.log(f"VERIFICATION FAILED: {message}")
+                        messagebox.showerror("Verification Failed", 
+                            f"{message}\n\nThe database may have been modified or corrupted.\n"
+                            "Using this database is not recommended!")
+                        
+                        # Ask if user wants to continue anyway
+                        continue_anyway = messagebox.askyesno(
+                            "Continue Anyway?",
+                            "Do you want to use this database despite the failed verification?"
+                        )
+                        
+                        if not continue_anyway:
+                            return
+            else:
+                # No checksum file found automatically, ask if user wants to select one manually
+                select_checksum = messagebox.askyesno(
+                    "No Checksum Found",
+                    "No checksum metadata file was found automatically.\n\n"
+                    "Would you like to select a checksum file manually for verification?"
+                )
+                
+                if select_checksum:
+                    # Let user select checksum file
+                    checksum_dir = os.path.dirname(file_path)
+                    manual_checksum_path = filedialog.askopenfilename(
+                        title="Select Checksum Metadata File",
+                        initialdir=checksum_dir,
+                        filetypes=[("Checksum files", "*.sha256.json"), ("JSON files", "*.json"), ("All files", "*.*")]
+                    )
+                    
+                    if manual_checksum_path:
+                        self.log(f"Verifying with selected checksum file: {os.path.basename(manual_checksum_path)}")
+                        success, message = self.verify_checksum_from_metadata(file_path, manual_checksum_path)
+                        if success:
+                            self.log(message)
+                            messagebox.showinfo("Verification Success", message)
+                        else:
+                            self.log(f"VERIFICATION FAILED: {message}")
+                            messagebox.showerror("Verification Failed", 
+                                f"{message}\n\nThe database may have been modified or corrupted.\n"
+                                "Using this database is not recommended!")
+                            
+                            # Ask if user wants to continue anyway
+                            continue_anyway = messagebox.askyesno(
+                                "Continue Anyway?",
+                                "Do you want to use this database despite the failed verification?"
+                            )
+                            
+                            if not continue_anyway:
+                                return
+            
             self.main_db_path = file_path
             self.main_db_var.set(file_path)
             self.log(f"Main DB selected: {os.path.basename(file_path)}")
@@ -199,12 +269,84 @@ class DatabaseCombiner:
         )
 
         for file_path in file_paths:
-            if file_path not in self.source_db_paths and file_path != self.main_db_path:
-                self.source_db_paths.append(file_path)
-                self.source_listbox.insert(tk.END, file_path)
-                self.log(f"Source DB added: {os.path.basename(file_path)}")
-            elif file_path == self.main_db_path:
+            if file_path == self.main_db_path:
                 messagebox.showwarning("Warning", "The Main DB cannot be used as a Source DB!")
+                continue
+                
+            if file_path in self.source_db_paths:
+                continue
+            
+            # Check if checksum metadata file exists in same directory
+            checksum_path = file_path + ".sha256.json"
+            if os.path.exists(checksum_path):
+                # Ask user if they want to verify with the found checksum file
+                verify = messagebox.askyesno(
+                    "Checksum Verification Available",
+                    f"A checksum metadata file was found for:\n{os.path.basename(file_path)}\n\n"
+                    "Would you like to verify the database integrity?"
+                )
+                
+                if verify:
+                    self.log(f"Verifying checksum for {os.path.basename(file_path)}...")
+                    success, message = self.verify_checksum_from_metadata(file_path, checksum_path)
+                    if success:
+                        self.log(message)
+                    else:
+                        self.log(f"VERIFICATION FAILED: {message}")
+                        messagebox.showerror("Verification Failed", 
+                            f"{message}\n\nFile: {os.path.basename(file_path)}\n\n"
+                            "The database may have been modified or corrupted.\n"
+                            "Using this database is not recommended!")
+                        
+                        # Ask if user wants to continue anyway
+                        continue_anyway = messagebox.askyesno(
+                            "Continue Anyway?",
+                            "Do you want to add this database despite the failed verification?"
+                        )
+                        
+                        if not continue_anyway:
+                            continue
+            else:
+                # No checksum file found automatically, ask if user wants to select one manually
+                select_checksum = messagebox.askyesno(
+                    "No Checksum Found",
+                    f"No checksum metadata file was found for:\n{os.path.basename(file_path)}\n\n"
+                    "Would you like to select a checksum file manually for verification?"
+                )
+                
+                if select_checksum:
+                    # Let user select checksum file
+                    checksum_dir = os.path.dirname(file_path)
+                    manual_checksum_path = filedialog.askopenfilename(
+                        title=f"Select Checksum Metadata File for {os.path.basename(file_path)}",
+                        initialdir=checksum_dir,
+                        filetypes=[("Checksum files", "*.sha256.json"), ("JSON files", "*.json"), ("All files", "*.*")]
+                    )
+                    
+                    if manual_checksum_path:
+                        self.log(f"Verifying {os.path.basename(file_path)} with selected checksum file...")
+                        success, message = self.verify_checksum_from_metadata(file_path, manual_checksum_path)
+                        if success:
+                            self.log(message)
+                        else:
+                            self.log(f"VERIFICATION FAILED: {message}")
+                            messagebox.showerror("Verification Failed", 
+                                f"{message}\n\nFile: {os.path.basename(file_path)}\n\n"
+                                "The database may have been modified or corrupted.\n"
+                                "Using this database is not recommended!")
+                            
+                            # Ask if user wants to continue anyway
+                            continue_anyway = messagebox.askyesno(
+                                "Continue Anyway?",
+                                "Do you want to add this database despite the failed verification?"
+                            )
+                            
+                            if not continue_anyway:
+                                continue
+            
+            self.source_db_paths.append(file_path)
+            self.source_listbox.insert(tk.END, file_path)
+            self.log(f"Source DB added: {os.path.basename(file_path)}")
     
     def remove_source_db(self):
         """Removes selected Source Database"""
@@ -220,6 +362,80 @@ class DatabaseCombiner:
         self.source_db_paths.clear()
         self.source_listbox.delete(0, tk.END)
         self.log("All Source DBs removed")
+    
+    def calculate_sha256_checksum(self, file_path):
+        """Calculates SHA-256 checksum for a file"""
+        sha256_hash = hashlib.sha256()
+        try:
+            with open(file_path, "rb") as f:
+                # Read file in chunks to handle large files
+                for byte_block in iter(lambda: f.read(4096), b""):
+                    sha256_hash.update(byte_block)
+            return sha256_hash.hexdigest()
+        except Exception as e:
+            self.log(f"Error calculating checksum: {e}")
+            return None
+
+    def create_checksum_metadata(self, file_path, checksum):
+        """Creates a checksum metadata JSON file"""
+        try:
+            file_size = os.path.getsize(file_path)
+            filename = os.path.basename(file_path)
+            
+            metadata = {
+                "version": "1.0",
+                "algorithm": "SHA-256",
+                "filename": filename,
+                "checksum": checksum,
+                "fileSize": file_size,
+                "timestamp": int(os.path.getmtime(file_path) * 1000),
+                "exportedBy": "WiFi GeoGrabber Python Database Combiner"
+            }
+            
+            return metadata
+        except Exception as e:
+            self.log(f"Error creating metadata: {e}")
+            return None
+
+    def save_checksum_metadata(self, db_path, metadata):
+        """Saves checksum metadata to a .sha256.json file"""
+        try:
+            checksum_path = db_path + ".sha256.json"
+            with open(checksum_path, 'w') as f:
+                json.dump(metadata, f, indent=2)
+            return checksum_path
+        except Exception as e:
+            self.log(f"Error saving metadata: {e}")
+            return None
+
+    def verify_checksum_from_metadata(self, db_path, metadata_path):
+        """Verifies database file using checksum metadata"""
+        try:
+            # Read metadata
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+            
+            # Verify algorithm
+            if metadata.get("algorithm") != "SHA-256":
+                return False, f"Unsupported algorithm: {metadata.get('algorithm')}"
+            
+            # Verify file size
+            actual_size = os.path.getsize(db_path)
+            expected_size = metadata.get("fileSize")
+            if actual_size != expected_size:
+                return False, f"File size mismatch: expected {expected_size} bytes, got {actual_size} bytes"
+            
+            # Calculate and verify checksum
+            actual_checksum = self.calculate_sha256_checksum(db_path)
+            expected_checksum = metadata.get("checksum")
+            
+            if actual_checksum != expected_checksum:
+                return False, "Checksum verification failed! File may have been modified or corrupted."
+            
+            return True, "Checksum verification successful!"
+            
+        except Exception as e:
+            return False, f"Error during verification: {str(e)}"
     
     def get_table_info(self, db_path):
         """Gets information about the tables in the database"""
@@ -309,21 +525,57 @@ class DatabaseCombiner:
             # Load from device_data table - ONLY BLUETOOTH, since WiFi is in wifi_data
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='device_data'")
             if cursor.fetchone():
-                cursor.execute("""
-                    SELECT device_name, device_address, device_type, signal_strength, 
-                           encryption_info, latitude, longitude, timestamp, frequency, 
-                           channel, wifi_standard, vendor_info, channel_width, max_connection_speed
-                    FROM device_data 
-                    WHERE latitude != 0 AND longitude != 0 AND device_type = 'BLUETOOTH'
-                """)
+                # Check available columns
+                cursor.execute("PRAGMA table_info(device_data)")
+                device_columns = [col[1] for col in cursor.fetchall()]
+                has_new_fields = 'capabilities' in device_columns
+                has_movement = 'last_seen_latitude' in device_columns
+                
+                if has_new_fields and has_movement:
+                    cursor.execute("""
+                        SELECT device_name, device_address, device_type, signal_strength, 
+                               encryption_info, latitude, longitude, timestamp, frequency, 
+                               channel, wifi_standard, vendor_info, channel_width, max_connection_speed,
+                               capabilities, center_freq0, center_freq1, 
+                               is_passpoint_network, operator_friendly_name, venue_name,
+                               last_seen_latitude, last_seen_longitude, last_seen_timestamp, movement_distance
+                        FROM device_data 
+                        WHERE latitude != 0 AND longitude != 0 AND device_type = 'BLUETOOTH'
+                    """)
+                elif has_movement:
+                    cursor.execute("""
+                        SELECT device_name, device_address, device_type, signal_strength, 
+                               encryption_info, latitude, longitude, timestamp, frequency, 
+                               channel, wifi_standard, vendor_info, channel_width, max_connection_speed,
+                               last_seen_latitude, last_seen_longitude, last_seen_timestamp, movement_distance
+                        FROM device_data 
+                        WHERE latitude != 0 AND longitude != 0 AND device_type = 'BLUETOOTH'
+                    """)
+                else:
+                    cursor.execute("""
+                        SELECT device_name, device_address, device_type, signal_strength, 
+                               encryption_info, latitude, longitude, timestamp, frequency, 
+                               channel, wifi_standard, vendor_info, channel_width, max_connection_speed
+                        FROM device_data 
+                        WHERE latitude != 0 AND longitude != 0 AND device_type = 'BLUETOOTH'
+                    """)
                 
                 for row in cursor.fetchall():
                     # Handle different number of columns
-                    if len(row) >= 14:
+                    if has_new_fields and has_movement and len(row) >= 24:
+                        device_name, device_address, device_type, signal_strength, encryption_info, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed, capabilities, center_freq0, center_freq1, is_passpoint_network, operator_friendly_name, venue_name, last_seen_lat, last_seen_lon, last_seen_timestamp, movement_distance = row
+                    elif has_movement and len(row) >= 18:
+                        device_name, device_address, device_type, signal_strength, encryption_info, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed, last_seen_lat, last_seen_lon, last_seen_timestamp, movement_distance = row
+                        capabilities = center_freq0 = center_freq1 = is_passpoint_network = operator_friendly_name = venue_name = None
+                    elif len(row) >= 14:
                         device_name, device_address, device_type, signal_strength, encryption_info, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed = row
+                        capabilities = center_freq0 = center_freq1 = is_passpoint_network = operator_friendly_name = venue_name = None
+                        last_seen_lat = last_seen_lon = last_seen_timestamp = movement_distance = None
                     else:
                         device_name, device_address, device_type, signal_strength, encryption_info, lat, lon, timestamp = row[:8]
                         frequency = channel = wifi_standard = vendor_info = channel_width = max_speed = None
+                        capabilities = center_freq0 = center_freq1 = is_passpoint_network = operator_friendly_name = venue_name = None
+                        last_seen_lat = last_seen_lon = last_seen_timestamp = movement_distance = None
                     
                     devices.append({
                         'source': 'device_data',
@@ -341,6 +593,16 @@ class DatabaseCombiner:
                         'vendor': vendor_info,
                         'channel_width': channel_width,
                         'max_speed': max_speed,
+                        'capabilities': capabilities,
+                        'center_freq0': center_freq0,
+                        'center_freq1': center_freq1,
+                        'is_passpoint': is_passpoint_network,
+                        'operator_name': operator_friendly_name,
+                        'venue_name': venue_name,
+                        'last_seen_lat': last_seen_lat,
+                        'last_seen_lon': last_seen_lon,
+                        'last_seen_timestamp': last_seen_timestamp,
+                        'movement_distance': movement_distance,
                         'db_source': os.path.basename(db_path)
                     })
 
@@ -351,8 +613,18 @@ class DatabaseCombiner:
                 cursor.execute("PRAGMA table_info(wifi_data)")
                 columns = [column[1] for column in cursor.fetchall()]
                 has_extended = 'frequency' in columns
+                has_new_fields = 'capabilities' in columns
                 
-                if has_extended:
+                if has_extended and has_new_fields:
+                    cursor.execute("""
+                        SELECT ssid, bssid, signal_strength, encryption, 
+                               latitude, longitude, timestamp, frequency, channel, 
+                               wifi_standard, vendor_info, channel_width, max_connection_speed,
+                               capabilities, center_freq0, center_freq1
+                        FROM wifi_data 
+                        WHERE latitude != 0 AND longitude != 0
+                    """)
+                elif has_extended:
                     cursor.execute("""
                         SELECT ssid, bssid, signal_strength, encryption, 
                                latitude, longitude, timestamp, frequency, channel, 
@@ -369,11 +641,15 @@ class DatabaseCombiner:
                     """)
                 
                 for row in cursor.fetchall():
-                    if has_extended and len(row) >= 13:
+                    if has_extended and has_new_fields and len(row) >= 16:
+                        ssid, bssid, signal_strength, encryption, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed, capabilities, center_freq0, center_freq1 = row[:16]
+                    elif has_extended and len(row) >= 13:
                         ssid, bssid, signal_strength, encryption, lat, lon, timestamp, frequency, channel, wifi_standard, vendor_info, channel_width, max_speed = row[:13]
+                        capabilities = center_freq0 = center_freq1 = None
                     else:
                         ssid, bssid, signal_strength, encryption, lat, lon, timestamp = row[:7]
                         frequency = channel = wifi_standard = vendor_info = channel_width = max_speed = None
+                        capabilities = center_freq0 = center_freq1 = None
                     
                     devices.append({
                         'source': 'wifi_data',
@@ -391,6 +667,9 @@ class DatabaseCombiner:
                         'vendor': vendor_info,
                         'channel_width': channel_width,
                         'max_speed': max_speed,
+                        'capabilities': capabilities,
+                        'center_freq0': center_freq0,
+                        'center_freq1': center_freq1,
                         'db_source': os.path.basename(db_path)
                     })
             
@@ -512,22 +791,28 @@ class DatabaseCombiner:
                     INSERT INTO device_data 
                     (device_name, device_address, device_type, signal_strength, encryption_info,
                      latitude, longitude, timestamp, frequency, channel, wifi_standard, 
-                     vendor_info, channel_width, max_connection_speed)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     vendor_info, channel_width, max_connection_speed,
+                     capabilities, center_freq0, center_freq1, 
+                     is_passpoint_network, operator_friendly_name, venue_name)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (device['name'], device['address'], device['type'], device['signal'],
                       device['encryption'], device['lat'], device['lon'], device['timestamp'],
                       device['frequency'], device['channel'], device['standard'],
-                      device['vendor'], device['channel_width'], device['max_speed']))
+                      device['vendor'], device['channel_width'], device['max_speed'],
+                      device.get('capabilities'), device.get('center_freq0'), device.get('center_freq1'),
+                      device.get('is_passpoint'), device.get('operator_name'), device.get('venue_name')))
             elif device['source'] == 'wifi_data':
                 cursor.execute("""
                     INSERT INTO wifi_data 
                     (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp,
-                     frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed,
+                     capabilities, center_freq0, center_freq1)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (device['name'], device['address'], device['signal'], device['encryption'],
                       device['lat'], device['lon'], device['timestamp'], device['frequency'],
                       device['channel'], device['standard'], device['vendor'],
-                      device['channel_width'], device['max_speed']))
+                      device['channel_width'], device['max_speed'],
+                      device.get('capabilities'), device.get('center_freq0'), device.get('center_freq1')))
             
             return 'added'
     
@@ -658,6 +943,26 @@ class DatabaseCombiner:
             if total_movements > 0:
                 self.log(f"Device movements detected: {total_movements}")
 
+            # Ask user if they want to create/update checksum
+            create_checksum = messagebox.askyesno(
+                "Create Checksum?",
+                "Would you like to create/update a SHA-256 checksum for the merged database?\n\n"
+                "This will help verify the database integrity in the future."
+            )
+            
+            if create_checksum:
+                self.log("Calculating SHA-256 checksum...")
+                self.status_var.set("Creating checksum...")
+                checksum = self.calculate_sha256_checksum(self.main_db_path)
+                if checksum:
+                    metadata = self.create_checksum_metadata(self.main_db_path, checksum)
+                    if metadata:
+                        saved_path = self.save_checksum_metadata(self.main_db_path, metadata)
+                        if saved_path:
+                            self.log(f"Checksum saved: {os.path.basename(saved_path)}")
+                            messagebox.showinfo("Checksum Created", 
+                                f"Checksum metadata saved to:\n{os.path.basename(saved_path)}")
+
             messagebox.showinfo("Success",
                 f"Merge completed!\n\n"
                 f"Newly added: {stats['added']}\n"
@@ -728,6 +1033,23 @@ class DatabaseCombiner:
             self.log("=== CLEANING COMPLETED ===")
             self.log(f"WiFi duplicates removed: {wifi_duplicates_removed}")
             self.log(f"Bluetooth duplicates removed: {bluetooth_duplicates_removed}")
+
+            # Ask user if they want to create/update checksum
+            create_checksum = messagebox.askyesno(
+                "Create Checksum?",
+                "Would you like to create/update a SHA-256 checksum for the cleaned database?\n\n"
+                "This will help verify the database integrity in the future."
+            )
+            
+            if create_checksum:
+                self.log("Calculating SHA-256 checksum...")
+                checksum = self.calculate_sha256_checksum(self.main_db_path)
+                if checksum:
+                    metadata = self.create_checksum_metadata(self.main_db_path, checksum)
+                    if metadata:
+                        saved_path = self.save_checksum_metadata(self.main_db_path, metadata)
+                        if saved_path:
+                            self.log(f"Checksum saved: {os.path.basename(saved_path)}")
 
             messagebox.showinfo("Success",
                 f"Database cleaned!\n\n"
@@ -815,6 +1137,23 @@ class DatabaseCombiner:
             self.log(f"Columns added: {repair_stats['columns_added']}")
             self.log(f"Tables analyzed: {repair_stats['tables_analyzed']}")
 
+            # Ask user if they want to create/update checksum
+            create_checksum = messagebox.askyesno(
+                "Create Checksum?",
+                "Would you like to create/update a SHA-256 checksum for the repaired database?\n\n"
+                "This will help verify the database integrity in the future."
+            )
+            
+            if create_checksum:
+                self.log("Calculating SHA-256 checksum...")
+                checksum = self.calculate_sha256_checksum(self.main_db_path)
+                if checksum:
+                    metadata = self.create_checksum_metadata(self.main_db_path, checksum)
+                    if metadata:
+                        saved_path = self.save_checksum_metadata(self.main_db_path, metadata)
+                        if saved_path:
+                            self.log(f"Checksum saved: {os.path.basename(saved_path)}")
+
             messagebox.showinfo("Success",
                 f"Database repair completed!\n\n"
                 f"Tables created: {repair_stats['tables_created']}\n"
@@ -860,8 +1199,11 @@ class DatabaseCombiner:
             'channel': 'INTEGER',
             'wifi_standard': 'TEXT',
             'vendor_info': 'TEXT',
-            'channel_width': 'INTEGER',
-            'max_connection_speed': 'INTEGER'
+            'channel_width': 'TEXT',
+            'max_connection_speed': 'INTEGER',
+            'capabilities': 'TEXT',
+            'center_freq0': 'INTEGER',
+            'center_freq1': 'INTEGER'
         }
 
         # Standard columns for device_data
@@ -870,8 +1212,14 @@ class DatabaseCombiner:
             'channel': 'INTEGER',
             'wifi_standard': 'TEXT',
             'vendor_info': 'TEXT',
-            'channel_width': 'INTEGER',
-            'max_connection_speed': 'INTEGER'
+            'channel_width': 'TEXT',
+            'max_connection_speed': 'INTEGER',
+            'capabilities': 'TEXT',
+            'center_freq0': 'INTEGER',
+            'center_freq1': 'INTEGER',
+            'is_passpoint_network': 'INTEGER',
+            'operator_friendly_name': 'TEXT',
+            'venue_name': 'TEXT'
         }
 
         # Repair wifi_data
@@ -944,19 +1292,18 @@ class DatabaseCombiner:
                 bssid TEXT NOT NULL,
                 signal_strength INTEGER,
                 encryption TEXT,
+                frequency INTEGER,
+                channel INTEGER,
+                capabilities TEXT,
+                wifi_standard TEXT,
+                vendor_info TEXT,
+                channel_width TEXT,
+                center_freq0 INTEGER,
+                center_freq1 INTEGER,
+                max_connection_speed INTEGER,
                 latitude REAL NOT NULL,
                 longitude REAL NOT NULL,
                 timestamp INTEGER,
-                frequency INTEGER,
-                channel INTEGER,
-                wifi_standard TEXT,
-                vendor_info TEXT,
-                channel_width INTEGER,
-                max_connection_speed INTEGER,
-                last_seen_latitude REAL,
-                last_seen_longitude REAL,
-                last_seen_timestamp INTEGER,
-                movement_distance REAL,
                 UNIQUE(bssid)
             )
         """)
@@ -970,15 +1317,21 @@ class DatabaseCombiner:
                 device_type TEXT NOT NULL,
                 signal_strength INTEGER,
                 encryption_info TEXT,
+                frequency INTEGER,
+                channel INTEGER,
+                channel_width TEXT,
+                capabilities TEXT,
+                center_freq0 INTEGER,
+                center_freq1 INTEGER,
+                wifi_standard TEXT,
+                vendor_info TEXT,
+                is_passpoint_network INTEGER,
+                operator_friendly_name TEXT,
+                venue_name TEXT,
+                max_connection_speed INTEGER,
                 latitude REAL NOT NULL,
                 longitude REAL NOT NULL,
                 timestamp INTEGER,
-                frequency INTEGER,
-                channel INTEGER,
-                wifi_standard TEXT,
-                vendor_info TEXT,
-                channel_width INTEGER,
-                max_connection_speed INTEGER,
                 last_seen_latitude REAL,
                 last_seen_longitude REAL,
                 last_seen_timestamp INTEGER,
@@ -997,41 +1350,40 @@ class DatabaseCombiner:
             cursor.execute("PRAGMA table_info(wifi_data)")
             wifi_columns = [col[1] for col in cursor.fetchall()]
 
-            if 'last_seen_latitude' not in wifi_columns:
-                cursor.execute("ALTER TABLE wifi_data ADD COLUMN last_seen_latitude REAL")
-                self.log("Column 'last_seen_latitude' added to wifi_data")
+            # New columns for wifi_data
+            wifi_new_columns = {
+                'capabilities': 'TEXT',
+                'center_freq0': 'INTEGER',
+                'center_freq1': 'INTEGER'
+            }
 
-            if 'last_seen_longitude' not in wifi_columns:
-                cursor.execute("ALTER TABLE wifi_data ADD COLUMN last_seen_longitude REAL")
-                self.log("Column 'last_seen_longitude' added to wifi_data")
-
-            if 'last_seen_timestamp' not in wifi_columns:
-                cursor.execute("ALTER TABLE wifi_data ADD COLUMN last_seen_timestamp INTEGER")
-                self.log("Column 'last_seen_timestamp' added to wifi_data")
-
-            if 'movement_distance' not in wifi_columns:
-                cursor.execute("ALTER TABLE wifi_data ADD COLUMN movement_distance REAL")
-                self.log("Column 'movement_distance' added to wifi_data")
+            for col_name, col_type in wifi_new_columns.items():
+                if col_name not in wifi_columns:
+                    cursor.execute(f"ALTER TABLE wifi_data ADD COLUMN {col_name} {col_type}")
+                    self.log(f"Column '{col_name}' added to wifi_data")
 
             # Check device_data table
             cursor.execute("PRAGMA table_info(device_data)")
             device_columns = [col[1] for col in cursor.fetchall()]
 
-            if 'last_seen_latitude' not in device_columns:
-                cursor.execute("ALTER TABLE device_data ADD COLUMN last_seen_latitude REAL")
-                self.log("Column 'last_seen_latitude' added to device_data")
+            # New columns for device_data
+            device_new_columns = {
+                'capabilities': 'TEXT',
+                'center_freq0': 'INTEGER',
+                'center_freq1': 'INTEGER',
+                'is_passpoint_network': 'INTEGER',
+                'operator_friendly_name': 'TEXT',
+                'venue_name': 'TEXT',
+                'last_seen_latitude': 'REAL',
+                'last_seen_longitude': 'REAL',
+                'last_seen_timestamp': 'INTEGER',
+                'movement_distance': 'REAL'
+            }
 
-            if 'last_seen_longitude' not in device_columns:
-                cursor.execute("ALTER TABLE device_data ADD COLUMN last_seen_longitude REAL")
-                self.log("Column 'last_seen_longitude' added to device_data")
-
-            if 'last_seen_timestamp' not in device_columns:
-                cursor.execute("ALTER TABLE device_data ADD COLUMN last_seen_timestamp INTEGER")
-                self.log("Column 'last_seen_timestamp' added to device_data")
-
-            if 'movement_distance' not in device_columns:
-                cursor.execute("ALTER TABLE device_data ADD COLUMN movement_distance REAL")
-                self.log("Column 'movement_distance' added to device_data")
+            for col_name, col_type in device_new_columns.items():
+                if col_name not in device_columns:
+                    cursor.execute(f"ALTER TABLE device_data ADD COLUMN {col_name} {col_type}")
+                    self.log(f"Column '{col_name}' added to device_data")
 
         except Exception as e:
             self.log(f"Error adding movement tracking columns: {str(e)}")
@@ -1308,12 +1660,14 @@ class DatabaseCombiner:
                 cursor.execute("""
                     INSERT OR IGNORE INTO wifi_data
                     (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp,
-                     frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed,
+                     capabilities, center_freq0, center_freq1)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (wifi['ssid'], wifi['bssid'], wifi['signal_strength'], wifi['encryption'],
                       wifi['latitude'], wifi['longitude'], wifi['timestamp'], wifi['frequency'],
                       wifi['channel'], wifi['wifi_standard'], wifi['vendor_info'],
-                      wifi['channel_width'], wifi['max_connection_speed']))
+                      wifi['channel_width'], wifi['max_connection_speed'],
+                      wifi.get('capabilities'), wifi.get('center_freq0'), wifi.get('center_freq1')))
             except Exception as e:
                 self.log(f"Error inserting WiFi {wifi['bssid']}: {str(e)}")
 
@@ -1324,12 +1678,16 @@ class DatabaseCombiner:
                     INSERT OR IGNORE INTO device_data
                     (device_name, device_address, device_type, signal_strength, encryption_info,
                      latitude, longitude, timestamp, frequency, channel, wifi_standard,
-                     vendor_info, channel_width, max_connection_speed)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     vendor_info, channel_width, max_connection_speed,
+                     capabilities, center_freq0, center_freq1, 
+                     is_passpoint_network, operator_friendly_name, venue_name)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (bt['device_name'], bt['device_address'], bt['device_type'], bt['signal_strength'],
                       bt['encryption_info'], bt['latitude'], bt['longitude'], bt['timestamp'],
                       bt['frequency'], bt['channel'], bt['wifi_standard'], bt['vendor_info'],
-                      bt['channel_width'], bt['max_connection_speed']))
+                      bt['channel_width'], bt['max_connection_speed'],
+                      bt.get('capabilities'), bt.get('center_freq0'), bt.get('center_freq1'),
+                      bt.get('is_passpoint_network'), bt.get('operator_friendly_name'), bt.get('venue_name')))
             except Exception as e:
                 self.log(f"Error inserting Bluetooth {bt['device_address']}: {str(e)}")
     
