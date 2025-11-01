@@ -273,9 +273,10 @@ public class EncryptionManager {
      * Derive database key from passphrase using PBKDF2
      */
     private String deriveKey(char[] passphrase, byte[] salt) throws Exception {
-        // Use PBKDF2WithHmacSHA1 for key derivation, which is SQLCipher standard
-        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA1");
-        PBEKeySpec spec = new PBEKeySpec(passphrase, salt, 64000, 256); // SQLCipher uses 64000 iterations for PBKDF2
+        // Use PBKDF2WithHmacSHA256 for key derivation (stronger than SHA1)
+        // SQLCipher supports SHA256 and it's recommended for modern security
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+        PBEKeySpec spec = new PBEKeySpec(passphrase, salt, 64000, 256); // 64000 iterations, 256-bit key
         SecretKey secretKey = factory.generateSecret(spec);
         byte[] keyBytes = secretKey.getEncoded();
 
