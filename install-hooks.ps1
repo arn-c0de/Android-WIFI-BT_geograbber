@@ -52,6 +52,12 @@ if git diff --cached | grep -E "(api[_-]?key|secret|password|token)\s*=\s*['\"][
     fi
 fi
 
+# Check 3: Prevent committing database files
+if git diff --cached --name-only | grep -E "\.db$"; then
+    echo -e "${RED}❌ Error: Attempting to commit a database (.db) file!${NC}"
+    FAILED=1
+fi
+
 if [ $FAILED -eq 1 ]; then
     echo -e "${RED}❌ Pre-commit check failed!${NC}"
     exit 1

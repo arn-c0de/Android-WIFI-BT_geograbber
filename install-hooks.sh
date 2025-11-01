@@ -46,7 +46,13 @@ if git diff --cached --name-only | grep -E "secrets\.properties$"; then
     FAILED=1
 fi
 
-# Check 3: Scan for hardcoded secrets
+# Check 3: Prevent committing database files
+if git diff --cached --name-only | grep -E "\.db$"; then
+    echo -e "${RED}❌ Error: Attempting to commit a database (.db) file!${NC}"
+    FAILED=1
+fi
+
+# Check 4: Scan for hardcoded secrets
 if git diff --cached | grep -E "(api[_-]?key|secret|password|token|private[_-]?key)\s*=\s*['\"][^'\"]{8,}['\"]" -i; then
     echo -e "${YELLOW}⚠️  Warning: Potential secret detected!${NC}"
     read -p "Continue anyway? (y/N): " -n 1 -r
