@@ -3415,13 +3415,12 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         
-        // Add cancel button after first attempt
-        if (attemptCount > 0) {
-            builder.setNegativeButton(R.string.cancel, (dialog, which) -> {
-                // Keep overlay visible and close app
-                finish();
-            });
-        }
+        // Always show "Exit" button to allow user to close app
+        builder.setNegativeButton("Exit", (dialog, which) -> {
+            // Keep overlay visible and close app
+            Toast.makeText(this, "App closed", Toast.LENGTH_SHORT).show();
+            finish();
+        });
         
         // Don't allow dismissal without action (keep overlay visible)
         builder.setCancelable(false);
