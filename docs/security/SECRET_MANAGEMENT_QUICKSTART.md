@@ -83,7 +83,8 @@ The pre-commit hook prevents committing:
 A: No! The project works without it. It's there for future API integrations.
 
 **Q: What if I accidentally commit a secret?**
-A: See the "What to Do If You Accidentally Commit a Secret" section in the full documentation.
+A: See the [What to Do If You Accidentally Commit a Secret](./SECRET_MANAGEMENT.md#what-to-do-if-you-accidentally-commit-a-secret) section in the full security documentation, or visit the [Security Policy](../../SECURITY.md) for more details.
+
 
 **Q: Can I skip the pre-commit hook?**
 A: Yes, but not recommended. Use `git commit --no-verify` to bypass (use carefully!).
@@ -91,3 +92,6 @@ A: Yes, but not recommended. Use `git commit --no-verify` to bypass (use careful
 ---
 
 **Last Updated**: 2025-11-01
+---
+
+
