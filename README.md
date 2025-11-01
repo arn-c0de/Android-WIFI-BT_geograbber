@@ -23,7 +23,7 @@
 </div>
 
 <div align="left">
-   <b>Current Version: v1.0.2</b>
+   <b>Current Version: v1.0.3-rc1</b>
 </div>
 
    ---
@@ -100,10 +100,21 @@ GeoGrabber is ideal for network analysis, signal mapping, and understanding wire
 ### 💾 Data Management
 
 - 🗄️ **SQLite Database** – Stores all scanned networks and devices locally
-- 💼 **Data Export** – Save database as a file for backup or analysis
-- 📥 **Data Import** – Load external databases to view or merge data
+- � **Database Encryption** – AES-256 encryption with SQLCipher (optional)
+- �💼 **Data Export** – Save database as a file for backup or analysis
+- 📥 **Data Import** – Load external databases to view or merge data (supports encrypted databases)
 - 📊 **Database Statistics** – View total counts of WiFi networks and Bluetooth devices
 - 🗑️ **Clear Database** – Delete all stored data when needed
+
+### 🔐 Security Features
+
+- 🛡️ **AES-256 Encryption** – Military-grade database encryption using SQLCipher
+- 🔑 **Android Keystore Integration** – Hardware-backed secure passphrase storage
+- 🔐 **Passphrase Protection** – User-controlled encryption with customizable passphrase
+- 🔄 **Database Migration** – Seamless conversion from unencrypted to encrypted databases
+- 💾 **Encrypted Import/Export** – Full support for encrypted database files
+- 🎯 **Zero-Knowledge Design** – Passphrases never logged or transmitted
+- 📖 **[Encryption Guide](docs/quickstart/database_encryption_quickstart.md)** – Complete setup and usage instructions
 
 ### 📋 Network Information Captured
 

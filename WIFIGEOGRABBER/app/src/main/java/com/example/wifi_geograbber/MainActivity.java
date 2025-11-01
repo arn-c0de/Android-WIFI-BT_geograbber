@@ -50,7 +50,7 @@ public class MainActivity extends AppCompatActivity {
     private WifiManager wifiManager;
     private LocationManager locationManager;
     private BluetoothAdapter bluetoothAdapter;
-    private SQLiteDatabase database;
+    private Object database; // Can be android.database.sqlite.SQLiteDatabase or net.sqlcipher.database.SQLiteDatabase
     
     // Database encryption support
     private EncryptionManager encryptionManager;
@@ -60,6 +60,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView statusText;
     private TextView infoSummary;
     private TextView logcatText;
+    private TextView encryptionStatusText;
     private ScrollView logcatScrollView;
     private ListView dataListView;
     private Button toggleScanButton, showButton, moreButton, bluetoothToggleButton, mapButton;
@@ -89,8 +90,87 @@ public class MainActivity extends AppCompatActivity {
     private android.net.Uri pendingImportUri = null;
     private java.io.File pendingImportFile = null;
 
+    // Helper methods for database operations that work with both types
+    private Cursor dbRawQuery(String sql, String[] selectionArgs) {
+        if (database == null) return null;
+        if (isDatabaseEncrypted) {
+            return ((net.sqlcipher.database.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
+        } else {
+            return ((android.database.sqlite.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
+        }
+    }
 
-        
+    private void dbExecSQL(String sql) {
+        if (database == null) return;
+        if (isDatabaseEncrypted) {
+            ((net.sqlcipher.database.SQLiteDatabase) database).execSQL(sql);
+        } else {
+            ((android.database.sqlite.SQLiteDatabase) database).execSQL(sql);
+        }
+    }
+
+    private void dbExecSQL(String sql, Object[] bindArgs) {
+        if (database == null) return;
+        if (isDatabaseEncrypted) {
+            ((net.sqlcipher.database.SQLiteDatabase) database).execSQL(sql, bindArgs);
+        } else {
+            ((android.database.sqlite.SQLiteDatabase) database).execSQL(sql, bindArgs);
+        }
+    }
+
+    private long dbInsert(String table, String nullColumnHack, android.content.ContentValues values) {
+        if (database == null) return -1;
+        if (isDatabaseEncrypted) {
+            return ((net.sqlcipher.database.SQLiteDatabase) database).insert(table, nullColumnHack, values);
+        } else {
+            return ((android.database.sqlite.SQLiteDatabase) database).insert(table, nullColumnHack, values);
+        }
+    }
+
+    private void dbBeginTransaction() {
+        if (database == null) return;
+        if (isDatabaseEncrypted) {
+            ((net.sqlcipher.database.SQLiteDatabase) database).beginTransaction();
+        } else {
+            ((android.database.sqlite.SQLiteDatabase) database).beginTransaction();
+        }
+    }
+
+    private void dbSetTransactionSuccessful() {
+        if (database == null) return;
+        if (isDatabaseEncrypted) {
+            ((net.sqlcipher.database.SQLiteDatabase) database).setTransactionSuccessful();
+        } else {
+            ((android.database.sqlite.SQLiteDatabase) database).setTransactionSuccessful();
+        }
+    }
+
+    private void dbEndTransaction() {
+        if (database == null) return;
+        if (isDatabaseEncrypted) {
+            ((net.sqlcipher.database.SQLiteDatabase) database).endTransaction();
+        } else {
+            ((android.database.sqlite.SQLiteDatabase) database).endTransaction();
+        }
+    }
+
+    private boolean dbInTransaction() {
+        if (database == null) return false;
+        if (isDatabaseEncrypted) {
+            return ((net.sqlcipher.database.SQLiteDatabase) database).inTransaction();
+        } else {
+            return ((android.database.sqlite.SQLiteDatabase) database).inTransaction();
+        }
+    }
+
+    private void dbClose() {
+        if (database == null) return;
+        if (isDatabaseEncrypted) {
+            ((net.sqlcipher.database.SQLiteDatabase) database).close();
+        } else {
+            ((android.database.sqlite.SQLiteDatabase) database).close();
+        }
+    }
 
     // Hide system UI (navigation bar)
     private void hideSystemUI() {
@@ -145,6 +225,7 @@ public class MainActivity extends AppCompatActivity {
         // initialization
         statusText = findViewById(R.id.status_text);
         infoSummary = findViewById(R.id.info_summary);
+        encryptionStatusText = findViewById(R.id.encryption_status);
         logcatText = findViewById(R.id.logcat_text);
         logcatScrollView = findViewById(R.id.logcat_scrollview);
         dataListView = findViewById(R.id.data_list);
@@ -695,26 +776,32 @@ public class MainActivity extends AppCompatActivity {
         int totalBluetooth = 0;
         
         // Count WiFi devices in DB
-        Cursor wifiCursor = database.rawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'WIFI'", null);
-        if (wifiCursor.moveToFirst()) {
-            totalWifi = wifiCursor.getInt(0);
+        Cursor wifiCursor = dbRawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'WIFI'", null);
+        if (wifiCursor != null) {
+            if (wifiCursor.moveToFirst()) {
+                totalWifi = wifiCursor.getInt(0);
+            }
+            wifiCursor.close();
         }
-        wifiCursor.close();
         
         // Count Bluetooth devices in DB
-        Cursor bluetoothCursor = database.rawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'BLUETOOTH'", null);
-        if (bluetoothCursor.moveToFirst()) {
-            totalBluetooth = bluetoothCursor.getInt(0);
+        Cursor bluetoothCursor = dbRawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'BLUETOOTH'", null);
+        if (bluetoothCursor != null) {
+            if (bluetoothCursor.moveToFirst()) {
+                totalBluetooth = bluetoothCursor.getInt(0);
+            }
+            bluetoothCursor.close();
         }
-        bluetoothCursor.close();
         
         // Count old WiFi data if available.
-        Cursor oldWifiCursor = database.rawQuery("SELECT COUNT(*) FROM wifi_data", null);
+        Cursor oldWifiCursor = dbRawQuery("SELECT COUNT(*) FROM wifi_data", null);
         int oldWifiCount = 0;
-        if (oldWifiCursor.moveToFirst()) {
-            oldWifiCount = oldWifiCursor.getInt(0);
+        if (oldWifiCursor != null) {
+            if (oldWifiCursor.moveToFirst()) {
+                oldWifiCount = oldWifiCursor.getInt(0);
+            }
+            oldWifiCursor.close();
         }
-        oldWifiCursor.close();
         
         String infoText = getString(R.string.active_label) + activeWifi + getString(R.string.wifi_label);
         if (isBluetoothScanningEnabled) {
@@ -893,22 +980,24 @@ public class MainActivity extends AppCompatActivity {
             int maxSpeed = estimateMaxSpeed(result);
             
             // Only check the wifi_data table to see if the BSSID already exists.
-            Cursor cursor = database.rawQuery("SELECT signal_strength FROM wifi_data WHERE bssid = ?", new String[]{result.BSSID});
+            Cursor cursor = dbRawQuery("SELECT signal_strength FROM wifi_data WHERE bssid = ?", new String[]{result.BSSID});
             boolean update = false;
-            if (cursor.moveToFirst()) {
-                int oldSignal = cursor.getInt(0);
-                if (result.level > oldSignal) {
-                    update = true;
+            if (cursor != null) {
+                if (cursor.moveToFirst()) {
+                    int oldSignal = cursor.getInt(0);
+                    if (result.level > oldSignal) {
+                        update = true;
+                    }
                 }
+                cursor.close();
             }
-            cursor.close();
             
             // Store WiFi data only in the wifi_data table
             if (update) {
-                database.execSQL("UPDATE wifi_data SET ssid=?, signal_strength=?, encryption=?, latitude=?, longitude=?, timestamp=?, frequency=?, channel=?, capabilities=?, wifi_standard=?, vendor_info=?, channel_width=?, center_freq0=?, center_freq1=?, max_connection_speed=? WHERE bssid=?",
+                dbExecSQL("UPDATE wifi_data SET ssid=?, signal_strength=?, encryption=?, latitude=?, longitude=?, timestamp=?, frequency=?, channel=?, capabilities=?, wifi_standard=?, vendor_info=?, channel_width=?, center_freq0=?, center_freq1=?, max_connection_speed=? WHERE bssid=?",
                         new Object[]{result.SSID, result.level, encryption, location.getLatitude(), location.getLongitude(), System.currentTimeMillis(), frequency, channel, capabilities, wifiStandard, vendorInfo, channelWidth, centerFreq0, centerFreq1, maxSpeed, result.BSSID});
             } else if (!existsInDb(result.BSSID)) {
-                database.execSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp, frequency, channel, capabilities, wifi_standard, vendor_info, channel_width, center_freq0, center_freq1, max_connection_speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                dbExecSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp, frequency, channel, capabilities, wifi_standard, vendor_info, channel_width, center_freq0, center_freq1, max_connection_speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         new Object[]{result.SSID, result.BSSID, result.level, encryption, location.getLatitude(), location.getLongitude(), System.currentTimeMillis(), frequency, channel, capabilities, wifiStandard, vendorInfo, channelWidth, centerFreq0, centerFreq1, maxSpeed});
             }
             
@@ -941,7 +1030,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void saveBluetoothDevice(String deviceName, String deviceAddress, int rssi, String deviceClass, Location location) {
         // Check if a Bluetooth device already exists and has a better signal strength.
-        Cursor cursor = database.rawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'BLUETOOTH'", new String[]{deviceAddress});
+        Cursor cursor = dbRawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'BLUETOOTH'", new String[]{deviceAddress});
         boolean update = false;
         boolean exists = false;
         double lastLat = 0, lastLon = 0;
@@ -974,18 +1063,18 @@ public class MainActivity extends AppCompatActivity {
             if (update) {
                 // Update with movement data
                 if (movementDistance != null) {
-                    database.execSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
+                    dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
                             "last_seen_latitude=latitude, last_seen_longitude=longitude, last_seen_timestamp=timestamp, " +
                             "latitude=?, longitude=?, timestamp=?, movement_distance=? " +
                             "WHERE device_address=? AND device_type='BLUETOOTH'",
                             new Object[]{deviceName, rssi, deviceClass, currentLat, currentLon, currentTimestamp, movementDistance, deviceAddress});
                 } else {
-                    database.execSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, latitude=?, longitude=?, timestamp=? WHERE device_address=? AND device_type='BLUETOOTH'",
+                    dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, latitude=?, longitude=?, timestamp=? WHERE device_address=? AND device_type='BLUETOOTH'",
                             new Object[]{deviceName, rssi, deviceClass, currentLat, currentLon, currentTimestamp, deviceAddress});
                 }
             } else {
                 // New entry
-                database.execSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                dbExecSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                         new Object[]{deviceName, deviceAddress, "BLUETOOTH", rssi, deviceClass, currentLat, currentLon, currentTimestamp});
             }
         }
@@ -995,7 +1084,7 @@ public class MainActivity extends AppCompatActivity {
     private void saveWifiDeviceForMovementTracking(String ssid, String bssid, int signal, String encryption, Location location, 
                                                   int frequency, int channel, String standard, String vendor, int channelWidth, int maxSpeed) {
         // Check if the WiFi device already exists in device_data.
-        Cursor cursor = database.rawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'WIFI'", new String[]{bssid});
+        Cursor cursor = dbRawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'WIFI'", new String[]{bssid});
         boolean update = false;
         boolean exists = false;
         double lastLat = 0, lastLon = 0;
@@ -1028,7 +1117,7 @@ public class MainActivity extends AppCompatActivity {
             if (update) {
                 // Update with movement data
                 if (movementDistance != null) {
-                    database.execSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
+                    dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
                             "frequency=?, channel=?, wifi_standard=?, vendor_info=?, channel_width=?, max_connection_speed=?, " +
                             "last_seen_latitude=latitude, last_seen_longitude=longitude, last_seen_timestamp=timestamp, " +
                             "latitude=?, longitude=?, timestamp=?, movement_distance=? " +
@@ -1036,7 +1125,7 @@ public class MainActivity extends AppCompatActivity {
                             new Object[]{ssid, signal, encryption, frequency, channel, standard, vendor, channelWidth, maxSpeed, 
                                        currentLat, currentLon, currentTimestamp, movementDistance, bssid});
                 } else {
-                    database.execSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
+                    dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
                             "frequency=?, channel=?, wifi_standard=?, vendor_info=?, channel_width=?, max_connection_speed=?, " +
                             "latitude=?, longitude=?, timestamp=? " +
                             "WHERE device_address=? AND device_type='WIFI'",
@@ -1045,7 +1134,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             } else {
                 // New entry
-                database.execSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, " +
+                dbExecSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, " +
                         "frequency, channel, wifi_standard, vendor_info, channel_width, max_connection_speed, " +
                         "latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         new Object[]{ssid, bssid, "WIFI", signal, encryption, frequency, channel, standard, vendor, channelWidth, maxSpeed, 
@@ -1056,14 +1145,14 @@ public class MainActivity extends AppCompatActivity {
 
     // Auxiliary function: Checks if BSSID is already in the database.
     private boolean existsInDb(String bssid) {
-        Cursor cursor = database.rawQuery("SELECT 1 FROM wifi_data WHERE bssid = ? LIMIT 1", new String[]{bssid});
+        Cursor cursor = dbRawQuery("SELECT 1 FROM wifi_data WHERE bssid = ? LIMIT 1", new String[]{bssid});
         boolean exists = cursor.moveToFirst();
         cursor.close();
         return exists;
     }
 
     private boolean existsInDeviceDb(String deviceAddress, String deviceType) {
-        Cursor cursor = database.rawQuery("SELECT 1 FROM device_data WHERE device_address = ? AND device_type = ? LIMIT 1", new String[]{deviceAddress, deviceType});
+        Cursor cursor = dbRawQuery("SELECT 1 FROM device_data WHERE device_address = ? AND device_type = ? LIMIT 1", new String[]{deviceAddress, deviceType});
         boolean exists = cursor.moveToFirst();
         cursor.close();
         return exists;
@@ -1075,7 +1164,7 @@ public class MainActivity extends AppCompatActivity {
         // Show both old Wi-Fi data and new unified data
         // Show new device_data data first
 
-        Cursor deviceCursor = database.rawQuery("SELECT * FROM device_data ORDER BY device_type, device_name", null);
+        Cursor deviceCursor = dbRawQuery("SELECT * FROM device_data ORDER BY device_type, device_name", null);
         if (deviceCursor.moveToFirst()) {
             int nameIdx = deviceCursor.getColumnIndexOrThrow("device_name");
             int addressIdx = deviceCursor.getColumnIndexOrThrow("device_address");
@@ -1132,7 +1221,7 @@ public class MainActivity extends AppCompatActivity {
         deviceCursor.close();
         
         // If there are still old WiFi data files that have not been migrated
-        Cursor wifiCursor = database.rawQuery("SELECT * FROM wifi_data WHERE bssid NOT IN (SELECT device_address FROM device_data WHERE device_type = 'WIFI')", null);
+        Cursor wifiCursor = dbRawQuery("SELECT * FROM wifi_data WHERE bssid NOT IN (SELECT device_address FROM device_data WHERE device_type = 'WIFI')", null);
         if (wifiCursor.moveToFirst()) {
             int ssidIdx = wifiCursor.getColumnIndexOrThrow("ssid");
             int bssidIdx = wifiCursor.getColumnIndexOrThrow("bssid");
@@ -1292,8 +1381,14 @@ public class MainActivity extends AppCompatActivity {
                     lastExportedDbChecksum = checksum;
                     lastExportedDbFilename = exportedFilename;
 
-                    Toast.makeText(this, "DB exported successfully!", Toast.LENGTH_LONG).show();
-                    addLogMessage("Database exported: " + exportedFilename);
+                    // Show success message with encryption status
+                    String successMessage = "DB exported successfully!";
+                    if (isDatabaseEncrypted) {
+                        successMessage += "\n\n🔒 This database is encrypted.";
+                    }
+                    Toast.makeText(this, successMessage, Toast.LENGTH_LONG).show();
+                    addLogMessage("Database exported: " + exportedFilename + 
+                                 (isDatabaseEncrypted ? " (encrypted)" : ""));
 
                     // Offer to export checksum metadata file
                     if (checksum != null) {
@@ -1356,8 +1451,8 @@ public class MainActivity extends AppCompatActivity {
 
     // Delete DB
     private void clearDatabase() {
-        database.execSQL("DELETE FROM wifi_data");
-        database.execSQL("DELETE FROM device_data");
+        dbExecSQL("DELETE FROM wifi_data");
+        dbExecSQL("DELETE FROM device_data");
         Toast.makeText(this, R.string.all_networks_deleted, Toast.LENGTH_SHORT).show();
         showData();
     }
@@ -1626,6 +1721,13 @@ public class MainActivity extends AppCompatActivity {
     // Process validated database import
     private void proceedWithDatabaseImport(java.io.File externalDbFile) {
         try {
+            // Check if database is encrypted
+            if (DatabaseEncryptionHelper.isDatabaseEncrypted(externalDbFile)) {
+                addLogMessage("Encrypted database detected");
+                showEncryptedDatabaseImportDialog(externalDbFile);
+                return;
+            }
+            
             // Security validation: Check database integrity and structure
             if (!validateExternalDatabase(externalDbFile)) {
                 Toast.makeText(this, "Security error: Invalid or malicious database file!", Toast.LENGTH_LONG).show();
@@ -2210,7 +2312,7 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             // Use transaction for atomicity and better error handling
-            database.beginTransaction();
+            dbBeginTransaction();
 
             //1. Copy device_data (WiFi and Bluetooth)
             android.database.Cursor deviceCursor = externalDb.rawQuery("SELECT * FROM device_data LIMIT 50000", null);
@@ -2266,7 +2368,7 @@ public class MainActivity extends AppCompatActivity {
                     // Check if the device already exists
                     if (!existsInDeviceDb(deviceAddress, deviceType)) {
                         // Add device to internal database
-                        database.execSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, frequency, channel, channel_width, capabilities, center_freq0, center_freq1, wifi_standard, vendor_info, max_connection_speed, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        dbExecSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, frequency, channel, channel_width, capabilities, center_freq0, center_freq1, wifi_standard, vendor_info, max_connection_speed, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                                 new Object[]{deviceName, deviceAddress, deviceType, signalStrength, encryptionInfo, frequency, channel, channelWidth, capabilities, centerFreq0, centerFreq1, wifiStandard, vendorInfo, maxSpeed, latitude, longitude, timestamp});
                         
                         if ("WIFI".equals(deviceType)) {
@@ -2328,7 +2430,7 @@ public class MainActivity extends AppCompatActivity {
                         // Check if the BSSID already exists (in wifi_data or device_data)
                         if (!existsInDb(bssid) && !existsInDeviceDb(bssid, "WIFI")) {
                             // Add to the wifi_data table
-                            database.execSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp, frequency, channel, capabilities, wifi_standard, vendor_info, channel_width, center_freq0, center_freq1, max_connection_speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            dbExecSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp, frequency, channel, capabilities, wifi_standard, vendor_info, channel_width, center_freq0, center_freq1, max_connection_speed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                                     new Object[]{ssid, bssid, signalStrength, encryption, latitude, longitude, timestamp, frequency, channel, capabilities, wifiStandard, vendorInfo, channelWidth, centerFreq0, centerFreq1, maxSpeed});
                             copiedLegacyWifi++;
                         }
@@ -2338,8 +2440,8 @@ public class MainActivity extends AppCompatActivity {
             }
             
             // Commit transaction if successful
-            database.setTransactionSuccessful();
-            database.endTransaction();
+            dbSetTransactionSuccessful();
+            dbEndTransaction();
 
             addLogMessage("Data transfer completed:");
             addLogMessage("• " + copiedWifi + " WiFi devices (device_data)");
@@ -2347,8 +2449,8 @@ public class MainActivity extends AppCompatActivity {
             addLogMessage("• " + copiedLegacyWifi + " Legacy WiFi entries");
         } catch (Exception e) {
             // Rollback transaction on error
-            if (database.inTransaction()) {
-                database.endTransaction();
+            if (dbInTransaction()) {
+                dbEndTransaction();
             }
             addLogMessage("Error while copying data: " + e.getMessage());
             throw e;
@@ -2361,7 +2463,7 @@ public class MainActivity extends AppCompatActivity {
     // Show number of networks
     private void showNetworkCount() {
         // Count devices from the new device_data table
-        Cursor deviceCursor = database.rawQuery("SELECT COUNT(*) FROM device_data", null);
+        Cursor deviceCursor = dbRawQuery("SELECT COUNT(*) FROM device_data", null);
         int deviceCount = 0;
         if (deviceCursor.moveToFirst()) {
             deviceCount = deviceCursor.getInt(0);
@@ -2369,7 +2471,7 @@ public class MainActivity extends AppCompatActivity {
         deviceCursor.close();
         
         // Count WiFi devices
-        Cursor wifiCursor = database.rawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'WIFI'", null);
+        Cursor wifiCursor = dbRawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'WIFI'", null);
         int wifiCount = 0;
         if (wifiCursor.moveToFirst()) {
             wifiCount = wifiCursor.getInt(0);
@@ -2377,7 +2479,7 @@ public class MainActivity extends AppCompatActivity {
         wifiCursor.close();
         
         // Count Bluetooth devices
-        Cursor bluetoothCursor = database.rawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'BLUETOOTH'", null);
+        Cursor bluetoothCursor = dbRawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'BLUETOOTH'", null);
         int bluetoothCount = 0;
         if (bluetoothCursor.moveToFirst()) {
             bluetoothCount = bluetoothCursor.getInt(0);
@@ -2385,7 +2487,7 @@ public class MainActivity extends AppCompatActivity {
         bluetoothCursor.close();
         
         // Count old WiFi data
-        Cursor oldWifiCursor = database.rawQuery("SELECT COUNT(*) FROM wifi_data", null);
+        Cursor oldWifiCursor = dbRawQuery("SELECT COUNT(*) FROM wifi_data", null);
         int oldWifiCount = 0;
         if (oldWifiCursor.moveToFirst()) {
             oldWifiCount = oldWifiCursor.getInt(0);
@@ -2421,7 +2523,7 @@ public class MainActivity extends AppCompatActivity {
             encryptedDbHelper.clearPassphrase();
         }
         
-        database.close();
+        dbClose();
     }
     
     @Override
@@ -2487,6 +2589,27 @@ public class MainActivity extends AppCompatActivity {
             // Use standard database
             DatabaseHelper dbHelper = new DatabaseHelper(this);
             database = dbHelper.getWritableDatabase();
+        }
+        
+        // Update encryption status indicator
+        updateEncryptionStatus();
+    }
+    
+    /**
+     * Update encryption status indicator
+     */
+    private void updateEncryptionStatus() {
+        if (encryptionStatusText != null) {
+            if (encryptionManager.isEncryptionEnabled()) {
+                String status = encryptionManager.isPassphraseCached() ? 
+                    getString(R.string.encryption_unlocked) : 
+                    getString(R.string.encryption_locked);
+                encryptionStatusText.setText("🔒 Database: " + status);
+                encryptionStatusText.setVisibility(View.VISIBLE);
+            } else {
+                encryptionStatusText.setText(getString(R.string.encryption_disabled));
+                encryptionStatusText.setVisibility(View.GONE); // Hide if not encrypted
+            }
         }
     }
     
@@ -2629,7 +2752,7 @@ public class MainActivity extends AppCompatActivity {
                     
                     // Close current database if open
                     if (database != null) {
-                        database.close();
+                        dbClose();
                     }
                     
                     // Check if unencrypted database exists
@@ -2651,7 +2774,7 @@ public class MainActivity extends AppCompatActivity {
                     } else {
                         // No existing database, just create encrypted one
                         encryptedDbHelper = new DatabaseEncryptionHelper(MainActivity.this, dbKey);
-                        SQLiteDatabase db = encryptedDbHelper.openEncryptedDatabase();
+                        net.sqlcipher.database.SQLiteDatabase db = encryptedDbHelper.openEncryptedDatabase();
                         if (db != null) {
                             db.close();
                             return true;
@@ -2674,6 +2797,7 @@ public class MainActivity extends AppCompatActivity {
                                   Toast.LENGTH_LONG).show();
                     isDatabaseEncrypted = true;
                     initializeEncryptedDatabase();
+                    updateEncryptionStatus();
                 } else {
                     Toast.makeText(MainActivity.this, R.string.migration_failed, 
                                   Toast.LENGTH_LONG).show();
@@ -2682,6 +2806,7 @@ public class MainActivity extends AppCompatActivity {
                     // Fall back to standard database
                     DatabaseHelper dbHelper = new DatabaseHelper(MainActivity.this);
                     database = dbHelper.getWritableDatabase();
+                    updateEncryptionStatus();
                 }
             }
         }.execute();
@@ -2850,7 +2975,7 @@ public class MainActivity extends AppCompatActivity {
                     
                     // Close database
                     if (database != null) {
-                        database.close();
+                        dbClose();
                     }
                     
                     boolean success = DatabaseEncryptionHelper.changeEncryptionKey(
@@ -2873,6 +2998,7 @@ public class MainActivity extends AppCompatActivity {
                                   Toast.LENGTH_LONG).show();
                     // Reinitialize database with new key
                     initializeEncryptedDatabase();
+                    updateEncryptionStatus();
                 } else {
                     Toast.makeText(MainActivity.this, R.string.encryption_key_change_failed, 
                                   Toast.LENGTH_LONG).show();
@@ -2924,7 +3050,7 @@ public class MainActivity extends AppCompatActivity {
                     
                     // Close database
                     if (database != null) {
-                        database.close();
+                        dbClose();
                     }
                     
                     // Decrypt database
@@ -2962,12 +3088,278 @@ public class MainActivity extends AppCompatActivity {
                     // Reinitialize with standard database
                     DatabaseHelper dbHelper = new DatabaseHelper(MainActivity.this);
                     database = dbHelper.getWritableDatabase();
+                    updateEncryptionStatus();
                 } else {
                     Toast.makeText(MainActivity.this, R.string.decryption_failed, 
                                   Toast.LENGTH_LONG).show();
                 }
             }
         }.execute();
+    }
+    
+    /**
+     * Show dialog for importing encrypted database
+     */
+    private void showEncryptedDatabaseImportDialog(final java.io.File encryptedDbFile) {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle(R.string.encrypted_db_detected);
+        builder.setMessage(R.string.encrypted_db_detected_message);
+        
+        final android.widget.EditText input = new android.widget.EditText(this);
+        input.setHint(R.string.passphrase_hint);
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | 
+                           android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+        layout.addView(input);
+        
+        builder.setView(layout);
+        
+        builder.setPositiveButton("Import", (dialog, which) -> {
+            String passphrase = input.getText().toString();
+            importEncryptedDatabase(encryptedDbFile, passphrase);
+        });
+        
+        builder.setNegativeButton(R.string.cancel, (dialog, which) -> {
+            encryptedDbFile.delete();
+        });
+        
+        builder.show();
+    }
+    
+    /**
+     * Import encrypted database
+     */
+    private void importEncryptedDatabase(final java.io.File encryptedDbFile, final String passphrase) {
+        new android.os.AsyncTask<Void, Void, Boolean>() {
+            android.app.ProgressDialog progressDialog;
+            int wifiCount = 0;
+            int bluetoothCount = 0;
+            
+            @Override
+            protected void onPreExecute() {
+                progressDialog = android.app.ProgressDialog.show(
+                    MainActivity.this, 
+                    "Importing Database",
+                    "Verifying encrypted database...", 
+                    true
+                );
+            }
+            
+            @Override
+            protected Boolean doInBackground(Void... params) {
+                net.sqlcipher.database.SQLiteDatabase testDb = null;
+                try {
+                    // Try to open encrypted database with passphrase
+                    net.sqlcipher.database.SQLiteDatabase.loadLibs(MainActivity.this);
+                    testDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                        encryptedDbFile.getAbsolutePath(), passphrase, null, 
+                        net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY);
+                    
+                    // Check for required tables
+                    boolean hasWifiData = hasEncryptedTable(testDb, "wifi_data");
+                    boolean hasDeviceData = hasEncryptedTable(testDb, "device_data");
+                    
+                    if (!hasWifiData && !hasDeviceData) {
+                        return false;
+                    }
+                    
+                    // Count data
+                    android.database.Cursor cursor = testDb.rawQuery(
+                        "SELECT COUNT(*) FROM device_data WHERE device_type='WIFI' AND latitude != 0 AND longitude != 0", null);
+                    if (cursor.moveToFirst()) wifiCount += cursor.getInt(0);
+                    cursor.close();
+
+                    cursor = testDb.rawQuery(
+                        "SELECT COUNT(*) FROM device_data WHERE device_type='BLUETOOTH' AND latitude != 0 AND longitude != 0", null);
+                    if (cursor.moveToFirst()) bluetoothCount = cursor.getInt(0);
+                    cursor.close();
+                    
+                    if (hasWifiData) {
+                        cursor = testDb.rawQuery(
+                            "SELECT COUNT(*) FROM wifi_data WHERE latitude != 0 AND longitude != 0", null);
+                        if (cursor.moveToFirst()) wifiCount += cursor.getInt(0);
+                        cursor.close();
+                    }
+                    
+                    return true;
+                    
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Error opening encrypted database", e);
+                    return false;
+                } finally {
+                    if (testDb != null) testDb.close();
+                }
+            }
+            
+            @Override
+            protected void onPostExecute(Boolean success) {
+                progressDialog.dismiss();
+                
+                if (success) {
+                    // Show confirmation dialog
+                    android.app.AlertDialog.Builder confirmBuilder = new android.app.AlertDialog.Builder(MainActivity.this);
+                    confirmBuilder.setTitle("Import Encrypted Database?");
+                    confirmBuilder.setMessage(
+                        "🔒 Encrypted database verified!\n\n" +
+                        "Found data:\n" +
+                        "• " + wifiCount + " WiFi networks\n" +
+                        "• " + bluetoothCount + " Bluetooth devices\n\n" +
+                        "Import this data into your database?"
+                    );
+                    
+                    confirmBuilder.setPositiveButton("Import", (d, w) -> {
+                        performEncryptedDatabaseImport(encryptedDbFile, passphrase, wifiCount, bluetoothCount);
+                    });
+                    
+                    confirmBuilder.setNegativeButton(R.string.cancel, (d, w) -> {
+                        encryptedDbFile.delete();
+                    });
+                    
+                    confirmBuilder.show();
+                } else {
+                    Toast.makeText(MainActivity.this, R.string.wrong_passphrase, Toast.LENGTH_LONG).show();
+                    encryptedDbFile.delete();
+                }
+            }
+        }.execute();
+    }
+    
+    /**
+     * Perform actual encrypted database import (copy data)
+     */
+    private void performEncryptedDatabaseImport(final java.io.File encryptedDbFile, 
+                                                final String passphrase, 
+                                                final int wifiCount, 
+                                                final int bluetoothCount) {
+        new android.os.AsyncTask<Void, Void, Boolean>() {
+            android.app.ProgressDialog progressDialog;
+            
+            @Override
+            protected void onPreExecute() {
+                progressDialog = android.app.ProgressDialog.show(
+                    MainActivity.this, 
+                    "Importing Database",
+                    "Copying encrypted database data...", 
+                    true
+                );
+            }
+            
+            @Override
+            protected Boolean doInBackground(Void... params) {
+                net.sqlcipher.database.SQLiteDatabase externalDb = null;
+                try {
+                    // Open encrypted external database
+                    net.sqlcipher.database.SQLiteDatabase.loadLibs(MainActivity.this);
+                    externalDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                        encryptedDbFile.getAbsolutePath(), passphrase, null, 
+                        net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY);
+                    
+                    // Copy data to internal database
+                    copyDataFromEncryptedToInternal(externalDb);
+                    
+                    return true;
+                    
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Error importing encrypted database", e);
+                    return false;
+                } finally {
+                    if (externalDb != null) externalDb.close();
+                    encryptedDbFile.delete();
+                }
+            }
+            
+            @Override
+            protected void onPostExecute(Boolean success) {
+                progressDialog.dismiss();
+                
+                if (success) {
+                    Toast.makeText(MainActivity.this, 
+                        "✓ Imported " + wifiCount + " WiFi + " + bluetoothCount + " BT devices", 
+                        Toast.LENGTH_LONG).show();
+                    
+                    // Refresh display
+                    if (isShowingStoredData) {
+                        showData();
+                    }
+                } else {
+                    Toast.makeText(MainActivity.this, "Import failed", Toast.LENGTH_LONG).show();
+                }
+            }
+        }.execute();
+    }
+    
+    /**
+     * Copy data from encrypted database to internal database
+     */
+    private void copyDataFromEncryptedToInternal(net.sqlcipher.database.SQLiteDatabase externalDb) {
+        // Copy wifi_data
+        if (hasEncryptedTable(externalDb, "wifi_data")) {
+            android.database.Cursor cursor = externalDb.rawQuery("SELECT * FROM wifi_data", null);
+            while (cursor.moveToNext()) {
+                android.content.ContentValues values = new android.content.ContentValues();
+                for (String columnName : cursor.getColumnNames()) {
+                    int columnIndex = cursor.getColumnIndex(columnName);
+                    if (!cursor.isNull(columnIndex)) {
+                        int type = cursor.getType(columnIndex);
+                        switch (type) {
+                            case android.database.Cursor.FIELD_TYPE_INTEGER:
+                                values.put(columnName, cursor.getLong(columnIndex));
+                                break;
+                            case android.database.Cursor.FIELD_TYPE_FLOAT:
+                                values.put(columnName, cursor.getDouble(columnIndex));
+                                break;
+                            case android.database.Cursor.FIELD_TYPE_STRING:
+                                values.put(columnName, cursor.getString(columnIndex));
+                                break;
+                        }
+                    }
+                }
+                dbInsert("wifi_data", null, values);
+            }
+            cursor.close();
+        }
+        
+        // Copy device_data
+        if (hasEncryptedTable(externalDb, "device_data")) {
+            android.database.Cursor cursor = externalDb.rawQuery("SELECT * FROM device_data", null);
+            while (cursor.moveToNext()) {
+                android.content.ContentValues values = new android.content.ContentValues();
+                for (String columnName : cursor.getColumnNames()) {
+                    int columnIndex = cursor.getColumnIndex(columnName);
+                    if (!cursor.isNull(columnIndex)) {
+                        int type = cursor.getType(columnIndex);
+                        switch (type) {
+                            case android.database.Cursor.FIELD_TYPE_INTEGER:
+                                values.put(columnName, cursor.getLong(columnIndex));
+                                break;
+                            case android.database.Cursor.FIELD_TYPE_FLOAT:
+                                values.put(columnName, cursor.getDouble(columnIndex));
+                                break;
+                            case android.database.Cursor.FIELD_TYPE_STRING:
+                                values.put(columnName, cursor.getString(columnIndex));
+                                break;
+                        }
+                    }
+                }
+                dbInsert("device_data", null, values);
+            }
+            cursor.close();
+        }
+    }
+    
+    /**
+     * Check if encrypted table exists
+     */
+    private boolean hasEncryptedTable(net.sqlcipher.database.SQLiteDatabase db, String tableName) {
+        android.database.Cursor cursor = db.rawQuery(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?", 
+            new String[]{tableName});
+        boolean exists = cursor.moveToFirst();
+        cursor.close();
+        return exists;
     }
 
     // Database Helper Class

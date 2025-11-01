@@ -4,8 +4,8 @@ import android.content.Context;
 import android.database.Cursor;
 import android.util.Log;
 
-import net.zetetic.database.sqlcipher.SQLiteDatabase;
-import net.zetetic.database.sqlcipher.SQLiteOpenHelper;
+import net.sqlcipher.database.SQLiteDatabase;
+import net.sqlcipher.database.SQLiteOpenHelper;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -93,8 +93,54 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
     @Override
     public void onCreate(SQLiteDatabase db) {
         Log.i(TAG, "Creating encrypted database tables");
-        db.execSQL(CREATE_WIFI_TABLE);
-        db.execSQL(CREATE_DEVICE_TABLE);
+        
+        // Check if tables already exist (e.g., from migration)
+        // This prevents "table already exists" errors
+        db.execSQL("CREATE TABLE IF NOT EXISTS wifi_data (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "ssid TEXT, " +
+                "bssid TEXT, " +
+                "signal_strength INTEGER, " +
+                "encryption TEXT, " +
+                "frequency INTEGER, " +
+                "channel INTEGER, " +
+                "capabilities TEXT, " +
+                "wifi_standard TEXT, " +
+                "vendor_info TEXT, " +
+                "channel_width TEXT, " +
+                "center_freq0 INTEGER, " +
+                "center_freq1 INTEGER, " +
+                "max_connection_speed INTEGER, " +
+                "latitude REAL, " +
+                "longitude REAL, " +
+                "timestamp INTEGER)");
+        
+        db.execSQL("CREATE TABLE IF NOT EXISTS device_data (" +
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                "device_name TEXT, " +
+                "device_address TEXT, " +
+                "device_type TEXT, " +
+                "signal_strength INTEGER, " +
+                "encryption_info TEXT, " +
+                "frequency INTEGER, " +
+                "channel INTEGER, " +
+                "channel_width TEXT, " +
+                "capabilities TEXT, " +
+                "center_freq0 INTEGER, " +
+                "center_freq1 INTEGER, " +
+                "wifi_standard TEXT, " +
+                "vendor_info TEXT, " +
+                "is_passpoint_network INTEGER, " +
+                "operator_friendly_name TEXT, " +
+                "venue_name TEXT, " +
+                "max_connection_speed INTEGER, " +
+                "latitude REAL, " +
+                "longitude REAL, " +
+                "timestamp INTEGER, " +
+                "last_seen_latitude REAL, " +
+                "last_seen_longitude REAL, " +
+                "last_seen_timestamp INTEGER, " +
+                "movement_distance REAL)");
     }
     
     @Override
@@ -220,7 +266,7 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
      */
     public static boolean migrateToEncrypted(Context context, String unencryptedDbPath, 
                                             String encryptedDbPath, String passphrase) {
-        SQLiteDatabase unencryptedDb = null;
+        android.database.sqlite.SQLiteDatabase unencryptedDb = null;
         SQLiteDatabase encryptedDb = null;
         
         try {

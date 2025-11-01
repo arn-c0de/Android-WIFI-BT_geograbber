@@ -38,7 +38,7 @@ public class ScanService extends Service {
     private WifiManager wifiManager;
     private LocationManager locationManager;
     private BluetoothAdapter bluetoothAdapter;
-    private SQLiteDatabase database;
+    private Object database; // Can be android.database.sqlite.SQLiteDatabase or net.sqlcipher.database.SQLiteDatabase
     
     // Database encryption support
     private EncryptionManager encryptionManager;
@@ -52,6 +52,47 @@ public class ScanService extends Service {
     private int wifiCount = 0;
     private int bluetoothCount = 0;
     private String databasePath = null; // Path to the active database
+
+    // Helper methods for database operations that work with both types
+    private Cursor dbRawQuery(String sql, String[] selectionArgs) {
+        if (database == null) return null;
+        boolean isDatabaseEncrypted = (encryptionManager != null && encryptionManager.isEncryptionEnabled());
+        if (isDatabaseEncrypted) {
+            return ((net.sqlcipher.database.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
+        } else {
+            return ((android.database.sqlite.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
+        }
+    }
+
+    private void dbExecSQL(String sql) {
+        if (database == null) return;
+        boolean isDatabaseEncrypted = (encryptionManager != null && encryptionManager.isEncryptionEnabled());
+        if (isDatabaseEncrypted) {
+            ((net.sqlcipher.database.SQLiteDatabase) database).execSQL(sql);
+        } else {
+            ((android.database.sqlite.SQLiteDatabase) database).execSQL(sql);
+        }
+    }
+
+    private void dbExecSQL(String sql, Object[] bindArgs) {
+        if (database == null) return;
+        boolean isDatabaseEncrypted = (encryptionManager != null && encryptionManager.isEncryptionEnabled());
+        if (isDatabaseEncrypted) {
+            ((net.sqlcipher.database.SQLiteDatabase) database).execSQL(sql, bindArgs);
+        } else {
+            ((android.database.sqlite.SQLiteDatabase) database).execSQL(sql, bindArgs);
+        }
+    }
+
+    private void dbClose() {
+        if (database == null) return;
+        boolean isDatabaseEncrypted = (encryptionManager != null && encryptionManager.isEncryptionEnabled());
+        if (isDatabaseEncrypted) {
+            ((net.sqlcipher.database.SQLiteDatabase) database).close();
+        } else {
+            ((android.database.sqlite.SQLiteDatabase) database).close();
+        }
+    }
 
     @Override
     public void onCreate() {
@@ -141,7 +182,7 @@ public class ScanService extends Service {
         }
         
         if (database != null) {
-            database.close();
+            dbClose();
         }
         
         Log.d("ScanService", "Background scanning stopped");
@@ -157,7 +198,7 @@ public class ScanService extends Service {
         try {
             // Close old connection
             if (database != null) {
-                database.close();
+                dbClose();
             }
             
             // Check if encryption is enabled
@@ -405,7 +446,7 @@ public class ScanService extends Service {
             }
             
             // Store WiFi data only in the wifi_data table
-            Cursor wifiCursor = database.rawQuery("SELECT signal_strength FROM wifi_data WHERE bssid = ?", new String[]{result.BSSID});
+            Cursor wifiCursor = dbRawQuery("SELECT signal_strength FROM wifi_data WHERE bssid = ?", new String[]{result.BSSID});
             boolean wifiUpdate = false;
             boolean wifiExists = false;
             if (wifiCursor.moveToFirst()) {
@@ -418,10 +459,10 @@ public class ScanService extends Service {
             wifiCursor.close();
             
             if (wifiUpdate) {
-                database.execSQL("UPDATE wifi_data SET ssid=?, signal_strength=?, encryption=?, latitude=?, longitude=?, timestamp=? WHERE bssid=?",
+                dbExecSQL("UPDATE wifi_data SET ssid=?, signal_strength=?, encryption=?, latitude=?, longitude=?, timestamp=? WHERE bssid=?",
                         new Object[]{result.SSID, result.level, encryption, location.getLatitude(), location.getLongitude(), System.currentTimeMillis(), result.BSSID});
             } else if (!wifiExists) {
-                database.execSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                dbExecSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
                         new Object[]{result.SSID, result.BSSID, result.level, encryption, location.getLatitude(), location.getLongitude(), System.currentTimeMillis()});
                 newCount++;
             }
@@ -439,7 +480,7 @@ public class ScanService extends Service {
     // Save/update WiFi device for motion analysis in device data table
     private void saveWifiDeviceForMovementTracking(String ssid, String bssid, int signal, String encryption, Location location) {
         // Check if the WiFi device already exists in device_data.
-        Cursor cursor = database.rawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'WIFI'", new String[]{bssid});
+        Cursor cursor = dbRawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'WIFI'", new String[]{bssid});
         boolean update = false;
         boolean exists = false;
         double lastLat = 0, lastLon = 0;
@@ -472,25 +513,25 @@ public class ScanService extends Service {
             if (update) {
                 // Update with movement data
                 if (movementDistance != null) {
-                    database.execSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
+                    dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
                             "last_seen_latitude=latitude, last_seen_longitude=longitude, last_seen_timestamp=timestamp, " +
                             "latitude=?, longitude=?, timestamp=?, movement_distance=? " +
                             "WHERE device_address=? AND device_type='WIFI'",
                             new Object[]{ssid, signal, encryption, currentLat, currentLon, currentTimestamp, movementDistance, bssid});
                 } else {
-                    database.execSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, latitude=?, longitude=?, timestamp=? WHERE device_address=? AND device_type='WIFI'",
+                    dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, latitude=?, longitude=?, timestamp=? WHERE device_address=? AND device_type='WIFI'",
                             new Object[]{ssid, signal, encryption, currentLat, currentLon, currentTimestamp, bssid});
                 }
             } else {
                 // New entry
-                database.execSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                dbExecSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                         new Object[]{ssid, bssid, "WIFI", signal, encryption, currentLat, currentLon, currentTimestamp});
             }
         }
     }
 
     private void saveBluetoothDevice(String deviceName, String deviceAddress, int rssi, String deviceClass, Location location) {
-        Cursor cursor = database.rawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'BLUETOOTH'", new String[]{deviceAddress});
+        Cursor cursor = dbRawQuery("SELECT signal_strength, latitude, longitude, timestamp FROM device_data WHERE device_address = ? AND device_type = 'BLUETOOTH'", new String[]{deviceAddress});
         boolean update = false;
         boolean exists = false;
         double lastLat = 0, lastLon = 0;
@@ -523,18 +564,18 @@ public class ScanService extends Service {
             if (update) {
                 // update with movement data
                 if (movementDistance != null) {
-                    database.execSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
+                    dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, " +
                             "last_seen_latitude=latitude, last_seen_longitude=longitude, last_seen_timestamp=timestamp, " +
                             "latitude=?, longitude=?, timestamp=?, movement_distance=? " +
                             "WHERE device_address=? AND device_type='BLUETOOTH'",
                             new Object[]{deviceName, rssi, deviceClass, currentLat, currentLon, currentTimestamp, movementDistance, deviceAddress});
                 } else {
-                    database.execSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, latitude=?, longitude=?, timestamp=? WHERE device_address=? AND device_type='BLUETOOTH'",
+                    dbExecSQL("UPDATE device_data SET device_name=?, signal_strength=?, encryption_info=?, latitude=?, longitude=?, timestamp=? WHERE device_address=? AND device_type='BLUETOOTH'",
                             new Object[]{deviceName, rssi, deviceClass, currentLat, currentLon, currentTimestamp, deviceAddress});
                 }
             } else {
                 // New entry
-                database.execSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                dbExecSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                         new Object[]{deviceName, deviceAddress, "BLUETOOTH", rssi, deviceClass, currentLat, currentLon, currentTimestamp});
                 bluetoothCount++;
                 Log.d("ScanService", "Saved new Bluetooth device: " + deviceName);
