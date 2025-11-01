@@ -367,6 +367,32 @@ public class MainActivity extends AppCompatActivity {
 
         // Initialize database with encryption support
         initializeDatabase();
+        
+        // Log database encryption status
+        addLogMessage("📱 App started (v" + APP_VERSION + ")");
+        addLogMessage("🔐 Database encryption: " + (isDatabaseEncrypted ? "ENABLED (AES-256)" : "DISABLED"));
+        if (isDatabaseEncrypted) {
+            addLogMessage("🔑 Using system-derived key (PBKDF2-HMAC-SHA256)");
+        }
+        
+        // Log database path for debugging
+        if (database != null) {
+            try {
+                String dbPath;
+                if (isDatabaseEncrypted) {
+                    dbPath = ((net.sqlcipher.database.SQLiteDatabase) database).getPath();
+                } else {
+                    dbPath = ((android.database.sqlite.SQLiteDatabase) database).getPath();
+                }
+                Log.i("MainActivity", "Database path: " + dbPath);
+                addLogMessage("📂 DB Path: " + dbPath);
+            } catch (Exception e) {
+                Log.e("MainActivity", "Error getting DB path: " + e.getMessage());
+            }
+        } else {
+            Log.w("MainActivity", "Database is null after initialization!");
+            addLogMessage("⚠️ Database is NULL after initialization");
+        }
 
         // Check permissions
         checkPermissions();
@@ -1471,7 +1497,11 @@ public class MainActivity extends AppCompatActivity {
                     String checksum = calculateSHA256(dbFile);
 
                     if (checksum != null) {
-                        addLogMessage("Checksum calculated: " + checksum);
+                        // Show checksum preview (first 8 + last 8 chars for verification)
+                        String checksumPreview = checksum.length() > 16 ? 
+                            checksum.substring(0, 8) + "..." + checksum.substring(checksum.length() - 8) : 
+                            checksum;
+                        addLogMessage("Checksum: " + checksumPreview);
                     }
 
                     // Export database file
@@ -1800,7 +1830,11 @@ public class MainActivity extends AppCompatActivity {
             addLogMessage("Checksum metadata loaded:");
             addLogMessage("  Algorithm: " + algorithm);
             addLogMessage("  Filename: " + originalFilename);
-            addLogMessage("  Expected checksum: " + expectedChecksum);
+            // Show checksum preview (first 8 + last 8 chars)
+            String checksumPreview = expectedChecksum.length() > 16 ? 
+                expectedChecksum.substring(0, 8) + "..." + expectedChecksum.substring(expectedChecksum.length() - 8) : 
+                expectedChecksum;
+            addLogMessage("  Expected checksum: " + checksumPreview);
             if (isEncrypted) {
                 addLogMessage("  Encryption: Enabled");
                 if (encryptionSaltBase64 != null) {
@@ -2472,8 +2506,15 @@ public class MainActivity extends AppCompatActivity {
             addLogMessage("✓ Checksum verified successfully for " + filename);
         } else {
             addLogMessage("✗ Checksum verification FAILED for " + filename);
-            addLogMessage("  Expected: " + metadataChecksum);
-            addLogMessage("  Actual:   " + fileChecksum);
+            // Show checksum previews (first 8 + last 8 chars)
+            String expectedPreview = metadataChecksum.length() > 16 ? 
+                metadataChecksum.substring(0, 8) + "..." + metadataChecksum.substring(metadataChecksum.length() - 8) : 
+                metadataChecksum;
+            String actualPreview = fileChecksum.length() > 16 ? 
+                fileChecksum.substring(0, 8) + "..." + fileChecksum.substring(fileChecksum.length() - 8) : 
+                fileChecksum;
+            addLogMessage("  Expected: " + expectedPreview);
+            addLogMessage("  Actual:   " + actualPreview);
         }
 
         return matches;
@@ -3191,6 +3232,34 @@ public class MainActivity extends AppCompatActivity {
                     dataListView.setVisibility(View.VISIBLE);
                 }
                 Toast.makeText(this, "✓ Database unlocked", Toast.LENGTH_SHORT).show();
+                
+                // Log database status after unlock
+                if (database != null) {
+                    try {
+                        // Count data in database
+                        Cursor wifiCursor = dbRawQuery("SELECT COUNT(*) FROM wifi_data", null);
+                        int wifiCount = 0;
+                        if (wifiCursor != null) {
+                            if (wifiCursor.moveToFirst()) wifiCount = wifiCursor.getInt(0);
+                            wifiCursor.close();
+                        }
+                        
+                        Cursor btCursor = dbRawQuery("SELECT COUNT(*) FROM device_data WHERE device_type='BLUETOOTH'", null);
+                        int btCount = 0;
+                        if (btCursor != null) {
+                            if (btCursor.moveToFirst()) btCount = btCursor.getInt(0);
+                            btCursor.close();
+                        }
+                        
+                        addLogMessage("📊 After unlock - DB contains: " + wifiCount + " WiFi + " + btCount + " BT");
+                        Log.i("MainActivity", "After unlock - DB contains: " + wifiCount + " WiFi + " + btCount + " BT");
+                        
+                        // Update total count display
+                        updateTotalNetworksCount();
+                    } catch (Exception e) {
+                        Log.e("MainActivity", "Error counting data after unlock: " + e.getMessage());
+                    }
+                }
             } else {
                 // Wrong passphrase - allow retry
                 int newAttemptCount = attemptCount + 1;
@@ -3675,14 +3744,62 @@ public class MainActivity extends AppCompatActivity {
             protected Boolean doInBackground(Void... params) {
                 net.sqlcipher.database.SQLiteDatabase externalDb = null;
                 try {
+                    // Ensure internal database is open before import
+                    if (database == null) {
+                        Log.e("Import", "Internal database is NULL before import! Opening now...");
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                // Initialize database if not already open
+                                if (encryptionManager.isEncryptionEnabled() && encryptionManager.isPassphraseCached()) {
+                                    initializeEncryptedDatabase();
+                                } else if (!encryptionManager.isEncryptionEnabled()) {
+                                    DatabaseHelper dbHelper = new DatabaseHelper(MainActivity.this);
+                                    database = dbHelper.getWritableDatabase();
+                                }
+                            }
+                        });
+                        
+                        // Wait a bit for DB to open
+                        try {
+                            Thread.sleep(500);
+                        } catch (InterruptedException e) {
+                            // Ignore
+                        }
+                        
+                        if (database == null) {
+                            Log.e("Import", "Failed to open internal database!");
+                            return false;
+                        }
+                    }
+                    
                     // Open encrypted external database
                     net.sqlcipher.database.SQLiteDatabase.loadLibs(MainActivity.this);
                     externalDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
                         encryptedDbFile.getAbsolutePath(), passphrase, null, 
                         net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY);
                     
+                    Log.i("Import", "Starting import from encrypted database...");
+                    
                     // Copy data to internal database
                     copyDataFromEncryptedToInternal(externalDb);
+                    
+                    // Force database sync to ensure data is written to disk
+                    if (database != null) {
+                        if (isDatabaseEncrypted) {
+                            net.sqlcipher.database.SQLiteDatabase db = (net.sqlcipher.database.SQLiteDatabase) database;
+                            if (db.isOpen() && !db.isReadOnly()) {
+                                // SQLCipher databases are auto-synced on transaction commit
+                                Log.i("Import", "Encrypted database transaction committed");
+                            }
+                        } else {
+                            android.database.sqlite.SQLiteDatabase db = (android.database.sqlite.SQLiteDatabase) database;
+                            if (db.isOpen() && !db.isReadOnly()) {
+                                // Standard SQLite databases are auto-synced
+                                Log.i("Import", "Standard database transaction committed");
+                            }
+                        }
+                    }
                     
                     return true;
                     
@@ -3703,10 +3820,31 @@ public class MainActivity extends AppCompatActivity {
                 pendingEncryptionSalt = null;
 
                 if (success) {
+                    // Verify data was actually written to database
+                    int totalWifi = 0;
+                    int totalBT = 0;
+                    
+                    try {
+                        Cursor wifiCursor = dbRawQuery("SELECT COUNT(*) FROM wifi_data", null);
+                        if (wifiCursor != null) {
+                            if (wifiCursor.moveToFirst()) totalWifi = wifiCursor.getInt(0);
+                            wifiCursor.close();
+                        }
+                        
+                        Cursor btCursor = dbRawQuery("SELECT COUNT(*) FROM device_data WHERE device_type='BLUETOOTH'", null);
+                        if (btCursor != null) {
+                            if (btCursor.moveToFirst()) totalBT = btCursor.getInt(0);
+                            btCursor.close();
+                        }
+                    } catch (Exception e) {
+                        Log.e("Import", "Error counting imported data: " + e.getMessage());
+                    }
+                    
                     Toast.makeText(MainActivity.this,
                         "✓ Imported " + wifiCount + " WiFi + " + bluetoothCount + " BT devices",
                         Toast.LENGTH_LONG).show();
                     addLogMessage("✓ Import completed: " + wifiCount + " WiFi + " + bluetoothCount + " BT");
+                    addLogMessage("📊 Database now contains: " + totalWifi + " WiFi + " + totalBT + " BT");
 
                     // Update total networks count
                     updateTotalNetworksCount();
@@ -3726,58 +3864,193 @@ public class MainActivity extends AppCompatActivity {
      * Copy data from encrypted database to internal database
      */
     private void copyDataFromEncryptedToInternal(net.sqlcipher.database.SQLiteDatabase externalDb) {
-        // Copy wifi_data
-        if (hasEncryptedTable(externalDb, "wifi_data")) {
-            android.database.Cursor cursor = externalDb.rawQuery("SELECT * FROM wifi_data", null);
-            while (cursor.moveToNext()) {
-                android.content.ContentValues values = new android.content.ContentValues();
-                for (String columnName : cursor.getColumnNames()) {
-                    int columnIndex = cursor.getColumnIndex(columnName);
-                    if (!cursor.isNull(columnIndex)) {
-                        int type = cursor.getType(columnIndex);
-                        switch (type) {
-                            case android.database.Cursor.FIELD_TYPE_INTEGER:
-                                values.put(columnName, cursor.getLong(columnIndex));
-                                break;
-                            case android.database.Cursor.FIELD_TYPE_FLOAT:
-                                values.put(columnName, cursor.getDouble(columnIndex));
-                                break;
-                            case android.database.Cursor.FIELD_TYPE_STRING:
-                                values.put(columnName, cursor.getString(columnIndex));
-                                break;
-                        }
-                    }
-                }
-                dbInsert("wifi_data", null, values);
-            }
-            cursor.close();
-        }
+        int wifiInserted = 0;
+        int deviceInserted = 0;
         
-        // Copy device_data
-        if (hasEncryptedTable(externalDb, "device_data")) {
-            android.database.Cursor cursor = externalDb.rawQuery("SELECT * FROM device_data", null);
-            while (cursor.moveToNext()) {
-                android.content.ContentValues values = new android.content.ContentValues();
-                for (String columnName : cursor.getColumnNames()) {
-                    int columnIndex = cursor.getColumnIndex(columnName);
-                    if (!cursor.isNull(columnIndex)) {
-                        int type = cursor.getType(columnIndex);
-                        switch (type) {
-                            case android.database.Cursor.FIELD_TYPE_INTEGER:
-                                values.put(columnName, cursor.getLong(columnIndex));
-                                break;
-                            case android.database.Cursor.FIELD_TYPE_FLOAT:
-                                values.put(columnName, cursor.getDouble(columnIndex));
-                                break;
-                            case android.database.Cursor.FIELD_TYPE_STRING:
-                                values.put(columnName, cursor.getString(columnIndex));
-                                break;
+        // Log database info for debugging
+        Log.i("Import", "═══════════════════════════════════════");
+        Log.i("Import", "IMPORT TARGET DATABASE INFO");
+        Log.i("Import", "═══════════════════════════════════════");
+        Log.i("Import", "Database is null: " + (database == null));
+        Log.i("Import", "Database is encrypted: " + isDatabaseEncrypted);
+        if (database != null) {
+            try {
+                String dbPath;
+                if (isDatabaseEncrypted) {
+                    net.sqlcipher.database.SQLiteDatabase db = (net.sqlcipher.database.SQLiteDatabase) database;
+                    dbPath = db.getPath();
+                    Log.i("Import", "DB Path: " + dbPath);
+                    Log.i("Import", "DB is open: " + db.isOpen());
+                    Log.i("Import", "DB is readonly: " + db.isReadOnly());
+                    
+                    // Also log to UI
+                    final String path = dbPath;
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            addLogMessage("📂 Import target DB: " + path);
+                            addLogMessage("🔐 Target is encrypted: YES");
+                        }
+                    });
+                } else {
+                    android.database.sqlite.SQLiteDatabase db = (android.database.sqlite.SQLiteDatabase) database;
+                    dbPath = db.getPath();
+                    Log.i("Import", "DB Path: " + dbPath);
+                    Log.i("Import", "DB is open: " + db.isOpen());
+                    Log.i("Import", "DB is readonly: " + db.isReadOnly());
+                    
+                    // Also log to UI
+                    final String path = dbPath;
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            addLogMessage("📂 Import target DB: " + path);
+                            addLogMessage("🔐 Target is encrypted: NO");
+                        }
+                    });
+                }
+            } catch (Exception e) {
+                Log.e("Import", "Error getting DB info: " + e.getMessage());
+            }
+        }
+        Log.i("Import", "═══════════════════════════════════════");
+        
+        try {
+            // Start transaction for better performance and atomicity
+            if (isDatabaseEncrypted) {
+                ((net.sqlcipher.database.SQLiteDatabase) database).beginTransaction();
+            } else {
+                ((android.database.sqlite.SQLiteDatabase) database).beginTransaction();
+            }
+            
+            // Copy wifi_data
+            if (hasEncryptedTable(externalDb, "wifi_data")) {
+                android.database.Cursor cursor = externalDb.rawQuery("SELECT * FROM wifi_data", null);
+                while (cursor.moveToNext()) {
+                    android.content.ContentValues values = new android.content.ContentValues();
+                    for (String columnName : cursor.getColumnNames()) {
+                        int columnIndex = cursor.getColumnIndex(columnName);
+                        if (!cursor.isNull(columnIndex)) {
+                            int type = cursor.getType(columnIndex);
+                            switch (type) {
+                                case android.database.Cursor.FIELD_TYPE_INTEGER:
+                                    values.put(columnName, cursor.getLong(columnIndex));
+                                    break;
+                                case android.database.Cursor.FIELD_TYPE_FLOAT:
+                                    values.put(columnName, cursor.getDouble(columnIndex));
+                                    break;
+                                case android.database.Cursor.FIELD_TYPE_STRING:
+                                    values.put(columnName, cursor.getString(columnIndex));
+                                    break;
+                            }
                         }
                     }
+                    long result = dbInsert("wifi_data", null, values);
+                    if (result != -1) wifiInserted++;
                 }
-                dbInsert("device_data", null, values);
+                cursor.close();
+                Log.i("Import", "Inserted " + wifiInserted + " wifi_data records");
             }
-            cursor.close();
+            
+            // Copy device_data
+            if (hasEncryptedTable(externalDb, "device_data")) {
+                android.database.Cursor cursor = externalDb.rawQuery("SELECT * FROM device_data", null);
+                while (cursor.moveToNext()) {
+                    android.content.ContentValues values = new android.content.ContentValues();
+                    for (String columnName : cursor.getColumnNames()) {
+                        int columnIndex = cursor.getColumnIndex(columnName);
+                        if (!cursor.isNull(columnIndex)) {
+                            int type = cursor.getType(columnIndex);
+                            switch (type) {
+                                case android.database.Cursor.FIELD_TYPE_INTEGER:
+                                    values.put(columnName, cursor.getLong(columnIndex));
+                                    break;
+                                case android.database.Cursor.FIELD_TYPE_FLOAT:
+                                    values.put(columnName, cursor.getDouble(columnIndex));
+                                    break;
+                                case android.database.Cursor.FIELD_TYPE_STRING:
+                                    values.put(columnName, cursor.getString(columnIndex));
+                                    break;
+                            }
+                        }
+                    }
+                    long result = dbInsert("device_data", null, values);
+                    if (result != -1) deviceInserted++;
+                }
+                cursor.close();
+                Log.i("Import", "Inserted " + deviceInserted + " device_data records");
+            }
+            
+            // Commit transaction
+            if (isDatabaseEncrypted) {
+                ((net.sqlcipher.database.SQLiteDatabase) database).setTransactionSuccessful();
+                ((net.sqlcipher.database.SQLiteDatabase) database).endTransaction();
+                
+                // Force sync to disk
+                try {
+                    net.sqlcipher.database.SQLiteDatabase db = (net.sqlcipher.database.SQLiteDatabase) database;
+                    // Execute a dummy query to ensure all changes are flushed
+                    android.database.Cursor c = db.rawQuery("PRAGMA wal_checkpoint(FULL)", null);
+                    if (c != null) {
+                        c.moveToFirst();
+                        c.close();
+                    }
+                    Log.i("Import", "Forced WAL checkpoint (full sync to disk)");
+                } catch (Exception e) {
+                    Log.w("Import", "Could not force WAL checkpoint: " + e.getMessage());
+                }
+            } else {
+                ((android.database.sqlite.SQLiteDatabase) database).setTransactionSuccessful();
+                ((android.database.sqlite.SQLiteDatabase) database).endTransaction();
+            }
+            
+            Log.i("Import", "✓ Import transaction committed: " + wifiInserted + " WiFi + " + deviceInserted + " device records");
+            
+            // Verify data was written by querying again
+            try {
+                int verifyWifi = 0;
+                int verifyDevice = 0;
+                
+                android.database.Cursor wifiCursor = null;
+                android.database.Cursor deviceCursor = null;
+                
+                if (isDatabaseEncrypted) {
+                    net.sqlcipher.database.SQLiteDatabase db = (net.sqlcipher.database.SQLiteDatabase) database;
+                    wifiCursor = db.rawQuery("SELECT COUNT(*) FROM wifi_data", null);
+                    deviceCursor = db.rawQuery("SELECT COUNT(*) FROM device_data", null);
+                } else {
+                    android.database.sqlite.SQLiteDatabase db = (android.database.sqlite.SQLiteDatabase) database;
+                    wifiCursor = db.rawQuery("SELECT COUNT(*) FROM wifi_data", null);
+                    deviceCursor = db.rawQuery("SELECT COUNT(*) FROM device_data", null);
+                }
+                
+                if (wifiCursor != null) {
+                    if (wifiCursor.moveToFirst()) verifyWifi = wifiCursor.getInt(0);
+                    wifiCursor.close();
+                }
+                if (deviceCursor != null) {
+                    if (deviceCursor.moveToFirst()) verifyDevice = deviceCursor.getInt(0);
+                    deviceCursor.close();
+                }
+                
+                Log.i("Import", "✓ Verification after commit: " + verifyWifi + " wifi_data + " + verifyDevice + " device_data in DB");
+            } catch (Exception e) {
+                Log.e("Import", "Error verifying data after commit: " + e.getMessage());
+            }
+            
+        } catch (Exception e) {
+            Log.e("Import", "Error during import transaction: " + e.getMessage(), e);
+            // Rollback transaction on error
+            try {
+                if (isDatabaseEncrypted) {
+                    ((net.sqlcipher.database.SQLiteDatabase) database).endTransaction();
+                } else {
+                    ((android.database.sqlite.SQLiteDatabase) database).endTransaction();
+                }
+            } catch (Exception e2) {
+                Log.e("Import", "Error rolling back transaction: " + e2.getMessage());
+            }
+            throw new RuntimeException("Import failed: " + e.getMessage(), e);
         }
     }
     
