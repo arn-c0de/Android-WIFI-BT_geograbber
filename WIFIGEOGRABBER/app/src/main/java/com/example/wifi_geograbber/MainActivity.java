@@ -3299,30 +3299,53 @@ public class MainActivity extends AppCompatActivity {
     private void showEncryptionSettingsDialog() {
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
         builder.setTitle(R.string.encryption_settings);
-        
-        String status = encryptionManager.isEncryptionEnabled() ? 
+
+        String status = encryptionManager.isEncryptionEnabled() ?
             getString(R.string.encryption_enabled) : getString(R.string.encryption_disabled);
-        
-        String[] options = encryptionManager.isEncryptionEnabled() ? 
+
+        String[] options = encryptionManager.isEncryptionEnabled() ?
             new String[]{getString(R.string.change_passphrase), getString(R.string.disable_encryption)} :
             new String[]{getString(R.string.enable_encryption)};
-        
-        builder.setMessage(getString(R.string.encryption_status) + ": " + status + "\n\n" + "Options:");
-        
-        builder.setItems(options, (dialog, which) -> {
+
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(40, 30, 40, 10);
+
+        android.widget.TextView statusText = new android.widget.TextView(this);
+        statusText.setText(getString(R.string.encryption_status) + ": " + status + "\n\nOptions:");
+        layout.addView(statusText);
+
+        android.widget.ListView optionsList = new android.widget.ListView(this);
+        android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_list_item_1, options);
+        optionsList.setAdapter(adapter);
+        layout.addView(optionsList);
+
+        if (encryptionManager.isEncryptionEnabled()) {
+            android.widget.Button resetButton = new android.widget.Button(this);
+            resetButton.setText("Encryption Reset");
+            resetButton.setOnClickListener(v -> {
+                showEncryptionResetDialog();
+            });
+            layout.addView(resetButton);
+        }
+
+        builder.setView(layout);
+        builder.setNegativeButton(R.string.cancel, null);
+        android.app.AlertDialog dialog = builder.create();
+        dialog.show();
+
+        optionsList.setOnItemClickListener((parent, view, position, id) -> {
             if (encryptionManager.isEncryptionEnabled()) {
-                if (which == 0) {
+                if (position == 0) {
                     showChangePassphraseDialog();
-                } else {
+                } else if (position == 1) {
                     showDisableEncryptionDialog();
                 }
             } else {
                 showSetupEncryptionDialog();
             }
+            dialog.dismiss();
         });
-        
-        builder.setNegativeButton(R.string.cancel, null);
-        builder.show();
     }
     
     /**
@@ -3447,6 +3470,129 @@ public class MainActivity extends AppCompatActivity {
                 } else {
                     Toast.makeText(MainActivity.this, R.string.encryption_key_change_failed, 
                                   Toast.LENGTH_LONG).show();
+                }
+            }
+        }.execute();
+    }
+    
+    /**
+     * Show encryption reset dialog
+     */
+    private void showEncryptionResetDialog() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("Encryption Reset");
+        builder.setMessage("This will reset the encryption and allow you to set up a new passphrase.\n\n" +
+                "⚠️ WARNING:\n" +
+                "• Current database will be decrypted first\n" +
+                "• Then re-encrypted with new passphrase\n" +
+                "• All data will be preserved\n" +
+                "• Background service will be stopped\n\n" +
+                "Do you want to continue?");
+        
+        builder.setPositiveButton("Reset Encryption", (dialog, which) -> {
+            resetEncryption();
+        });
+        
+        builder.setNegativeButton(R.string.cancel, null);
+        builder.show();
+    }
+    
+    /**
+     * Reset encryption (decrypt then show setup dialog)
+     */
+    private void resetEncryption() {
+        new android.os.AsyncTask<Void, Void, Boolean>() {
+            android.app.ProgressDialog progressDialog;
+            
+            @Override
+            protected void onPreExecute() {
+                // Stop all scanning activities
+                if (isScanning) {
+                    stopScanning();
+                }
+                stopService(new Intent(MainActivity.this, ScanService.class));
+                
+                progressDialog = android.app.ProgressDialog.show(
+                    MainActivity.this, 
+                    "Resetting Encryption",
+                    "Deleting encrypted database...", 
+                    true
+                );
+            }
+            
+            @Override
+            protected Boolean doInBackground(Void... params) {
+                try {
+                    // Close current database
+                    if (database != null) {
+                        dbClose();
+                        database = null;
+                    }
+                    
+                    // Wait for database to close
+                    Thread.sleep(500);
+                    
+                    // Delete the encrypted database files
+                    String dbPath = getDatabasePath("wifi_scanner.db").getAbsolutePath();
+                    java.io.File dbFile = new java.io.File(dbPath);
+                    java.io.File dbJournal = new java.io.File(dbPath + "-journal");
+                    java.io.File dbWal = new java.io.File(dbPath + "-wal");
+                    java.io.File dbShm = new java.io.File(dbPath + "-shm");
+                    
+                    boolean success = true;
+                    if (dbFile.exists()) {
+                        success = dbFile.delete();
+                        Log.d("MainActivity", "Deleted database file: " + success);
+                    }
+                    if (dbJournal.exists()) {
+                        dbJournal.delete();
+                    }
+                    if (dbWal.exists()) {
+                        dbWal.delete();
+                    }
+                    if (dbShm.exists()) {
+                        dbShm.delete();
+                    }
+                    
+                    if (!success) {
+                        Log.e("MainActivity", "Failed to delete encrypted database");
+                        return false;
+                    }
+                    
+                    // Clear encryption manager
+                    encryptionManager.clearPassphrase();
+                    encryptionManager.disableEncryption();
+                    
+                    return true;
+                    
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Encryption reset error", e);
+                    return false;
+                }
+            }
+            
+            @Override
+            protected void onPostExecute(Boolean success) {
+                progressDialog.dismiss();
+                
+                if (success) {
+                    Toast.makeText(MainActivity.this, "Encryption reset successful. Database deleted. You can now set up new encryption.", 
+                                  Toast.LENGTH_LONG).show();
+                    
+                    // Reset encryption flags
+                    isDatabaseEncrypted = false;
+                    
+                    // Re-initialize database as unencrypted
+                    initializeDatabase();
+                    
+                    // Show setup dialog to offer encryption again
+                    showSetupEncryptionDialog();
+                } else {
+                    Toast.makeText(MainActivity.this, "Encryption reset failed. Please try again.", 
+                                  Toast.LENGTH_LONG).show();
+                    
+                    // Try to recover by opening whatever database we have
+                    initializeDatabase();
                 }
             }
         }.execute();
