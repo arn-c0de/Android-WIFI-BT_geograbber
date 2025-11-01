@@ -1,0 +1,57 @@
+name: 📚 Documentation Issue
+description: Problem or improvement in the documentation
+title: "[Docs]: "
+labels: ["documentation", "triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us improve the documentation!
+        
+  - type: dropdown
+    id: doc-type
+    attributes:
+      label: Which documentation does this concern?
+      multiple: true
+      options:
+        - README.md
+        - CONTRIBUTING.md
+        - Docs folder (guides)
+        - Code comments/Docstrings
+        - API documentation
+        - Setup guide
+    validations:
+      required: true
+      
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is the problem?
+      description: What is unclear, missing, or incorrect?
+      placeholder: Describe the problem with the documentation
+    validations:
+      required: true
+      
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Improvement Suggestion
+      description: How should it be?
+      placeholder: Describe how the documentation could be improved
+    validations:
+      required: true
+      
+  - type: input
+    id: location
+    attributes:
+      label: File path or link
+      description: Where is the part that needs improvement?
+      placeholder: e.g. docs/QUICKSTART.md line 45
+      
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Would you like to improve the documentation?
+      options:
+        - label: I would like to create a pull request
