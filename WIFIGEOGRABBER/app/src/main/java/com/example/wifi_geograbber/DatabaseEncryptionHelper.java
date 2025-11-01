@@ -84,7 +84,14 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
     public DatabaseEncryptionHelper(Context context, String passphrase) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
         this.context = context;
-        this.passphrase = passphrase;
+        // Ensure passphrase is in the correct format for SQLCipher
+        // If it's a hex string (64 chars), wrap it in x'...'
+        if (passphrase != null && passphrase.length() == 64 && passphrase.matches("[0-9a-fA-F]+")) {
+            this.passphrase = "x'" + passphrase + "'";
+            Log.d(TAG, "Using hex key format for SQLCipher");
+        } else {
+            this.passphrase = passphrase;
+        }
         
         // Initialize SQLCipher
         SQLiteDatabase.loadLibs(context);

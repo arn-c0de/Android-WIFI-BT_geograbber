@@ -13,6 +13,7 @@
     <string name="more">More</string>
     <string name="show_map">🗺️ Show Map</string>
     <string name="debug_log">Debug Log:</string>
+    <string name="export_log_button">Export Debug Log</string>
     <string name="logcat_placeholder">LogCat will be displayed here…\n</string>
 
     <!-- Map Activity -->

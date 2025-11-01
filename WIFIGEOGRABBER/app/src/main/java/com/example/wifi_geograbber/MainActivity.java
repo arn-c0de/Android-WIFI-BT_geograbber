@@ -20,6 +20,8 @@ import android.net.wifi.WifiManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Build;
+import android.text.Editable;
+import android.text.Selection;
 import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
@@ -316,8 +318,26 @@ public class MainActivity extends AppCompatActivity {
         bluetoothAdapter = bluetoothManager.getAdapter();
 
         // New button for further actions
+            // Double-click to select all in debug log
+            logcatText.setOnClickListener(new View.OnClickListener() {
+                private long lastClickTime = 0;
+                @Override
+                public void onClick(View v) {
+                    long clickTime = System.currentTimeMillis();
+                    if (clickTime - lastClickTime < 400) { // double-click detected (400ms)
+                        Editable editable = Editable.Factory.getInstance().newEditable(logcatText.getText());
+                        logcatText.setText(editable);
+                        Selection.setSelection(editable, 0, editable.length());
+                    }
+                    lastClickTime = clickTime;
+                }
+            });
         moreButton = findViewById(R.id.more_button);
         moreButton.setOnClickListener(v -> showMoreDialog());
+
+        // Export log button
+        Button exportLogButton = findViewById(R.id.export_log_button);
+        exportLogButton.setOnClickListener(v -> exportDebugLogToTxt());
 
         // Toggle button for active scanning
         toggleScanButton.setOnClickListener(v -> {
@@ -1821,7 +1841,7 @@ public class MainActivity extends AppCompatActivity {
                 // Checksum verified successfully
                 Toast.makeText(this, "✓ Checksum verified successfully!", Toast.LENGTH_LONG).show();
                 addLogMessage("Proceeding with verified import...");
-                clearPendingImport();
+                // DON'T clear pending import yet - we need the salt!
                 proceedWithDatabaseImport(dbFile);
             } else {
                 // Checksum mismatch - show error
@@ -2406,6 +2426,20 @@ public class MainActivity extends AppCompatActivity {
                     String saltBase64 = android.util.Base64.encodeToString(salt, android.util.Base64.NO_WRAP);
                     metadata.put("encryptionSalt", saltBase64);
                     addLogMessage("Including encryption salt in metadata for portable import");
+                    
+                    // DEBUG: Log derived key for troubleshooting
+                    String cachedKey = encryptionManager.getCachedDatabaseKey();
+                    if (cachedKey != null) {
+                        // Log full key for debugging
+                        Log.i("EXPORT_DEBUG", "═══════════════════════════════════════");
+                        Log.i("EXPORT_DEBUG", "DATABASE EXPORT - ENCRYPTION INFO");
+                        Log.i("EXPORT_DEBUG", "═══════════════════════════════════════");
+                        Log.i("EXPORT_DEBUG", "Salt (Base64): " + saltBase64);
+                        Log.i("EXPORT_DEBUG", "Derived Key (hex): " + cachedKey);
+                        Log.i("EXPORT_DEBUG", "Key Length: " + cachedKey.length() + " chars");
+                        Log.i("EXPORT_DEBUG", "═══════════════════════════════════════");
+                        addLogMessage("🔑 Export Key: " + cachedKey);
+                    }
                 }
             }
 
@@ -3480,22 +3514,56 @@ public class MainActivity extends AppCompatActivity {
                     // If we have salt from metadata, derive the key properly
                     if (pendingEncryptionSalt != null) {
                         Log.i("MainActivity", "Using encryption salt from metadata to derive key");
+                        
+                        // DEBUG: Log import parameters
+                        String saltBase64 = android.util.Base64.encodeToString(pendingEncryptionSalt, android.util.Base64.NO_WRAP);
+                        Log.i("IMPORT_DEBUG", "═══════════════════════════════════════");
+                        Log.i("IMPORT_DEBUG", "DATABASE IMPORT - ENCRYPTION INFO");
+                        Log.i("IMPORT_DEBUG", "═══════════════════════════════════════");
+                        Log.i("IMPORT_DEBUG", "Salt (Base64): " + saltBase64);
+                        Log.i("IMPORT_DEBUG", "Passphrase Length: " + passphrase.length() + " chars");
+                        
                         char[] passphraseChars = passphrase.toCharArray();
-                        derivedKey = encryptionManager.deriveKeyWithCustomSalt(passphraseChars, pendingEncryptionSalt);
+                        String hexKey = encryptionManager.deriveKeyWithCustomSalt(passphraseChars, pendingEncryptionSalt);
                         java.util.Arrays.fill(passphraseChars, '\0');  // Clear passphrase from memory
+                        
+                        // SQLCipher expects hex keys in the format: x'<hex-string>'
+                        derivedKey = "x'" + hexKey + "'";
+                        
+                        // Log full key for debugging BEFORE attempting to open database
+                        Log.i("IMPORT_DEBUG", "Derived Key (hex): " + hexKey);
+                        Log.i("IMPORT_DEBUG", "Key Length: " + hexKey.length() + " chars");
+                        Log.i("IMPORT_DEBUG", "═══════════════════════════════════════");
+                        
+                        // Log to UI (must be done on UI thread)
+                        final String keyForLog = hexKey;
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                addLogMessage("🔑 Import Key: " + keyForLog);
+                            }
+                        });
+                        
+                        Log.i("MainActivity", "Derived hex key for SQLCipher (length: " + hexKey.length() + ")");
+                        Log.i("MainActivity", "Attempting to open database with derived key...");
 
-                        // Open database with derived key
+                        // Open database with derived key in hex format
                         testDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
                             encryptedDbFile.getAbsolutePath(), derivedKey, null,
                             net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY);
                     } else {
-                    // Fallback: Try raw passphrase (backwards compatibility)
-                    Log.i("MainActivity", "No salt in metadata - trying raw passphrase");
-                    derivedKey = passphrase;
-                    testDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
-                        encryptedDbFile.getAbsolutePath(), derivedKey, null,
-                        net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY);
-                }                    // Check for required tables
+                        // Fallback: Try raw passphrase (backwards compatibility)
+                        Log.i("MainActivity", "No salt in metadata - trying raw passphrase");
+                        Log.i("IMPORT_DEBUG", "═══════════════════════════════════════");
+                        Log.i("IMPORT_DEBUG", "DATABASE IMPORT - NO SALT (LEGACY MODE)");
+                        Log.i("IMPORT_DEBUG", "═══════════════════════════════════════");
+                        Log.i("IMPORT_DEBUG", "Using raw passphrase (no PBKDF2 derivation)");
+                        Log.i("IMPORT_DEBUG", "═══════════════════════════════════════");
+                        derivedKey = passphrase;
+                        testDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                            encryptedDbFile.getAbsolutePath(), derivedKey, null,
+                            net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY);
+                    }                    // Check for required tables
                     boolean hasWifiData = hasEncryptedTable(testDb, "wifi_data");
                     boolean hasDeviceData = hasEncryptedTable(testDb, "device_data");
                     
@@ -3544,7 +3612,8 @@ public class MainActivity extends AppCompatActivity {
                         "Found data:\n" +
                         "• " + wifiCount + " WiFi networks\n" +
                         "• " + bluetoothCount + " Bluetooth devices\n\n" +
-                        "Import this data into your database?"
+                        "Import this data into your database?\n\n" +
+                        "📋 Encryption debug info logged to Logcat (tag: IMPORT_DEBUG)"
                     );
                     
                     confirmBuilder.setPositiveButton("Import", (d, w) -> {
@@ -3556,8 +3625,11 @@ public class MainActivity extends AppCompatActivity {
                     });
                     
                     confirmBuilder.show();
+                    addLogMessage("✓ Database unlocked successfully - check Logcat for key comparison");
                 } else {
                     Toast.makeText(MainActivity.this, R.string.wrong_passphrase, Toast.LENGTH_LONG).show();
+                    addLogMessage("✗ Failed to unlock database - wrong passphrase or corrupted file");
+                    addLogMessage("Check Logcat (tag: IMPORT_DEBUG) for detailed encryption info");
                     encryptedDbFile.delete();
                     pendingEncryptionSalt = null;  // Clear pending salt on failure
                 }
@@ -3838,6 +3910,65 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         }
+    }
+
+    // Export debug log to txt file
+    private void exportDebugLogToTxt() {
+        String logText = logcatText.getText().toString();
+        
+        // Show dialog with options
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("Export Debug Log");
+        builder.setMessage("Choose export option:");
+        
+        // Copy to clipboard option
+        builder.setPositiveButton("📋 Copy to Clipboard", (dialog, which) -> {
+            android.content.ClipboardManager clipboard = (android.content.ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+            android.content.ClipData clip = android.content.ClipData.newPlainText("Debug Log", logText);
+            clipboard.setPrimaryClip(clip);
+            Toast.makeText(this, "Debug log copied to clipboard!", Toast.LENGTH_SHORT).show();
+            addLogMessage("Debug log copied to clipboard");
+        });
+        
+        // Save to Downloads option
+        builder.setNegativeButton("💾 Save to Downloads", (dialog, which) -> {
+            try {
+                // For Android 10+ (API 29+), use MediaStore to save to Downloads
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    android.content.ContentValues values = new android.content.ContentValues();
+                    String timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(new java.util.Date());
+                    String filename = "debug_log_" + timestamp + ".txt";
+                    values.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename);
+                    values.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "text/plain");
+                    values.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS);
+                    
+                    android.net.Uri uri = getContentResolver().insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+                    if (uri != null) {
+                        java.io.OutputStream outputStream = getContentResolver().openOutputStream(uri);
+                        outputStream.write(logText.getBytes());
+                        outputStream.close();
+                        Toast.makeText(this, "Debug log saved to Downloads/" + filename, Toast.LENGTH_LONG).show();
+                        addLogMessage("Debug log saved to Downloads/" + filename);
+                    }
+                } else {
+                    // For older Android versions, save to public Downloads directory
+                    java.io.File downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS);
+                    String timestamp = new java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.getDefault()).format(new java.util.Date());
+                    java.io.File exportFile = new java.io.File(downloadsDir, "debug_log_" + timestamp + ".txt");
+                    java.io.FileWriter writer = new java.io.FileWriter(exportFile);
+                    writer.write(logText);
+                    writer.close();
+                    Toast.makeText(this, "Debug log saved to Downloads/" + exportFile.getName(), Toast.LENGTH_LONG).show();
+                    addLogMessage("Debug log saved to " + exportFile.getName());
+                }
+            } catch (Exception e) {
+                Toast.makeText(this, "Save failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                addLogMessage("ERROR: Failed to save log: " + e.getMessage());
+            }
+        });
+        
+        builder.setNeutralButton("Cancel", null);
+        builder.show();
     }
 }
 
