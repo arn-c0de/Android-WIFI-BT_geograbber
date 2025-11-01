@@ -92,20 +92,32 @@ public class MainActivity extends AppCompatActivity {
 
     // Helper methods for database operations that work with both types
     private Cursor dbRawQuery(String sql, String[] selectionArgs) {
-        if (database == null) return null;
-        if (isDatabaseEncrypted) {
-            return ((net.sqlcipher.database.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
-        } else {
-            return ((android.database.sqlite.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
+        try {
+            if (database == null) return null;
+            if (isDatabaseEncrypted) {
+                return ((net.sqlcipher.database.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
+            } else {
+                return ((android.database.sqlite.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
+            }
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Error in dbRawQuery: " + e.getMessage(), e);
+            return null;
         }
     }
 
     private void dbExecSQL(String sql) {
-        if (database == null) return;
-        if (isDatabaseEncrypted) {
-            ((net.sqlcipher.database.SQLiteDatabase) database).execSQL(sql);
-        } else {
-            ((android.database.sqlite.SQLiteDatabase) database).execSQL(sql);
+        try {
+            if (database == null) return;
+            if (isDatabaseEncrypted) {
+                ((net.sqlcipher.database.SQLiteDatabase) database).execSQL(sql);
+            } else {
+                ((android.database.sqlite.SQLiteDatabase) database).execSQL(sql);
+            }
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Error in dbExecSQL: " + e.getMessage(), e);
+            if (e.getMessage() != null && e.getMessage().contains("readonly database")) {
+                Toast.makeText(this, "Database is readonly. Please restart the app.", Toast.LENGTH_LONG).show();
+            }
         }
     }
 
@@ -1468,11 +1480,23 @@ public class MainActivity extends AppCompatActivity {
                 "• Delete Database: Completely remove database file (requires app restart)");
         
         builder.setPositiveButton("Clear Data", (dialog, which) -> {
-            // Just clear the data in the tables
-            dbExecSQL("DELETE FROM wifi_data");
-            dbExecSQL("DELETE FROM device_data");
-            Toast.makeText(this, R.string.all_networks_deleted, Toast.LENGTH_SHORT).show();
-            showData();
+            // Explicitly stop ScanService to release database
+            stopService(new Intent(this, ScanService.class));
+            if (isScanning) {
+                stopScanning();
+            }
+            // Wait 500ms to ensure ScanService is fully stopped
+            new android.os.Handler().postDelayed(() -> {
+                try {
+                    dbExecSQL("DELETE FROM wifi_data");
+                    dbExecSQL("DELETE FROM device_data");
+                    Toast.makeText(this, R.string.all_networks_deleted, Toast.LENGTH_SHORT).show();
+                    showData();
+                } catch (Exception e) {
+                    android.util.Log.e("MainActivity", "Error clearing database: " + e.getMessage(), e);
+                    Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                }
+            }, 500);
         });
         
         builder.setNegativeButton("Delete Database", (dialog, which) -> {
@@ -1498,55 +1522,128 @@ public class MainActivity extends AppCompatActivity {
         
         confirmBuilder.setPositiveButton("Yes, Delete", (dialog, which) -> {
             try {
+                // Explicitly stop ScanService to release database
+                stopService(new Intent(this, ScanService.class));
+                if (isScanning) {
+                    stopScanning();
+                }
+                // Wait 500ms to ensure ScanService is fully stopped
+                new android.os.Handler().postDelayed(() -> {
+                    try {
+                        // Delete both possible database names
+                        String[] dbNames = {"wifi_scanner.db", "wifi_scanner_encrypted.db"};
+                        boolean anyDeleted = false;
+                        for (String dbName : dbNames) {
+                            java.io.File dbFile = getDatabasePath(dbName);
+                            if (dbFile.exists()) {
+                                boolean deleted = dbFile.delete();
+                                if (deleted) {
+                                    anyDeleted = true;
+                                    android.util.Log.d("MainActivity", "Database file deleted: " + dbName);
+                                }
+                            }
+                            java.io.File journalFile = new java.io.File(dbFile.getAbsolutePath() + "-journal");
+                            if (journalFile.exists()) {
+                                journalFile.delete();
+                            }
+                            java.io.File walFile = new java.io.File(dbFile.getAbsolutePath() + "-wal");
+                            if (walFile.exists()) {
+                                walFile.delete();
+                            }
+                            java.io.File shmFile = new java.io.File(dbFile.getAbsolutePath() + "-shm");
+                            if (shmFile.exists()) {
+                                shmFile.delete();
+                            }
+                        }
+                        encryptionManager.disableEncryption();
+                        if (anyDeleted) {
+                            Toast.makeText(this, "✓ Database deleted. App will restart...", Toast.LENGTH_LONG).show();
+                            new android.os.Handler().postDelayed(() -> {
+                                Intent intent = new Intent(this, MainActivity.class);
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                finishAffinity();
+                                startActivity(intent);
+                            }, 1500);
+                        } else {
+                            Toast.makeText(this, "No database file found to delete", Toast.LENGTH_LONG).show();
+                        }
+                    } catch (Exception e) {
+                        android.util.Log.e("MainActivity", "Error deleting database files: " + e.getMessage(), e);
+                        Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }, 500);
+                
                 // Close database connection
                 if (database != null) {
                     dbClose();
                     database = null;
                 }
                 
-                // Get database file path
-                String dbName = "wifi_scanner.db";
-                java.io.File dbFile = getDatabasePath(dbName);
-                
-                // Delete main database file
-                boolean deleted = false;
-                if (dbFile.exists()) {
-                    deleted = dbFile.delete();
-                    Log.d("MainActivity", "Database file deleted: " + deleted);
+                // Close encrypted database helper
+                if (encryptedDbHelper != null) {
+                    encryptedDbHelper = null;
                 }
                 
-                // Delete associated files (journal, wal, shm)
-                java.io.File journalFile = new java.io.File(dbFile.getAbsolutePath() + "-journal");
-                if (journalFile.exists()) {
-                    journalFile.delete();
-                }
-                
-                java.io.File walFile = new java.io.File(dbFile.getAbsolutePath() + "-wal");
-                if (walFile.exists()) {
-                    walFile.delete();
-                }
-                
-                java.io.File shmFile = new java.io.File(dbFile.getAbsolutePath() + "-shm");
-                if (shmFile.exists()) {
-                    shmFile.delete();
-                }
-                
-                if (deleted) {
-                    Toast.makeText(this, "✓ Database deleted. App will restart...", Toast.LENGTH_LONG).show();
-                    
-                        // Restart app after short delay
-                        new android.os.Handler().postDelayed(() -> {
-                            Intent intent = new Intent(this, MainActivity.class);
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                            finishAffinity();
-                            startActivity(intent);
-                        }, 2000);
-                } else {
-                    Toast.makeText(this, "Failed to delete database file", Toast.LENGTH_LONG).show();
-                }
+                // Wait a moment for all connections to close
+                new android.os.Handler().postDelayed(() -> {
+                    try {
+                        // Delete both possible database names
+                        String[] dbNames = {"wifi_scanner.db", "wifi_scanner_encrypted.db"};
+                        boolean anyDeleted = false;
+                        
+                        for (String dbName : dbNames) {
+                            java.io.File dbFile = getDatabasePath(dbName);
+                            
+                            // Delete main database file
+                            if (dbFile.exists()) {
+                                boolean deleted = dbFile.delete();
+                                if (deleted) {
+                                    anyDeleted = true;
+                                    Log.d("MainActivity", "Database file deleted: " + dbName);
+                                }
+                            }
+                            
+                            // Delete associated files (journal, wal, shm)
+                            java.io.File journalFile = new java.io.File(dbFile.getAbsolutePath() + "-journal");
+                            if (journalFile.exists()) {
+                                journalFile.delete();
+                            }
+                            
+                            java.io.File walFile = new java.io.File(dbFile.getAbsolutePath() + "-wal");
+                            if (walFile.exists()) {
+                                walFile.delete();
+                            }
+                            
+                            java.io.File shmFile = new java.io.File(dbFile.getAbsolutePath() + "-shm");
+                            if (shmFile.exists()) {
+                                shmFile.delete();
+                            }
+                        }
+                        
+                        // Clear encryption settings
+                        encryptionManager.disableEncryption();
+                        
+                        if (anyDeleted) {
+                            Toast.makeText(this, "✓ Database deleted. App will restart...", Toast.LENGTH_LONG).show();
+                            
+                            // Restart app after short delay
+                            new android.os.Handler().postDelayed(() -> {
+                                Intent intent = new Intent(this, MainActivity.class);
+                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+                                finishAffinity();
+                                startActivity(intent);
+                            }, 1500);
+                        } else {
+                            Toast.makeText(this, "No database file found to delete", Toast.LENGTH_LONG).show();
+                        }
+                    } catch (Exception e) {
+                        Log.e("MainActivity", "Error deleting database files: " + e.getMessage(), e);
+                        Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
+                }, 500); // Wait 500ms for connections to close
                 
             } catch (Exception e) {
-                Log.e("MainActivity", "Error deleting database: " + e.getMessage(), e);
+                Log.e("MainActivity", "Error preparing database deletion: " + e.getMessage(), e);
                 Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
             }
         });

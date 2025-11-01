@@ -56,38 +56,64 @@ public class ScanService extends Service {
 
     // Helper methods for database operations that work with both types
     private Cursor dbRawQuery(String sql, String[] selectionArgs) {
-        if (database == null) return null;
-        if (isUsingEncryptedDatabase) {
-            return ((net.sqlcipher.database.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
-        } else {
-            return ((android.database.sqlite.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
+        try {
+            if (database == null) {
+                Log.w("ScanService", "Database is null in dbRawQuery");
+                return null;
+            }
+            if (isUsingEncryptedDatabase) {
+                return ((net.sqlcipher.database.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
+            } else {
+                return ((android.database.sqlite.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
+            }
+        } catch (Exception e) {
+            Log.e("ScanService", "Error in dbRawQuery: " + e.getMessage());
+            return null;
         }
     }
 
     private void dbExecSQL(String sql) {
-        if (database == null) return;
-        if (isUsingEncryptedDatabase) {
-            ((net.sqlcipher.database.SQLiteDatabase) database).execSQL(sql);
-        } else {
-            ((android.database.sqlite.SQLiteDatabase) database).execSQL(sql);
+        try {
+            if (database == null) {
+                Log.w("ScanService", "Database is null in dbExecSQL");
+                return;
+            }
+            if (isUsingEncryptedDatabase) {
+                ((net.sqlcipher.database.SQLiteDatabase) database).execSQL(sql);
+            } else {
+                ((android.database.sqlite.SQLiteDatabase) database).execSQL(sql);
+            }
+        } catch (Exception e) {
+            Log.e("ScanService", "Error in dbExecSQL: " + e.getMessage());
         }
     }
 
     private void dbExecSQL(String sql, Object[] bindArgs) {
-        if (database == null) return;
-        if (isUsingEncryptedDatabase) {
-            ((net.sqlcipher.database.SQLiteDatabase) database).execSQL(sql, bindArgs);
-        } else {
-            ((android.database.sqlite.SQLiteDatabase) database).execSQL(sql, bindArgs);
+        try {
+            if (database == null) {
+                Log.w("ScanService", "Database is null in dbExecSQL with args");
+                return;
+            }
+            if (isUsingEncryptedDatabase) {
+                ((net.sqlcipher.database.SQLiteDatabase) database).execSQL(sql, bindArgs);
+            } else {
+                ((android.database.sqlite.SQLiteDatabase) database).execSQL(sql, bindArgs);
+            }
+        } catch (Exception e) {
+            Log.e("ScanService", "Error in dbExecSQL with args: " + e.getMessage());
         }
     }
 
     private void dbClose() {
-        if (database == null) return;
-        if (isUsingEncryptedDatabase) {
-            ((net.sqlcipher.database.SQLiteDatabase) database).close();
-        } else {
-            ((android.database.sqlite.SQLiteDatabase) database).close();
+        try {
+            if (database == null) return;
+            if (isUsingEncryptedDatabase) {
+                ((net.sqlcipher.database.SQLiteDatabase) database).close();
+            } else {
+                ((android.database.sqlite.SQLiteDatabase) database).close();
+            }
+        } catch (Exception e) {
+            Log.e("ScanService", "Error closing database: " + e.getMessage());
         }
     }
 
