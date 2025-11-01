@@ -67,7 +67,9 @@ docs/
 ### 3. Development & Security 🔧
 1. [CONTRIBUTING.md](../CONTRIBUTING.md) – Contribution guidelines
 2. [SECURITY.md](../SECURITY.md) – Security policy
- 3. [SHA-256 Checksum Verification Guide](security/SHA256_CHECKSUM_VERIFICATION.md) – Database integrity & verification
+3. [SHA-256 Checksum Verification Guide](security/SHA256_CHECKSUM_VERIFICATION.md) – Database integrity
+4. [SHA-256 Checksum Verification Guide](security/SECRET_MANAGEMENT_QUICKSTART.md) – Secret Quickstart  
+
 
 ---
 
