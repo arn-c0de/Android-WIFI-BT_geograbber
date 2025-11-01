@@ -1,5 +1,5 @@
 name: "✨ Task / To-Do"
-about: "Create a new actionable task for contributors to help improve CrawlLama."
+about: "Create a new actionable task for contributors to help improve GeoGrabber."
 labels: ["task", "help wanted", "good first issue"]
 title: "[Task] <Short, clear summary>"
 assignees: []
