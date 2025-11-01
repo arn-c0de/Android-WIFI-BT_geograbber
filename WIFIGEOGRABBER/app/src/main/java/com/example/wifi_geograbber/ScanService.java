@@ -62,12 +62,22 @@ public class ScanService extends Service {
                 return null;
             }
             if (isUsingEncryptedDatabase) {
-                return ((net.sqlcipher.database.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
+                net.sqlcipher.database.SQLiteDatabase db = (net.sqlcipher.database.SQLiteDatabase) database;
+                if (!db.isOpen() || db.isReadOnly()) {
+                    Log.w("ScanService", "Encrypted database is not open or is readonly in dbRawQuery");
+                    return null;
+                }
+                return db.rawQuery(sql, selectionArgs);
             } else {
-                return ((android.database.sqlite.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
+                android.database.sqlite.SQLiteDatabase db = (android.database.sqlite.SQLiteDatabase) database;
+                if (!db.isOpen() || db.isReadOnly()) {
+                    Log.w("ScanService", "Database is not open or is readonly in dbRawQuery");
+                    return null;
+                }
+                return db.rawQuery(sql, selectionArgs);
             }
         } catch (Exception e) {
-            Log.e("ScanService", "Error in dbRawQuery: " + e.getMessage());
+            Log.e("ScanService", "Error in dbRawQuery: " + e.getMessage(), e);
             return null;
         }
     }
@@ -79,12 +89,22 @@ public class ScanService extends Service {
                 return;
             }
             if (isUsingEncryptedDatabase) {
-                ((net.sqlcipher.database.SQLiteDatabase) database).execSQL(sql);
+                net.sqlcipher.database.SQLiteDatabase db = (net.sqlcipher.database.SQLiteDatabase) database;
+                if (!db.isOpen() || db.isReadOnly()) {
+                    Log.w("ScanService", "Encrypted database is not open or is readonly in dbExecSQL");
+                    return;
+                }
+                db.execSQL(sql);
             } else {
-                ((android.database.sqlite.SQLiteDatabase) database).execSQL(sql);
+                android.database.sqlite.SQLiteDatabase db = (android.database.sqlite.SQLiteDatabase) database;
+                if (!db.isOpen() || db.isReadOnly()) {
+                    Log.w("ScanService", "Database is not open or is readonly in dbExecSQL");
+                    return;
+                }
+                db.execSQL(sql);
             }
         } catch (Exception e) {
-            Log.e("ScanService", "Error in dbExecSQL: " + e.getMessage());
+            Log.e("ScanService", "Error in dbExecSQL: " + e.getMessage(), e);
         }
     }
 
@@ -95,12 +115,22 @@ public class ScanService extends Service {
                 return;
             }
             if (isUsingEncryptedDatabase) {
-                ((net.sqlcipher.database.SQLiteDatabase) database).execSQL(sql, bindArgs);
+                net.sqlcipher.database.SQLiteDatabase db = (net.sqlcipher.database.SQLiteDatabase) database;
+                if (!db.isOpen() || db.isReadOnly()) {
+                    Log.w("ScanService", "Encrypted database is not open or is readonly in dbExecSQL with args");
+                    return;
+                }
+                db.execSQL(sql, bindArgs);
             } else {
-                ((android.database.sqlite.SQLiteDatabase) database).execSQL(sql, bindArgs);
+                android.database.sqlite.SQLiteDatabase db = (android.database.sqlite.SQLiteDatabase) database;
+                if (!db.isOpen() || db.isReadOnly()) {
+                    Log.w("ScanService", "Database is not open or is readonly in dbExecSQL with args");
+                    return;
+                }
+                db.execSQL(sql, bindArgs);
             }
         } catch (Exception e) {
-            Log.e("ScanService", "Error in dbExecSQL with args: " + e.getMessage());
+            Log.e("ScanService", "Error in dbExecSQL with args: " + e.getMessage(), e);
         }
     }
 
@@ -164,27 +194,36 @@ public class ScanService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         createNotificationChannel();
-        
+
         // Read Bluetooth status from intent
         if (intent != null) {
             isBluetoothEnabled = intent.getBooleanExtra("bluetooth_enabled", false);
             // Extract database path from intent
             databasePath = intent.getStringExtra("database_path");
         }
-        
+
+        // CRITICAL: startForeground() MUST be called before initializeDatabase()
+        // because initializeDatabase() may call stopSelf() if passphrase is not cached
+        startForeground(NOTIFICATION_ID, createNotification());
+
         // Reinitialize database if path has changed
         initializeDatabase();
-        
-        startForeground(NOTIFICATION_ID, createNotification());
-        
+
+        // Check if database initialization succeeded
+        if (database == null) {
+            Log.w("ScanService", "Database not initialized - service will stop");
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+
         if (!isRunning) {
             isRunning = true;
             startLocationUpdates();
             handler.post(scanRunnable);
             Log.d("ScanService", "Background scanning started - Bluetooth: " + isBluetoothEnabled);
         }
-        
-        return START_STICKY; // The service will automatically restart when it is stopped.
+
+    return START_NOT_STICKY; // The service will NOT restart automatically when stopped.
     }
 
     @Override
@@ -216,6 +255,34 @@ public class ScanService extends Service {
         return null; //We use an unbound service
     }
 
+    /**
+     * Delete database file and all associated files
+     */
+    private void deleteDatabaseFiles() {
+        try {
+            java.io.File dbFile = getDatabasePath("wifi_scanner.db");
+
+            // Delete main database file
+            if (dbFile.exists()) {
+                boolean deleted = dbFile.delete();
+                Log.d("ScanService", "Deleted old database file: " + deleted);
+            }
+
+            // Delete associated files
+            java.io.File journalFile = new java.io.File(dbFile.getAbsolutePath() + "-journal");
+            if (journalFile.exists()) journalFile.delete();
+
+            java.io.File walFile = new java.io.File(dbFile.getAbsolutePath() + "-wal");
+            if (walFile.exists()) walFile.delete();
+
+            java.io.File shmFile = new java.io.File(dbFile.getAbsolutePath() + "-shm");
+            if (shmFile.exists()) shmFile.delete();
+
+        } catch (Exception e) {
+            Log.e("ScanService", "Error deleting database files: " + e.getMessage());
+        }
+    }
+
     // Initialize database based on path
     private void initializeDatabase() {
         try {
@@ -223,10 +290,11 @@ public class ScanService extends Service {
             if (database != null) {
                 dbClose();
             }
-            
+
             // Reset the flag
             isUsingEncryptedDatabase = false;
-            
+            database = null; // Reset to null
+
             // Check if encryption is enabled
             if (encryptionManager.isEncryptionEnabled()) {
                 // Use encrypted database
@@ -234,23 +302,33 @@ public class ScanService extends Service {
                 if (dbKey != null) {
                     encryptedDbHelper = new DatabaseEncryptionHelper(this, dbKey);
                     database = encryptedDbHelper.openEncryptedDatabase();
-                    
+
                     if (database != null) {
-                        isUsingEncryptedDatabase = true;
-                        Log.d("ScanService", "Using encrypted database");
+                        net.sqlcipher.database.SQLiteDatabase encDb = (net.sqlcipher.database.SQLiteDatabase) database;
+                        if (encDb.isOpen() && !encDb.isReadOnly()) {
+                            isUsingEncryptedDatabase = true;
+                            Log.d("ScanService", "Using encrypted database (writable)");
+                        } else {
+                            Log.e("ScanService", "Encrypted database opened but is readonly - cannot write data");
+                            encDb.close();
+                            database = null;
+                            // DO NOT disable encryption! User needs to unlock it in MainActivity
+                            // Service will be stopped in onStartCommand() when it checks database == null
+                            return;
+                        }
                     } else {
-                        Log.e("ScanService", "Failed to open encrypted database, falling back to unencrypted");
-                        encryptionManager.disableEncryption();
-                        MainActivity.DatabaseHelper dbHelper = new MainActivity.DatabaseHelper(this);
-                        database = dbHelper.getWritableDatabase();
-                        isUsingEncryptedDatabase = false;
+                        Log.e("ScanService", "Failed to open encrypted database - wrong passphrase or corrupted");
+                        database = null;
+                        // DO NOT disable encryption! User needs to provide correct passphrase
+                        // Service will be stopped in onStartCommand() when it checks database == null
+                        return;
                     }
                 } else {
-                    Log.e("ScanService", "Encryption enabled but passphrase not cached");
-                    // Fall back to standard database
-                    MainActivity.DatabaseHelper dbHelper = new MainActivity.DatabaseHelper(this);
-                    database = dbHelper.getWritableDatabase();
-                    isUsingEncryptedDatabase = false;
+                    Log.w("ScanService", "Encryption enabled but passphrase not cached - waiting for user to unlock");
+                    // DO NOT disable encryption! User needs to unlock the database first in MainActivity
+                    database = null;
+                    // Service will be stopped in onStartCommand() when it checks database == null
+                    return;
                 }
             } else if (databasePath != null && !databasePath.isEmpty()) {
                 // Use external database
@@ -264,25 +342,38 @@ public class ScanService extends Service {
                 isUsingEncryptedDatabase = false;
                 Log.d("ScanService", "Using internal database");
             }
-            
-            // Verify database is valid
+
+            // Verify database is valid and writable
             if (database == null) {
-                throw new Exception("Database is null after initialization");
+                Log.e("ScanService", "Database is null after initialization");
+                return;
             }
-            
+
+            // Additional validation: check if database is writable
+            boolean isWritable = false;
+            if (isUsingEncryptedDatabase) {
+                net.sqlcipher.database.SQLiteDatabase db = (net.sqlcipher.database.SQLiteDatabase) database;
+                isWritable = db.isOpen() && !db.isReadOnly();
+            } else {
+                android.database.sqlite.SQLiteDatabase db = (android.database.sqlite.SQLiteDatabase) database;
+                isWritable = db.isOpen() && !db.isReadOnly();
+            }
+
+            if (!isWritable) {
+                Log.e("ScanService", "Database is readonly - cannot write data");
+                database = null;
+                return;
+            }
+
+            Log.d("ScanService", "Database initialized successfully and is writable");
+
         } catch (Exception e) {
             Log.e("ScanService", "Error initializing database: " + e.getMessage());
             e.printStackTrace();
-            // Fallback to the internal database
-            try {
-                MainActivity.DatabaseHelper dbHelper = new MainActivity.DatabaseHelper(this);
-                database = dbHelper.getWritableDatabase();
-                isUsingEncryptedDatabase = false;
-                Log.d("ScanService", "Fallback to internal database successful");
-            } catch (Exception fallbackError) {
-                Log.e("ScanService", "CRITICAL: Cannot initialize any database!", fallbackError);
-                database = null;
-            }
+
+            // DO NOT automatically disable encryption or delete database!
+            // Set database to null so service will stop in onStartCommand()
+            database = null;
         }
     }
 

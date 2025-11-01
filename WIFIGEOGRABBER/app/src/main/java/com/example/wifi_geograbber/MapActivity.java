@@ -31,7 +31,9 @@ public class MapActivity extends AppCompatActivity {
     private static final String PREF_CENTER_LON = "centerLon";
     private static final String PREF_ZOOM = "zoomLevel";
     private WebView mapWebView;
-    private SQLiteDatabase database;
+    private Object database; // Can be either SQLiteDatabase or net.sqlcipher.database.SQLiteDatabase
+    private boolean isDatabaseEncrypted = false;
+    private EncryptionManager encryptionManager;
     private Button backButton, refreshButton, locationButton;
     private FusedLocationProviderClient fusedLocationClient;
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
@@ -117,11 +119,18 @@ public class MapActivity extends AppCompatActivity {
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
-        // Initialize database - always use internal DB
-        // (all external data has already been imported)
-        MainActivity.DatabaseHelper dbHelper = new MainActivity.DatabaseHelper(this);
-        database = dbHelper.getReadableDatabase();
-        
+        // Initialize encryption manager
+        encryptionManager = new EncryptionManager(this);
+
+        // Initialize database - check if encryption is enabled
+        initializeDatabase();
+
+        if (database == null) {
+            Toast.makeText(this, "Failed to open database", Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
+
         Toast.makeText(this, R.string.internal_database_loaded, Toast.LENGTH_SHORT).show();
         dbStatusText.setText(R.string.internal_app_database);
         dbStatusText.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
@@ -136,6 +145,76 @@ public class MapActivity extends AppCompatActivity {
 
         // Load data and show map
         loadDataAndShowMap();
+    }
+
+    /**
+     * Initialize database (encrypted or unencrypted)
+     */
+    private void initializeDatabase() {
+        // Check if encryption is enabled
+        if (encryptionManager.isEncryptionEnabled()) {
+            // Get cached passphrase
+            String dbKey = encryptionManager.getCachedDatabaseKey();
+            if (dbKey != null) {
+                try {
+                    // Open encrypted database in readonly mode
+                    DatabaseEncryptionHelper encryptedDbHelper = new DatabaseEncryptionHelper(this, dbKey);
+                    database = encryptedDbHelper.openEncryptedDatabaseReadonly();
+                    isDatabaseEncrypted = true;
+                    Log.d("MapActivity", "Opened encrypted database in readonly mode");
+                } catch (Exception e) {
+                    Log.e("MapActivity", "Failed to open encrypted database: " + e.getMessage());
+                    database = null;
+                }
+            } else {
+                Log.e("MapActivity", "Encryption enabled but passphrase not cached");
+                database = null;
+            }
+        } else {
+            // Open unencrypted database
+            try {
+                MainActivity.DatabaseHelper dbHelper = new MainActivity.DatabaseHelper(this);
+                database = dbHelper.getReadableDatabase();
+                isDatabaseEncrypted = false;
+                Log.d("MapActivity", "Opened unencrypted database in readonly mode");
+            } catch (Exception e) {
+                Log.e("MapActivity", "Failed to open unencrypted database: " + e.getMessage());
+                database = null;
+            }
+        }
+    }
+
+    /**
+     * Execute raw query on database (works with both encrypted and unencrypted)
+     */
+    private Cursor dbRawQuery(String sql, String[] selectionArgs) {
+        try {
+            if (database == null) return null;
+            if (isDatabaseEncrypted) {
+                return ((net.sqlcipher.database.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
+            } else {
+                return ((android.database.sqlite.SQLiteDatabase) database).rawQuery(sql, selectionArgs);
+            }
+        } catch (Exception e) {
+            Log.e("MapActivity", "Error in dbRawQuery: " + e.getMessage(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Close database
+     */
+    private void dbClose() {
+        try {
+            if (database == null) return;
+            if (isDatabaseEncrypted) {
+                ((net.sqlcipher.database.SQLiteDatabase) database).close();
+            } else {
+                ((android.database.sqlite.SQLiteDatabase) database).close();
+            }
+        } catch (Exception e) {
+            Log.e("MapActivity", "Error closing database: " + e.getMessage(), e);
+        }
     }
 
     // Method to hide System UI (fullscreen, home button, navigation)
@@ -208,7 +287,7 @@ public class MapActivity extends AppCompatActivity {
                 "AND latitude != 0 AND longitude != 0 " +
                 "ORDER BY signal_strength DESC";
 
-            Cursor deviceCursor = database.rawQuery(sql, new String[]{
+            Cursor deviceCursor = dbRawQuery(sql, new String[]{
                 String.valueOf(minLat), String.valueOf(maxLat),
                 String.valueOf(minLon), String.valueOf(maxLon)
             });
@@ -244,7 +323,7 @@ public class MapActivity extends AppCompatActivity {
             deviceCursor.close();
 
             // Additionally load WiFi data from old table (only in visible area, without LIMIT)
-            Cursor wifiCursor = database.rawQuery(
+            Cursor wifiCursor = dbRawQuery(
                 "SELECT ssid, bssid, signal_strength, encryption, " +
                 "latitude, longitude, timestamp " +
                 "FROM wifi_data WHERE latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? " +
@@ -963,7 +1042,7 @@ public class MapActivity extends AppCompatActivity {
         @JavascriptInterface
         public String getTotalDeviceCount() {
             try {
-                Cursor cursor = database.rawQuery(
+                Cursor cursor = dbRawQuery(
                     "SELECT COUNT(*) as total_devices, " +
                     "SUM(CASE WHEN device_type = 'WIFI' THEN 1 ELSE 0 END) as wifi_count, " +
                     "SUM(CASE WHEN device_type != 'WIFI' THEN 1 ELSE 0 END) as bt_count " +
@@ -1017,7 +1096,7 @@ public class MapActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         if (database != null) {
-            database.close();
+            dbClose();
         }
 
         // Delete temporary external DB

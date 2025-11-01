@@ -122,20 +122,74 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void dbExecSQL(String sql, Object[] bindArgs) {
-        if (database == null) return;
-        if (isDatabaseEncrypted) {
-            ((net.sqlcipher.database.SQLiteDatabase) database).execSQL(sql, bindArgs);
-        } else {
-            ((android.database.sqlite.SQLiteDatabase) database).execSQL(sql, bindArgs);
+        try {
+            if (database == null) {
+                android.util.Log.w("MainActivity", "Database is null in dbExecSQL with args");
+                return;
+            }
+
+            // Check if database is readonly before attempting write
+            if (isDatabaseEncrypted) {
+                net.sqlcipher.database.SQLiteDatabase db = (net.sqlcipher.database.SQLiteDatabase) database;
+                if (!db.isOpen()) {
+                    android.util.Log.w("MainActivity", "Encrypted database is not open in dbExecSQL with args");
+                    return;
+                }
+                if (db.isReadOnly()) {
+                    android.util.Log.w("MainActivity", "Encrypted database is readonly in dbExecSQL with args - skipping write operation");
+                    Toast.makeText(this, "Database is readonly. Please restart the app.", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                db.execSQL(sql, bindArgs);
+            } else {
+                android.database.sqlite.SQLiteDatabase db = (android.database.sqlite.SQLiteDatabase) database;
+                if (!db.isOpen()) {
+                    android.util.Log.w("MainActivity", "Database is not open in dbExecSQL with args");
+                    return;
+                }
+                if (db.isReadOnly()) {
+                    android.util.Log.w("MainActivity", "Database is readonly in dbExecSQL with args - skipping write operation");
+                    Toast.makeText(this, "Database is readonly. Please restart the app.", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                db.execSQL(sql, bindArgs);
+            }
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Error in dbExecSQL with args: " + e.getMessage(), e);
+            if (e.getMessage() != null && e.getMessage().contains("readonly database")) {
+                Toast.makeText(this, "Database is readonly. Please restart the app.", Toast.LENGTH_LONG).show();
+            } else if (e.getMessage() != null && e.getMessage().contains("not a database")) {
+                Toast.makeText(this, "Database corrupted. Please clear data or reinstall.", Toast.LENGTH_LONG).show();
+            }
         }
     }
 
     private long dbInsert(String table, String nullColumnHack, android.content.ContentValues values) {
-        if (database == null) return -1;
-        if (isDatabaseEncrypted) {
-            return ((net.sqlcipher.database.SQLiteDatabase) database).insert(table, nullColumnHack, values);
-        } else {
-            return ((android.database.sqlite.SQLiteDatabase) database).insert(table, nullColumnHack, values);
+        try {
+            if (database == null) {
+                android.util.Log.w("MainActivity", "Database is null in dbInsert");
+                return -1;
+            }
+
+            // Check if database is readonly before attempting write
+            if (isDatabaseEncrypted) {
+                net.sqlcipher.database.SQLiteDatabase db = (net.sqlcipher.database.SQLiteDatabase) database;
+                if (!db.isOpen() || db.isReadOnly()) {
+                    android.util.Log.w("MainActivity", "Encrypted database is not open or readonly in dbInsert");
+                    return -1;
+                }
+                return db.insert(table, nullColumnHack, values);
+            } else {
+                android.database.sqlite.SQLiteDatabase db = (android.database.sqlite.SQLiteDatabase) database;
+                if (!db.isOpen() || db.isReadOnly()) {
+                    android.util.Log.w("MainActivity", "Database is not open or readonly in dbInsert");
+                    return -1;
+                }
+                return db.insert(table, nullColumnHack, values);
+            }
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Error in dbInsert: " + e.getMessage(), e);
+            return -1;
         }
     }
 
@@ -230,6 +284,9 @@ public class MainActivity extends AppCompatActivity {
         
         // Activate full-screen mode - hide the navigation bar (after setContentView!)
         hideSystemUI();
+
+        // Ensure ScanService is stopped on app start
+        stopService(new Intent(this, ScanService.class));
 
         // Initialize encryption manager
         encryptionManager = new EncryptionManager(this);
@@ -1471,15 +1528,15 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // Delete DB
+    // Clear all data from database
     private void clearDatabase() {
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
-        builder.setTitle("Delete Database");
-        builder.setMessage("What would you like to do?\n\n" +
-                "• Clear Data: Remove all entries but keep database structure\n" +
-                "• Delete Database: Completely remove database file (requires app restart)");
-        
-        builder.setPositiveButton("Clear Data", (dialog, which) -> {
+        builder.setTitle("Clear Database");
+        builder.setMessage("This will remove all WiFi and Bluetooth data from the database.\n\n" +
+                "The database structure and encryption settings will be preserved.\n\n" +
+                "Are you sure?");
+
+        builder.setPositiveButton("Clear All Data", (dialog, which) -> {
             // Explicitly stop ScanService to release database
             stopService(new Intent(this, ScanService.class));
             if (isScanning) {
@@ -1491,165 +1548,18 @@ public class MainActivity extends AppCompatActivity {
                     dbExecSQL("DELETE FROM wifi_data");
                     dbExecSQL("DELETE FROM device_data");
                     Toast.makeText(this, R.string.all_networks_deleted, Toast.LENGTH_SHORT).show();
+                    // Refresh the display to show empty data
                     showData();
+                    android.util.Log.d("MainActivity", "Database cleared successfully");
                 } catch (Exception e) {
                     android.util.Log.e("MainActivity", "Error clearing database: " + e.getMessage(), e);
-                    Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(this, "Error clearing database: " + e.getMessage(), Toast.LENGTH_LONG).show();
                 }
             }, 500);
         });
-        
-        builder.setNegativeButton("Delete Database", (dialog, which) -> {
-            // Actually delete the database file
-            deleteDatabaseFile();
-        });
-        
-        builder.setNeutralButton("Cancel", null);
+
+        builder.setNegativeButton("Cancel", null);
         builder.show();
-    }
-    
-    /**
-     * Actually delete the database file from disk
-     */
-    private void deleteDatabaseFile() {
-        android.app.AlertDialog.Builder confirmBuilder = new android.app.AlertDialog.Builder(this);
-        confirmBuilder.setTitle("⚠️ Delete Database File");
-        confirmBuilder.setMessage("This will permanently delete the database file!\n\n" +
-                "• All WiFi and Bluetooth data will be lost\n" +
-                "• App will restart after deletion\n" +
-                "• A new empty database will be created\n\n" +
-                "Are you sure?");
-        
-        confirmBuilder.setPositiveButton("Yes, Delete", (dialog, which) -> {
-            try {
-                // Explicitly stop ScanService to release database
-                stopService(new Intent(this, ScanService.class));
-                if (isScanning) {
-                    stopScanning();
-                }
-                // Wait 500ms to ensure ScanService is fully stopped
-                new android.os.Handler().postDelayed(() -> {
-                    try {
-                        // Delete both possible database names
-                        String[] dbNames = {"wifi_scanner.db", "wifi_scanner_encrypted.db"};
-                        boolean anyDeleted = false;
-                        for (String dbName : dbNames) {
-                            java.io.File dbFile = getDatabasePath(dbName);
-                            if (dbFile.exists()) {
-                                boolean deleted = dbFile.delete();
-                                if (deleted) {
-                                    anyDeleted = true;
-                                    android.util.Log.d("MainActivity", "Database file deleted: " + dbName);
-                                }
-                            }
-                            java.io.File journalFile = new java.io.File(dbFile.getAbsolutePath() + "-journal");
-                            if (journalFile.exists()) {
-                                journalFile.delete();
-                            }
-                            java.io.File walFile = new java.io.File(dbFile.getAbsolutePath() + "-wal");
-                            if (walFile.exists()) {
-                                walFile.delete();
-                            }
-                            java.io.File shmFile = new java.io.File(dbFile.getAbsolutePath() + "-shm");
-                            if (shmFile.exists()) {
-                                shmFile.delete();
-                            }
-                        }
-                        encryptionManager.disableEncryption();
-                        if (anyDeleted) {
-                            Toast.makeText(this, "✓ Database deleted. App will restart...", Toast.LENGTH_LONG).show();
-                            new android.os.Handler().postDelayed(() -> {
-                                Intent intent = new Intent(this, MainActivity.class);
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                                finishAffinity();
-                                startActivity(intent);
-                            }, 1500);
-                        } else {
-                            Toast.makeText(this, "No database file found to delete", Toast.LENGTH_LONG).show();
-                        }
-                    } catch (Exception e) {
-                        android.util.Log.e("MainActivity", "Error deleting database files: " + e.getMessage(), e);
-                        Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    }
-                }, 500);
-                
-                // Close database connection
-                if (database != null) {
-                    dbClose();
-                    database = null;
-                }
-                
-                // Close encrypted database helper
-                if (encryptedDbHelper != null) {
-                    encryptedDbHelper = null;
-                }
-                
-                // Wait a moment for all connections to close
-                new android.os.Handler().postDelayed(() -> {
-                    try {
-                        // Delete both possible database names
-                        String[] dbNames = {"wifi_scanner.db", "wifi_scanner_encrypted.db"};
-                        boolean anyDeleted = false;
-                        
-                        for (String dbName : dbNames) {
-                            java.io.File dbFile = getDatabasePath(dbName);
-                            
-                            // Delete main database file
-                            if (dbFile.exists()) {
-                                boolean deleted = dbFile.delete();
-                                if (deleted) {
-                                    anyDeleted = true;
-                                    Log.d("MainActivity", "Database file deleted: " + dbName);
-                                }
-                            }
-                            
-                            // Delete associated files (journal, wal, shm)
-                            java.io.File journalFile = new java.io.File(dbFile.getAbsolutePath() + "-journal");
-                            if (journalFile.exists()) {
-                                journalFile.delete();
-                            }
-                            
-                            java.io.File walFile = new java.io.File(dbFile.getAbsolutePath() + "-wal");
-                            if (walFile.exists()) {
-                                walFile.delete();
-                            }
-                            
-                            java.io.File shmFile = new java.io.File(dbFile.getAbsolutePath() + "-shm");
-                            if (shmFile.exists()) {
-                                shmFile.delete();
-                            }
-                        }
-                        
-                        // Clear encryption settings
-                        encryptionManager.disableEncryption();
-                        
-                        if (anyDeleted) {
-                            Toast.makeText(this, "✓ Database deleted. App will restart...", Toast.LENGTH_LONG).show();
-                            
-                            // Restart app after short delay
-                            new android.os.Handler().postDelayed(() -> {
-                                Intent intent = new Intent(this, MainActivity.class);
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                                finishAffinity();
-                                startActivity(intent);
-                            }, 1500);
-                        } else {
-                            Toast.makeText(this, "No database file found to delete", Toast.LENGTH_LONG).show();
-                        }
-                    } catch (Exception e) {
-                        Log.e("MainActivity", "Error deleting database files: " + e.getMessage(), e);
-                        Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-                    }
-                }, 500); // Wait 500ms for connections to close
-                
-            } catch (Exception e) {
-                Log.e("MainActivity", "Error preparing database deletion: " + e.getMessage(), e);
-                Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            }
-        });
-        
-        confirmBuilder.setNegativeButton("Cancel", null);
-        confirmBuilder.show();
     }
 
     // Offer to export checksum metadata file
@@ -2732,10 +2642,9 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        // Clear passphrase from memory when app goes to background
-        if (encryptionManager != null) {
-            encryptionManager.clearPassphrase();
-        }
+        // DO NOT clear passphrase here - it would break MapActivity!
+        // Passphrase will be cleared in onDestroy() when app is actually closing
+        // This allows MapActivity to access the encrypted database
     }
 
     // Update button text according to status
@@ -2767,13 +2676,41 @@ public class MainActivity extends AppCompatActivity {
     // ====================================================================
     
     /**
+     * Delete database file and all associated files
+     */
+    private void deleteDatabaseFiles() {
+        try {
+            java.io.File dbFile = getDatabasePath("wifi_scanner.db");
+
+            // Delete main database file
+            if (dbFile.exists()) {
+                boolean deleted = dbFile.delete();
+                android.util.Log.d("MainActivity", "Deleted old database file: " + deleted);
+            }
+
+            // Delete associated files
+            java.io.File journalFile = new java.io.File(dbFile.getAbsolutePath() + "-journal");
+            if (journalFile.exists()) journalFile.delete();
+
+            java.io.File walFile = new java.io.File(dbFile.getAbsolutePath() + "-wal");
+            if (walFile.exists()) walFile.delete();
+
+            java.io.File shmFile = new java.io.File(dbFile.getAbsolutePath() + "-shm");
+            if (shmFile.exists()) shmFile.delete();
+
+        } catch (Exception e) {
+            android.util.Log.e("MainActivity", "Error deleting database files: " + e.getMessage());
+        }
+    }
+
+    /**
      * Initialize database with encryption support
      */
     private void initializeDatabase() {
         // Check if encryption is enabled
         if (encryptionManager.isEncryptionEnabled()) {
             isDatabaseEncrypted = true;
-            
+
             // Check if passphrase is cached
             if (!encryptionManager.isPassphraseCached()) {
                 // Hide data view until unlocked
@@ -2792,12 +2729,12 @@ public class MainActivity extends AppCompatActivity {
                 // Show first-launch encryption prompt
                 showFirstLaunchEncryptionDialog();
             }
-            
+
             // Use standard database
             DatabaseHelper dbHelper = new DatabaseHelper(this);
             database = dbHelper.getWritableDatabase();
         }
-        
+
         // Update encryption status indicator
         updateEncryptionStatus();
     }
@@ -2829,15 +2766,30 @@ public class MainActivity extends AppCompatActivity {
         if (dbKey != null) {
             encryptedDbHelper = new DatabaseEncryptionHelper(this, dbKey);
             database = encryptedDbHelper.openEncryptedDatabase();
-            
+
             if (database == null) {
                 // This should not happen anymore as openEncryptedDatabase() auto-recovers
                 // But if it does, it means wrong passphrase
-                Log.e("MainActivity", "Failed to open encrypted database even after auto-recovery");
+                android.util.Log.e("MainActivity", "Failed to open encrypted database even after auto-recovery");
                 Toast.makeText(this, R.string.wrong_passphrase, Toast.LENGTH_LONG).show();
                 finish();
             } else {
-                Log.d("MainActivity", "Encrypted database opened successfully");
+                // Verify database is writable
+                net.sqlcipher.database.SQLiteDatabase encDb = (net.sqlcipher.database.SQLiteDatabase) database;
+                if (!encDb.isOpen()) {
+                    android.util.Log.e("MainActivity", "Encrypted database is not open");
+                    Toast.makeText(this, "Database error - not open", Toast.LENGTH_LONG).show();
+                    finish();
+                    return;
+                }
+                if (encDb.isReadOnly()) {
+                    android.util.Log.e("MainActivity", "Encrypted database is readonly");
+                    Toast.makeText(this, "Database error - readonly. Please clear app data.", Toast.LENGTH_LONG).show();
+                    finish();
+                    return;
+                }
+                isDatabaseEncrypted = true;
+                android.util.Log.d("MainActivity", "Encrypted database opened successfully and is writable");
             }
         } else {
             Toast.makeText(this, R.string.database_locked, Toast.LENGTH_LONG).show();

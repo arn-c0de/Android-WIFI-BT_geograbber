@@ -230,7 +230,32 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
             SQLiteDatabase db = getWritableDatabase(passphrase);
             
             if (db != null) {
-                // Verify the database is accessible
+                // Check if database is readonly - if so, recreate it
+                if (db.isReadOnly()) {
+                    Log.w(TAG, "Database is readonly, closing and recreating...");
+                    db.close();
+                    
+                    // Delete the readonly database file
+                    if (dbFile.exists()) {
+                        dbFile.delete();
+                    }
+                    
+                    // Delete associated files
+                    File journalFile = new File(dbFile.getAbsolutePath() + "-journal");
+                    if (journalFile.exists()) journalFile.delete();
+                    
+                    File walFile = new File(dbFile.getAbsolutePath() + "-wal");
+                    if (walFile.exists()) walFile.delete();
+                    
+                    File shmFile = new File(dbFile.getAbsolutePath() + "-shm");
+                    if (shmFile.exists()) shmFile.delete();
+                    
+                    // Create new writable database
+                    db = getWritableDatabase(passphrase);
+                    Log.d(TAG, "Created new writable encrypted database");
+                }
+                
+                // Verify the database is accessible and writable
                 try {
                     Cursor cursor = db.rawQuery("SELECT SQLITE_VERSION()", null);
                     if (cursor != null) {
@@ -238,6 +263,13 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
                         String version = cursor.getString(0);
                         Log.d(TAG, "Successfully opened encrypted database, SQLite version: " + version);
                         cursor.close();
+                    }
+                    
+                    // Test write access
+                    if (!db.isReadOnly()) {
+                        Log.d(TAG, "Database is writable");
+                    } else {
+                        Log.w(TAG, "Database is still readonly after recreation!");
                     }
                 } catch (Exception verifyError) {
                     Log.e(TAG, "Error verifying database after open", verifyError);
@@ -292,7 +324,43 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
             return null;
         }
     }
-    
+
+    /**
+     * Open encrypted database in readonly mode (for MapActivity)
+     */
+    public SQLiteDatabase openEncryptedDatabaseReadonly() {
+        File dbFile = context.getDatabasePath(DATABASE_NAME);
+
+        try {
+            if (!dbFile.exists() || dbFile.length() == 0) {
+                Log.e(TAG, "Database file does not exist or is empty");
+                return null;
+            }
+
+            Log.d(TAG, "Opening encrypted database in readonly mode at: " + dbFile.getAbsolutePath());
+
+            // Open database in readonly mode
+            SQLiteDatabase db = SQLiteDatabase.openDatabase(
+                dbFile.getAbsolutePath(),
+                passphrase,
+                null,
+                SQLiteDatabase.OPEN_READONLY
+            );
+
+            if (db != null && db.isOpen()) {
+                Log.d(TAG, "Encrypted database opened successfully in readonly mode");
+                return db;
+            }
+
+            Log.e(TAG, "Failed to open encrypted database in readonly mode");
+            return null;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Error opening encrypted database in readonly mode: " + e.getMessage(), e);
+            return null;
+        }
+    }
+
     /**
      * Check if database is encrypted (SQLCipher database)
      */

@@ -47,7 +47,7 @@ public class EncryptionManager {
     
     private final Context context;
     private final SharedPreferences prefs;
-    private char[] cachedPassphrase = null;
+    private static char[] cachedPassphrase = null;  // Static so it's shared across all instances
     
     public EncryptionManager(Context context) {
         this.context = context.getApplicationContext();
