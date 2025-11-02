@@ -113,7 +113,7 @@ GeoGrabber is ideal for network analysis, signal mapping, and understanding wire
 
 ### 🔐 Security Features
 
-- 🛡️ **AES-256 Encryption** – Military-grade database encryption using SQLCipher
+- 🛡️ **AES-256 Encryption** – Database encryption using SQLCipher
 - 🔑 **Android Keystore Integration** – Hardware-backed secure passphrase storage
 - 🔐 **Passphrase Protection** – User-controlled encryption with customizable passphrase
 - 🔄 **Database Migration** – Seamless conversion from unencrypted to encrypted databases
