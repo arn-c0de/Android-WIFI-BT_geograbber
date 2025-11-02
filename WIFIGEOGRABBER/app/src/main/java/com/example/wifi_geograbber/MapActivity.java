@@ -1426,27 +1426,171 @@ public class MapActivity extends AppCompatActivity {
         android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
         imm.hideSoftInputFromWindow(searchInput.getWindowToken(), 0);
         
-        // Search in deviceList
-        java.util.List<DeviceData> searchResults = new java.util.ArrayList<>();
-        String lowerQuery = query.toLowerCase();
+        // First try database search
+        java.util.List<DeviceData> searchResults = searchInDatabase(query);
         
-        for (DeviceData device : deviceList) {
-            String name = device.name != null ? device.name.toLowerCase() : "";
-            String address = device.address != null ? device.address.toLowerCase() : "";
-            String vendor = device.vendor != null ? device.vendor.toLowerCase() : "";
-            
-            if (name.contains(lowerQuery) || address.contains(lowerQuery) || vendor.contains(lowerQuery)) {
-                searchResults.add(device);
+        // Fallback: if database search returns nothing, search all loaded devices
+        if (searchResults.isEmpty() && deviceList != null && !deviceList.isEmpty()) {
+            Log.d("MapActivity", "Database search found nothing, trying deviceList fallback");
+            String lowerQuery = query.toLowerCase();
+            for (DeviceData device : deviceList) {
+                String name = device.name != null ? device.name.toLowerCase() : "";
+                String address = device.address != null ? device.address.toLowerCase() : "";
+                String vendor = device.vendor != null ? device.vendor.toLowerCase() : "";
+                
+                if (name.contains(lowerQuery) || address.contains(lowerQuery) || vendor.contains(lowerQuery)) {
+                    searchResults.add(device);
+                }
             }
+            Log.d("MapActivity", "Fallback search in deviceList found " + searchResults.size() + " results");
         }
         
         if (searchResults.isEmpty()) {
-            Toast.makeText(this, R.string.no_search_results, Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "No results found for: " + query, Toast.LENGTH_SHORT).show();
             return;
         }
         
         // Show results in a dialog
         showSearchResultsDialog(searchResults, query);
+    }
+    
+    private java.util.List<DeviceData> searchInDatabase(String query) {
+        java.util.List<DeviceData> results = new java.util.ArrayList<>();
+        String lowerQuery = query.toLowerCase();
+        
+        Log.d("MapActivity", "Starting database search for: '" + query + "', encrypted=" + isDatabaseEncrypted);
+        
+        if (database == null) {
+            Log.e("MapActivity", "Database is null!");
+            return results;
+        }
+        
+        // Try to get all tables first
+        try {
+            android.database.Cursor tablesCursor = null;
+            if (isDatabaseEncrypted) {
+                net.sqlcipher.database.SQLiteDatabase sqlCipherDb = (net.sqlcipher.database.SQLiteDatabase) database;
+                tablesCursor = sqlCipherDb.rawQuery("SELECT name FROM sqlite_master WHERE type='table'", null);
+            } else {
+                android.database.sqlite.SQLiteDatabase stdDb = (android.database.sqlite.SQLiteDatabase) database;
+                tablesCursor = stdDb.rawQuery("SELECT name FROM sqlite_master WHERE type='table'", null);
+            }
+            
+            if (tablesCursor != null) {
+                Log.d("MapActivity", "Available tables:");
+                while (tablesCursor.moveToNext()) {
+                    Log.d("MapActivity", "  - " + tablesCursor.getString(0));
+                }
+                tablesCursor.close();
+            }
+        } catch (Exception e) {
+            Log.e("MapActivity", "Error listing tables: " + e.getMessage());
+        }
+        
+        // Try device_data table
+        try {
+            android.database.Cursor cursor = null;
+            String sql = "SELECT name, address, type, signal, encryption, latitude, longitude, timestamp, " +
+                        "COALESCE(vendor, ''), COALESCE(frequency, 0), COALESCE(channel, 0), COALESCE(standard, ''), " +
+                        "COALESCE(channel_width, 0), COALESCE(max_speed, 0) " +
+                        "FROM device_data WHERE LOWER(name) LIKE ? OR LOWER(address) LIKE ? OR LOWER(vendor) LIKE ?";
+            
+            Log.d("MapActivity", "Executing query: " + sql);
+            
+            if (isDatabaseEncrypted) {
+                net.sqlcipher.database.SQLiteDatabase sqlCipherDb = (net.sqlcipher.database.SQLiteDatabase) database;
+                cursor = sqlCipherDb.rawQuery(sql, new String[]{"%" + lowerQuery + "%", "%" + lowerQuery + "%", "%" + lowerQuery + "%"});
+            } else {
+                android.database.sqlite.SQLiteDatabase stdDb = (android.database.sqlite.SQLiteDatabase) database;
+                cursor = stdDb.rawQuery(sql, new String[]{"%" + lowerQuery + "%", "%" + lowerQuery + "%", "%" + lowerQuery + "%"});
+            }
+            
+            if (cursor != null) {
+                int count = cursor.getCount();
+                Log.d("MapActivity", "device_data query returned " + count + " rows");
+                
+                while (cursor.moveToNext()) {
+                    DeviceData device = new DeviceData();
+                    device.name = cursor.getString(0);
+                    device.address = cursor.getString(1);
+                    device.type = cursor.getString(2);
+                    device.signal = cursor.getInt(3);
+                    device.encryption = cursor.getString(4);
+                    device.lat = cursor.getDouble(5);
+                    device.lon = cursor.getDouble(6);
+                    device.timestamp = cursor.getLong(7);
+                    device.vendor = cursor.getString(8);
+                    device.frequency = cursor.getInt(9);
+                    device.channel = cursor.getInt(10);
+                    device.standard = cursor.getString(11);
+                    device.channelWidth = cursor.getInt(12);
+                    device.maxSpeed = cursor.getInt(13);
+                    results.add(device);
+                    Log.d("MapActivity", "Found: " + device.name + " (" + device.address + ")");
+                }
+                cursor.close();
+            }
+        } catch (Exception e) {
+            Log.e("MapActivity", "Error querying device_data: " + e.getMessage(), e);
+            e.printStackTrace();
+        }
+        
+        // Try wifi_data table
+        try {
+            android.database.Cursor cursor = null;
+            String sql = "SELECT ssid, bssid, 'WIFI' as type, signal_strength, encryption, latitude, longitude, timestamp, " +
+                        "COALESCE(vendor, ''), COALESCE(frequency, 0), COALESCE(channel, 0), COALESCE(standard, ''), " +
+                        "COALESCE(channel_width, 0), COALESCE(max_speed, 0) " +
+                        "FROM wifi_data WHERE LOWER(ssid) LIKE ? OR LOWER(bssid) LIKE ? OR LOWER(vendor) LIKE ?";
+            
+            if (isDatabaseEncrypted) {
+                net.sqlcipher.database.SQLiteDatabase sqlCipherDb = (net.sqlcipher.database.SQLiteDatabase) database;
+                cursor = sqlCipherDb.rawQuery(sql, new String[]{"%" + lowerQuery + "%", "%" + lowerQuery + "%", "%" + lowerQuery + "%"});
+            } else {
+                android.database.sqlite.SQLiteDatabase stdDb = (android.database.sqlite.SQLiteDatabase) database;
+                cursor = stdDb.rawQuery(sql, new String[]{"%" + lowerQuery + "%", "%" + lowerQuery + "%", "%" + lowerQuery + "%"});
+            }
+            
+            if (cursor != null) {
+                Log.d("MapActivity", "wifi_data query returned " + cursor.getCount() + " rows");
+                while (cursor.moveToNext()) {
+                    DeviceData device = new DeviceData();
+                    device.name = cursor.getString(0);
+                    device.address = cursor.getString(1);
+                    device.type = cursor.getString(2);
+                    device.signal = cursor.getInt(3);
+                    device.encryption = cursor.getString(4);
+                    device.lat = cursor.getDouble(5);
+                    device.lon = cursor.getDouble(6);
+                    device.timestamp = cursor.getLong(7);
+                    device.vendor = cursor.getString(8);
+                    device.frequency = cursor.getInt(9);
+                    device.channel = cursor.getInt(10);
+                    device.standard = cursor.getString(11);
+                    device.channelWidth = cursor.getInt(12);
+                    device.maxSpeed = cursor.getInt(13);
+                    
+                    // Check for duplicates
+                    boolean isDuplicate = false;
+                    for (DeviceData existing : results) {
+                        if (existing.address.equals(device.address)) {
+                            isDuplicate = true;
+                            break;
+                        }
+                    }
+                    if (!isDuplicate) {
+                        results.add(device);
+                        Log.d("MapActivity", "Found: " + device.name + " (" + device.address + ")");
+                    }
+                }
+                cursor.close();
+            }
+        } catch (Exception e) {
+            Log.w("MapActivity", "wifi_data not available: " + e.getMessage());
+        }
+        
+        Log.d("MapActivity", "Total search results: " + results.size());
+        return results;
     }
     
     private void showSearchResultsDialog(java.util.List<DeviceData> results, String query) {
