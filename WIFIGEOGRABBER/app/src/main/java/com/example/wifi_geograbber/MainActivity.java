@@ -3908,8 +3908,20 @@ public class MainActivity extends AppCompatActivity {
                 progressDialog.dismiss();
                 
                 if (success) {
-                    Toast.makeText(MainActivity.this, R.string.encryption_key_changed, 
-                                  Toast.LENGTH_LONG).show();
+                    // Disable biometric unlock since passphrase changed
+                    boolean bioWasEnabled = false;
+                    if (biometricAuthManager != null && biometricAuthManager.isBiometricEnabled()) {
+                        biometricAuthManager.disableBiometricUnlock();
+                        bioWasEnabled = true;
+                        Log.i("MainActivity", "Biometric unlock disabled due to passphrase change");
+                    }
+                    
+                    String message = getString(R.string.encryption_key_changed);
+                    if (bioWasEnabled) {
+                        message += "\n\n⚠️ Biometric unlock has been disabled. You can re-enable it in encryption settings.";
+                    }
+                    Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
+                    
                     // Reinitialize database with new key
                     initializeEncryptedDatabase();
                     updateEncryptionStatus();
@@ -4008,6 +4020,12 @@ public class MainActivity extends AppCompatActivity {
                     // Clear encryption manager
                     encryptionManager.clearPassphrase();
                     encryptionManager.disableEncryption();
+                    
+                    // Disable biometric unlock since encryption is being reset
+                    if (biometricAuthManager != null && biometricAuthManager.isBiometricEnabled()) {
+                        biometricAuthManager.disableBiometricUnlock();
+                        Log.i("MainActivity", "Biometric unlock disabled due to encryption reset");
+                    }
                     
                     return true;
                     
