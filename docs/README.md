@@ -51,9 +51,9 @@ docs/
 
 ## 🔗 External Links
 
-- **GitHub Repository**: [github.com/arn-c0de/Android-WIFI-BT_geograbber](https://github.com/arn-c0de/Android-WIFI-BT_geograbber)
-- **Issues**: [github.com/arn-c0de/Android-WIFI-BT_geograbber/issues](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/issues)
-- **Security Advisories**: [github.com/arn-c0de/Android-WIFI-BT_geograbber/security/advisories](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/security/advisories)
+- **GitHub Repository**: [github.com/arn-c0de/Geograbber](https://github.com/arn-c0de/Geograbber)
+- **Issues**: [github.com/arn-c0de/Geograbber/issues](https://github.com/arn-c0de/Geograbber/issues)
+- **Security Advisories**: [github.com/arn-c0de/Geograbber/security/advisories](https://github.com/arn-c0de/Geograbber/security/advisories)
 
 ---
 
@@ -83,9 +83,9 @@ docs/
 
 ## 🆘 Need Help?
 
-- **Found a bug?** → [Bug Report](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/issues/new?template=bug_report.yml)
-- **Feature request?** → [Feature Request](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/issues/new?template=feature_request.yml)
-- **Documentation issue?** → [Documentation Issue](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/issues/new?template=documentation.yml)
+- **Found a bug?** → [Bug Report](https://github.com/arn-c0de/Geograbber/issues/new?template=bug_report.yml)
+- **Feature request?** → [Feature Request](https://github.com/arn-c0de/Geograbber/issues/new?template=feature_request.yml)
+- **Documentation issue?** → [Documentation Issue](https://github.com/arn-c0de/Geograbber/issues/new?template=documentation.yml)
 
 ---
 

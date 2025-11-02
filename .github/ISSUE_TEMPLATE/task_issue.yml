@@ -52,7 +52,7 @@ body:
       placeholder: |-
         - Related issue: #123
         - Reference: docs/README.md
-        - Useful link: https://github.com/arn-c0de/Android-WIFI-BT_geograbber
+        - Useful link: https://github.com/arn-c0de/Geograbber
     validations:
       required: false
 
