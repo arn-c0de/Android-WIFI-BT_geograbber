@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 ## [1.0.3] – 2025-11-01
 
 ### 🔐 Security & Reliability
+- Fixed log injection vulnerability by sanitizing user input before logging search queries in MapActivity.
 - Security Overlay (black screen): App content is fully hidden during passphrase entry until the database is unlocked
 - SQLCipher 4.5.4 AES-256 page-level database encryption  
 - PBKDF2-HMAC-SHA512 with 256k iterations and per-installation salt  
@@ -123,9 +124,5 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-<!--
-Issue #6 (Exported data/PC tools security):
-App database exports (.db) are fully encrypted with SQLCipher and require a passphrase. The exported sha256.json contains only metadata and encryption salt, not sensitive data. Without the passphrase, exported data cannot be accessed or manipulated. PC tools are currently not relevant, as they cannot open encrypted .db files. This issue can be considered resolved for app exports.
--->
 
 **Older versions and changes will be added as the project evolves.**

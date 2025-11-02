@@ -1458,7 +1458,9 @@ public class MapActivity extends AppCompatActivity {
         java.util.List<DeviceData> results = new java.util.ArrayList<>();
         String lowerQuery = query.toLowerCase();
         
-        Log.d("MapActivity", "Starting database search for: '" + query + "', encrypted=" + isDatabaseEncrypted);
+        // Sanitize query for logging to prevent log injection
+        String safeQuery = (query == null) ? "" : query.replaceAll("[\r\n]", "");
+        Log.d("MapActivity", "Starting database search for: '" + safeQuery + "', encrypted=" + isDatabaseEncrypted);
         
         if (database == null) {
             Log.e("MapActivity", "Database is null!");
