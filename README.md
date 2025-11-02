@@ -1,12 +1,12 @@
-<!-- Social Media Meta Tags for GeoGrabber -->
-<meta property="og:title" content="GeoGrabber: WiFi & Bluetooth Geolocation App" />
-<meta property="og:description" content="Scan, map, and analyze WiFi networks & Bluetooth devices with GPS precision. Professional wardriving and signal mapping for Android." />
-<meta property="og:image" content="https://raw.githubusercontent.com/arn-c0de/Geograbber/main/images/logo.png" />
-<meta property="og:url" content="https://arn-c0de.github.io/Android-WIFI-BT_geograbber/" />
-<meta property="og:type" content="website" />
-<meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="GeoGrabber: WiFi & Bluetooth Geolocation App" />
-<meta name="twitter:description" content="Scan, map, and analyze WiFi networks & Bluetooth devices with GPS precision. Professional wardriving and signal mapping for Android." />
+![Android](https://img.shields.io/badge/Android-6.0%2B-green)
+![Platform](https://img.shields.io/badge/platform-Android-lightblue)
+![Language](https://img.shields.io/badge/language-Java-orange)
+![Language](https://img.shields.io/badge/language-Python-blue)
+![License](https://img.shields.io/badge/license-Non--Commercial-orange)
+![Status](https://img.shields.io/badge/status-Active-success)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/arn-c0de/Android-WIFI-BT_geograbber)
+
+📚 **[Documentation](https://github.com/arn-c0de/Geograbber/docs)** · 🚀 **[Database Combiner Guide](https://github.com/arn-c0de/Geograbber/docs/quickstart/database_combiner_quickstart.md)** · 🗺️ **[Map Viewer Guide](https://github.com/arn-c0de/Geograbber/docs/quickstart/map_viewer_quickstart.md)** · 📁 **[Project Structure](https://github.com/arn-c0de/Geograbber/PROJECT_STRUCTURE.md)** · 📂 **[Detailed Structure](https://github.com/arn-c0de/Geograbber/docs/project-structure/PROJECT_STRUCTURE.md)** · � **[Changelog](https://github.com/arn-c0de/Geograbber/CHANGELOG.md)** · 🤝 **[Contributing](https://github.com/arn-c0de/Geograbber/CONTRIBUTING.md)** · 🔒 **[Security](https://github.com/arn-c0de/Geograbber/SECURITY.md)** · 📜 **[Code of Conduct](https://github.com/arn-c0de/Geograbber/CODE_OF_CONDUCT.md)**
 
 [🌐 Project Website](https://arn-c0de.github.io/Geograbber)
 
