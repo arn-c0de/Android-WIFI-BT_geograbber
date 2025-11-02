@@ -136,7 +136,20 @@ public class BiometricAuthManager {
         }
         
         try {
-            // Create biometric-protected key
+            // CRITICAL: Clean up any existing biometric key and data first
+            Log.d(TAG, "Enabling biometric - cleaning up any existing key/data");
+            try {
+                KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
+                keyStore.load(null);
+                if (keyStore.containsAlias(KEY_ALIAS_BIOMETRIC)) {
+                    keyStore.deleteEntry(KEY_ALIAS_BIOMETRIC);
+                    Log.d(TAG, "Deleted existing biometric key");
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Error cleaning up old biometric key", e);
+            }
+            
+            // Create NEW biometric-protected key
             SecretKey secretKey = createBiometricKey();
             
             if (secretKey == null) {
@@ -177,12 +190,24 @@ public class BiometricAuthManager {
                             
                             // CRITICAL: Trim the passphrase to remove any whitespace
                             String passphraseStr = new String(passphrase).trim();
-                            byte[] encryptedData = authenticatedCipher.doFinal(passphraseStr.getBytes(StandardCharsets.UTF_8));
+                            Log.d(TAG, "Passphrase to encrypt - length: " + passphraseStr.length() 
+                                + ", first char code: " + (passphraseStr.length() > 0 ? (int)passphraseStr.charAt(0) : -1));
+                            
+                            byte[] plaintextBytes = passphraseStr.getBytes(StandardCharsets.UTF_8);
+                            Log.d(TAG, "Plaintext bytes to encrypt: " + plaintextBytes.length);
+                            
+                            byte[] encryptedData = authenticatedCipher.doFinal(plaintextBytes);
+                            Log.d(TAG, "Encrypted data bytes: " + encryptedData.length);
+                            
+                            String encryptedB64 = Base64.encodeToString(encryptedData, Base64.NO_WRAP);
+                            String ivB64 = Base64.encodeToString(iv, Base64.NO_WRAP);
+                            
+                            Log.d(TAG, "Storing Base64 - IV length: " + ivB64.length() + ", Encrypted length: " + encryptedB64.length());
                             
                             // Store encrypted passphrase and IV
                             SharedPreferences.Editor editor = prefs.edit();
-                            editor.putString(KEY_ENCRYPTED_PASSPHRASE_BIO, Base64.encodeToString(encryptedData, Base64.NO_WRAP));
-                            editor.putString(KEY_IV_BIO, Base64.encodeToString(iv, Base64.NO_WRAP));
+                            editor.putString(KEY_ENCRYPTED_PASSPHRASE_BIO, encryptedB64);
+                            editor.putString(KEY_IV_BIO, ivB64);
                             editor.putBoolean(KEY_BIOMETRIC_ENABLED, true);
                             editor.apply();
                             
@@ -229,11 +254,16 @@ public class BiometricAuthManager {
      */
     public void disableBiometricUnlock() {
         try {
+            Log.d(TAG, "Disabling biometric unlock - cleaning up keys and data");
+            
             // Delete biometric key from keystore
             KeyStore keyStore = KeyStore.getInstance("AndroidKeyStore");
             keyStore.load(null);
             if (keyStore.containsAlias(KEY_ALIAS_BIOMETRIC)) {
                 keyStore.deleteEntry(KEY_ALIAS_BIOMETRIC);
+                Log.d(TAG, "Deleted biometric key from keystore");
+            } else {
+                Log.d(TAG, "No biometric key found in keystore");
             }
             
             // Clear stored data
@@ -241,9 +271,9 @@ public class BiometricAuthManager {
             editor.remove(KEY_ENCRYPTED_PASSPHRASE_BIO);
             editor.remove(KEY_IV_BIO);
             editor.putBoolean(KEY_BIOMETRIC_ENABLED, false);
-            editor.apply();
+            boolean applied = editor.commit(); // Use commit() to ensure synchronous write
             
-            Log.i(TAG, "Biometric unlock disabled");
+            Log.i(TAG, "Biometric unlock disabled - prefs cleared: " + applied);
             
         } catch (Exception e) {
             Log.e(TAG, "Error disabling biometric unlock", e);
@@ -275,12 +305,19 @@ public class BiometricAuthManager {
             String ivStr = prefs.getString(KEY_IV_BIO, null);
             String encryptedPassphraseStr = prefs.getString(KEY_ENCRYPTED_PASSPHRASE_BIO, null);
             
+            // DEBUG: Log what we're retrieving
+            Log.d(TAG, "Retrieving biometric data - IV length: " + (ivStr != null ? ivStr.length() : 0) 
+                + ", Encrypted data length: " + (encryptedPassphraseStr != null ? encryptedPassphraseStr.length() : 0));
+            
             if (ivStr == null || encryptedPassphraseStr == null) {
+                Log.e(TAG, "Biometric data missing - IV: " + (ivStr != null) + ", Encrypted: " + (encryptedPassphraseStr != null));
                 callback.onAuthenticationError("Biometric data corrupted");
                 return;
             }
             
             byte[] iv = Base64.decode(ivStr, Base64.NO_WRAP);
+            byte[] encryptedBytes = Base64.decode(encryptedPassphraseStr, Base64.NO_WRAP);
+            Log.d(TAG, "Decoded data - IV bytes: " + iv.length + ", Encrypted bytes: " + encryptedBytes.length);
             
             // Initialize cipher for decryption
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
@@ -310,10 +347,17 @@ public class BiometricAuthManager {
                             if (cryptoObject != null && cryptoObject.getCipher() != null) {
                                 Cipher authCipher = cryptoObject.getCipher();
                                 byte[] encryptedBytes = Base64.decode(encryptedPassphraseStr, Base64.NO_WRAP);
+                                
+                                Log.d(TAG, "About to decrypt " + encryptedBytes.length + " bytes");
                                 byte[] decryptedData = authCipher.doFinal(encryptedBytes);
+                                Log.d(TAG, "Decrypted " + decryptedData.length + " bytes");
                                 
                                 // CRITICAL: Trim to remove any whitespace
-                                String passphraseStr = new String(decryptedData, StandardCharsets.UTF_8).trim();
+                                String passphraseStr = new String(decryptedData, StandardCharsets.UTF_8);
+                                Log.d(TAG, "Decrypted string before trim - length: " + passphraseStr.length() 
+                                    + ", first char code: " + (passphraseStr.length() > 0 ? (int)passphraseStr.charAt(0) : -1));
+                                
+                                passphraseStr = passphraseStr.trim();
                                 char[] passphrase = passphraseStr.toCharArray();
                                 
                                 Log.i(TAG, "Biometric authentication successful - decrypted passphrase length: " + passphrase.length);
@@ -323,6 +367,7 @@ public class BiometricAuthManager {
                                 
                                 callback.onAuthenticationSucceeded(passphrase);
                             } else {
+                                Log.e(TAG, "Crypto object is null or cipher is null");
                                 callback.onAuthenticationError("Crypto object unavailable");
                             }
                             

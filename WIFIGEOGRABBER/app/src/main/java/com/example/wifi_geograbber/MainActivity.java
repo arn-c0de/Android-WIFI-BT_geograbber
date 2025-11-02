@@ -4936,6 +4936,8 @@ public class MainActivity extends AppCompatActivity {
                                     Toast.LENGTH_LONG).show();
                                 addLogMessage("INFO: Biometric unlock enabled");
                             });
+                            // CRITICAL: Clear passphrase AFTER biometric enrollment completes
+                            java.util.Arrays.fill(passphrase, '\0');
                         }
                         
                         @Override
@@ -4945,15 +4947,18 @@ public class MainActivity extends AppCompatActivity {
                                     Toast.LENGTH_LONG).show();
                                 addLogMessage("ERROR: Failed to enable biometric unlock - " + error);
                             });
+                            // CRITICAL: Clear passphrase AFTER biometric enrollment completes (even on failure)
+                            java.util.Arrays.fill(passphrase, '\0');
                         }
                     });
             } else {
                 Toast.makeText(this, "❌ Incorrect passphrase - cannot unlock database", Toast.LENGTH_LONG).show();
                 addLogMessage("ERROR: Passphrase verification failed for biometric enrollment");
+                // Clear passphrase immediately if verification failed
+                java.util.Arrays.fill(passphrase, '\0');
             }
             
-            // Clear passphrase from memory
-            java.util.Arrays.fill(passphrase, '\0');
+            // Clear input field
             passphraseInput.setText("");
         });
         
