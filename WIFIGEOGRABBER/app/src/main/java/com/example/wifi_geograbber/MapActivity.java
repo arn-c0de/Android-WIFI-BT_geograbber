@@ -43,6 +43,7 @@ public class MapActivity extends AppCompatActivity {
     private static final String PREF_CENTER_LAT = "centerLat";
     private static final String PREF_CENTER_LON = "centerLon";
     private static final String PREF_ZOOM = "zoomLevel";
+    private static final String PREF_MAP_STYLE = "mapStyle";
     private WebView mapWebView;
     private Object database; // Can be either SQLiteDatabase or net.sqlcipher.database.SQLiteDatabase
     private boolean isDatabaseEncrypted = false;
@@ -480,8 +481,9 @@ public class MapActivity extends AppCompatActivity {
         double centerLat = Double.longBitsToDouble(prefs.getLong(PREF_CENTER_LAT, Double.doubleToLongBits(0)));
         double centerLon = Double.longBitsToDouble(prefs.getLong(PREF_CENTER_LON, Double.doubleToLongBits(0)));
         int zoomLevel = prefs.getInt(PREF_ZOOM, 15);
+        String mapStyle = prefs.getString(PREF_MAP_STYLE, "light"); // Default: light
 
-        String htmlContent = generateMapHTML(savedFilters, centerLat, centerLon, zoomLevel);
+        String htmlContent = generateMapHTML(savedFilters, centerLat, centerLon, zoomLevel, mapStyle);
         // SECURITY: Only locally-generated, trusted HTML content is loaded
         // No external or user-controlled URLs are ever loaded into this WebView
         mapWebView.loadDataWithBaseURL("https://localhost/", htmlContent, "text/html", "UTF-8", null);
@@ -525,7 +527,7 @@ public class MapActivity extends AppCompatActivity {
     }
     
     // Overloaded method for MapHTML with filter and center
-    private String generateMapHTML(String savedFilters, double centerLat, double centerLon, int zoomLevel) {
+    private String generateMapHTML(String savedFilters, double centerLat, double centerLon, int zoomLevel, String mapStyle) {
         // Check if external DB is used
         String externalDbPath = getIntent().getStringExtra("external_db_path");
         boolean isExternalDb = (externalDbPath != null);
@@ -534,6 +536,19 @@ public class MapActivity extends AppCompatActivity {
         String filterJson = savedFilters != null ? savedFilters : "[]";
         String centerJson = "{" +
             "\"lat\":" + centerLat + ",\"lon\":" + centerLon + ",\"zoom\":" + zoomLevel + "}";
+
+        // Determine tile layer URL based on style
+        String tileLayerUrl;
+        String tileLayerAttribution;
+        if ("dark".equals(mapStyle)) {
+            // CartoDB Dark Matter (free, no API key needed)
+            tileLayerUrl = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+            tileLayerAttribution = "© OpenStreetMap contributors © CARTO";
+        } else {
+            // Default: OpenStreetMap
+            tileLayerUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+            tileLayerAttribution = "© OpenStreetMap contributors";
+        }
 
         return "<!DOCTYPE html>\n" +
             "<html>\n" +
@@ -665,6 +680,7 @@ public class MapActivity extends AppCompatActivity {
             "        <button class='filter-action-btn' onclick='toggleAllFilters(false)'>All Off</button>\n" +
             "        <hr style='margin: 10px 0;'>\n" +
             "        <button class='filter-action-btn' onclick='requestCenterOnUser()'>Live Location</button>\n" +
+            "        <button class='filter-action-btn' id='mapStyleBtn' onclick='toggleMapStyle()'>Map Style: " + (mapStyle.equals("dark") ? "Dark" : "Light") + "</button>\n" +
             "        </div>\n" +
             "    </div>\n" +
             "    \n" +
@@ -739,8 +755,8 @@ public class MapActivity extends AppCompatActivity {
             "                setTimeout(notifyAndroidOfViewportChange, 200); // Debounce\n" +
             "            });\n" +
             "            \n" +
-            "            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {\n" +
-            "                attribution: '© OpenStreetMap contributors'\n" +
+            "            L.tileLayer('" + tileLayerUrl + "', {\n" +
+            "                attribution: '" + tileLayerAttribution + "'\n" +
             "            }).addTo(map);\n" +
             "            \n" +
             "            // Only add markers if devices are present\n" +
@@ -1039,6 +1055,14 @@ public class MapActivity extends AppCompatActivity {
             "            }\n" +
             "        }\n" +
             "\n" +
+            "        function toggleMapStyle() {\n" +
+            "            if (typeof Android !== 'undefined' && Android.toggleMapStyle) {\n" +
+            "                Android.toggleMapStyle();\n" +
+            "            } else {\n" +
+            "                alert('Map style toggle not available.');\n" +
+            "            }\n" +
+            "        }\n" +
+            "\n" +
             "        function centerOnUserLocation(lat, lon) {\n" +
             "            if (!map) return;\n" +
             "            const userLatLng = [lat, lon];\n" +
@@ -1333,7 +1357,7 @@ public class MapActivity extends AppCompatActivity {
     }
     // For compatibility, in case old method is called
     private String generateMapHTML() {
-        return generateMapHTML(null, 0, 0, 15);
+        return generateMapHTML(null, 0, 0, 15, "light");
     }
     
     // JavaScript interface for communication between WebView and Android
@@ -1443,6 +1467,47 @@ public class MapActivity extends AppCompatActivity {
                 Log.e("MapActivity", "Error getting total device count: " + e.getMessage());
             }
             return getString(R.string.total_unknown);
+        }
+
+        @JavascriptInterface
+        public void toggleMapStyle() {
+            runOnUiThread(() -> {
+                android.content.SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+                String currentStyle = prefs.getString(PREF_MAP_STYLE, "light");
+                String newStyle = currentStyle.equals("dark") ? "light" : "dark";
+                
+                prefs.edit().putString(PREF_MAP_STYLE, newStyle).apply();
+                
+                // Change tile layer via JavaScript without reloading the entire page
+                String tileLayerUrl;
+                String tileLayerAttribution;
+                if ("dark".equals(newStyle)) {
+                    tileLayerUrl = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
+                    tileLayerAttribution = "© OpenStreetMap contributors © CARTO";
+                } else {
+                    tileLayerUrl = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+                    tileLayerAttribution = "© OpenStreetMap contributors";
+                }
+                
+                String jsCode = String.format(
+                    "if (typeof map !== 'undefined' && map) {" +
+                    "  map.eachLayer(function(layer) {" +
+                    "    if (layer instanceof L.TileLayer) {" +
+                    "      map.removeLayer(layer);" +
+                    "    }" +
+                    "  });" +
+                    "  L.tileLayer('%s', { attribution: '%s' }).addTo(map);" +
+                    "  document.getElementById('mapStyleBtn').innerHTML = 'Map Style: %s';" +
+                    "}",
+                    tileLayerUrl, tileLayerAttribution, newStyle.equals("dark") ? "Dark" : "Light"
+                );
+                
+                mapWebView.evaluateJavascript(jsCode, null);
+                
+                Toast.makeText(MapActivity.this, 
+                    "Map Style: " + (newStyle.equals("dark") ? "Dark" : "Light"), 
+                    Toast.LENGTH_SHORT).show();
+            });
         }
     }
     
@@ -1726,8 +1791,51 @@ public class MapActivity extends AppCompatActivity {
     
     @Override
     protected void onPause() {
-    super.onPause();
-    // Do not clear encryption key on pause; only clear on screen off or app destroy
+        super.onPause();
+        // Clear encryption key and mark as locked when app goes to background
+        if (isDatabaseEncrypted && encryptionManager != null) {
+            String cachedKey = encryptionManager.getCachedDatabaseKey();
+            if (cachedKey != null) {
+                clearEncryptionKey();
+                Log.d("MapActivity", "App paused - encryption key cleared");
+            }
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // If database is encrypted and key was cleared, require unlock
+        if (isDatabaseEncrypted && encryptionManager != null) {
+            String cachedKey = encryptionManager.getCachedDatabaseKey();
+            if (cachedKey == null) {
+                Log.d("MapActivity", "App resumed with encrypted DB but no key - showing unlock screen");
+                Intent unlockIntent = new Intent(this, DatabaseUnlockActivity.class);
+                startActivityForResult(unlockIntent, 9999);
+            }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 9999) {
+            if (resultCode == RESULT_OK) {
+                Log.d("MapActivity", "Database unlocked successfully - reloading data");
+                // Reinitialize database connection and reload data
+                initializeDatabase();
+                if (database != null) {
+                    loadDataAndShowMap();
+                } else {
+                    Toast.makeText(this, "Failed to open database", Toast.LENGTH_SHORT).show();
+                    finish();
+                }
+            } else {
+                Log.w("MapActivity", "Database unlock failed or cancelled - closing activity");
+                Toast.makeText(this, "Database unlock required", Toast.LENGTH_SHORT).show();
+                finish();
+            }
+        }
     }
     
     private void registerScreenOffReceiver() {

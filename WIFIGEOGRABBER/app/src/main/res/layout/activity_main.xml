@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -164,12 +165,14 @@
 
     </ScrollView>
 
-    <Button
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/export_log_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/export_log_button"
         android:layout_marginTop="4dp"
-        android:layout_gravity="end"/>
+        android:layout_gravity="end"
+        app:backgroundTint="#1A237E"
+        android:textColor="#FFFFFF"/>
 
 </LinearLayout>
