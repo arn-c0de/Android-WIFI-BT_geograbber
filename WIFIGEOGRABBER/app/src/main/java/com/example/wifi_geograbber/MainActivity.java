@@ -35,6 +35,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -44,11 +45,11 @@ public class MainActivity extends AppCompatActivity {
     /**
      * =============================
      *   CODE VERSION MARKER
-     *   APP_VERSION: 1.0.3
+     *   APP_VERSION: 1.0.4
      * =============================
      * Use this variable to visually distinguish code versions.
      */
-    public static final String APP_VERSION = "1.0.3";
+    public static final String APP_VERSION = "1.0.4";
     private WifiManager wifiManager;
     private LocationManager locationManager;
     private BluetoothAdapter bluetoothAdapter;
@@ -75,6 +76,7 @@ public class MainActivity extends AppCompatActivity {
     private boolean isScanning = false;
     private boolean isBluetoothScanningEnabled = false;
     private boolean isShowingStoredData = false;
+    private boolean receiversRegistered = false;
     private boolean isUsingExternalDatabase = false;
     private String currentDatabasePath = null;
     private static final int PERMISSION_REQUEST_CODE = 100;
@@ -477,6 +479,9 @@ public class MainActivity extends AppCompatActivity {
         bluetoothFilter.addAction(BluetoothDevice.ACTION_FOUND);
         bluetoothFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED); 
         registerReceiver(bluetoothScanReceiver, bluetoothFilter);
+        
+        // Mark receivers as registered
+        receiversRegistered = true;
 
         // Load and display all available networks immediately upon startup.
         loadAndDisplayAvailableNetworks();
@@ -804,8 +809,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void stopScanning() {
         isScanning = false;
-        handler.removeCallbacks(scanRunnable);
-        statusText.setText("WiFi scanning stopped");
+        if (handler != null && scanRunnable != null) {
+            handler.removeCallbacks(scanRunnable);
+        }
+        if (statusText != null) {
+            statusText.setText("WiFi scanning stopped");
+        }
         addLogMessage("Scanning stopped");
 
         // Stop background service
@@ -2913,8 +2922,17 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        unregisterReceiver(wifiScanReceiver);
-        unregisterReceiver(bluetoothScanReceiver);
+        
+        // Only unregister receivers if they were actually registered
+        if (receiversRegistered) {
+            try {
+                unregisterReceiver(wifiScanReceiver);
+                unregisterReceiver(bluetoothScanReceiver);
+                receiversRegistered = false;
+            } catch (IllegalArgumentException e) {
+                // Receiver was already unregistered, ignore
+            }
+        }
         
         // Stop background service only if scanning was active.
         if (isScanning) {
@@ -2922,7 +2940,10 @@ public class MainActivity extends AppCompatActivity {
             stopService(serviceIntent);
         }
         
-        stopScanning();
+        // Stop scanning if handler was initialized
+        if (handler != null) {
+            stopScanning();
+        }
         
         // Clear encryption passphrase from memory
         if (encryptionManager != null) {
@@ -3094,6 +3115,21 @@ public class MainActivity extends AppCompatActivity {
     }
     
     /**
+     * Helper method to generate test hash for debugging
+     */
+    private String testHashPassphrase(char[] passphrase) {
+        try {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] passphraseBytes = new String(passphrase).getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            byte[] hash = digest.digest(passphraseBytes);
+            String encoded = android.util.Base64.encodeToString(hash, android.util.Base64.NO_WRAP);
+            return encoded.substring(0, Math.min(16, encoded.length()));
+        } catch (Exception e) {
+            return "error";
+        }
+    }
+    
+    /**
      * Initialize encrypted database
      * Automatically handles corrupted databases by recreating them
      */
@@ -3207,8 +3243,13 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             
+            // DEBUG: Log passphrase hash before setup
+            char[] passphraseChars = passphrase.toCharArray();
+            String testHash = testHashPassphrase(passphraseChars);
+            android.util.Log.d("MainActivity", "Setup encryption - passphrase length: " + passphraseChars.length + ", test hash preview: " + testHash);
+            
             // Set up encryption
-            setupEncryption(passphrase.toCharArray());
+            setupEncryption(passphraseChars);
         });
         
         builder.setNegativeButton(R.string.cancel, null);
@@ -3219,6 +3260,9 @@ public class MainActivity extends AppCompatActivity {
      * Set up encryption with passphrase
      */
     private void setupEncryption(final char[] passphrase) {
+        // Make a copy of the passphrase for later use with biometric setup
+        final char[] passphraseCopy = Arrays.copyOf(passphrase, passphrase.length);
+        
         new android.os.AsyncTask<Void, Void, Boolean>() {
             android.app.ProgressDialog progressDialog;
             
@@ -3317,6 +3361,10 @@ public class MainActivity extends AppCompatActivity {
                     isDatabaseEncrypted = true;
                     initializeEncryptedDatabase();
                     updateEncryptionStatus();
+                    
+                    // Ask user if they want to enable biometric unlock
+                    // Pass the original passphrase, not the cached one
+                    offerBiometricSetup(passphraseCopy);
                 } else {
                     Toast.makeText(MainActivity.this, R.string.migration_failed, 
                                   Toast.LENGTH_LONG).show();
@@ -3326,9 +3374,76 @@ public class MainActivity extends AppCompatActivity {
                     DatabaseHelper dbHelper = new DatabaseHelper(MainActivity.this);
                     database = dbHelper.getWritableDatabase();
                     updateEncryptionStatus();
+                    
+                    // Clear the passphrase copy
+                    Arrays.fill(passphraseCopy, '\0');
                 }
             }
         }.execute();
+    }
+    
+    /**
+     * Offer to enable biometric unlock after encryption setup
+     * @param originalPassphrase The original passphrase used to set up encryption
+     */
+    private void offerBiometricSetup(final char[] originalPassphrase) {
+        BiometricAuthManager biometricAuthManager = new BiometricAuthManager(this, encryptionManager);
+        
+        // Check if biometric hardware is available
+        if (!biometricAuthManager.isBiometricSupported()) {
+            // Biometric not available on this device
+            Arrays.fill(originalPassphrase, '\0');
+            return;
+        }
+        
+        // Check if already enabled
+        if (biometricAuthManager.isBiometricEnabled()) {
+            // Already enabled
+            Arrays.fill(originalPassphrase, '\0');
+            return;
+        }
+        
+        // Ask user if they want to enable biometric unlock
+        new android.app.AlertDialog.Builder(this)
+            .setTitle("Enable Biometric Unlock?")
+            .setMessage("Would you like to enable fingerprint or face unlock for quick access to your encrypted database?\n\n" +
+                       "You can change this setting later in the encryption settings.")
+            .setPositiveButton("Enable", (dialog, which) -> {
+                // Use the ORIGINAL passphrase from setup, not the cached one
+                biometricAuthManager.enableBiometricUnlock(this, originalPassphrase, 
+                    new BiometricAuthManager.BiometricEnrollCallback() {
+                        @Override
+                        public void onEnrollSuccess() {
+                            runOnUiThread(() -> {
+                                Toast.makeText(MainActivity.this, 
+                                    "Biometric unlock enabled successfully", 
+                                    Toast.LENGTH_SHORT).show();
+                            });
+                            // Clear passphrase after successful enrollment
+                            Arrays.fill(originalPassphrase, '\0');
+                        }
+                        
+                        @Override
+                        public void onEnrollFailed(String error) {
+                            runOnUiThread(() -> {
+                                Toast.makeText(MainActivity.this, 
+                                    "Failed to enable biometric unlock: " + error, 
+                                    Toast.LENGTH_LONG).show();
+                            });
+                            // Clear passphrase after failed enrollment
+                            Arrays.fill(originalPassphrase, '\0');
+                        }
+                    });
+            })
+            .setNegativeButton("Skip", (dialog, which) -> {
+                // Clear passphrase if user skips
+                Arrays.fill(originalPassphrase, '\0');
+            })
+            .setOnCancelListener(dialog -> {
+                // Clear passphrase if dialog is cancelled
+                Arrays.fill(originalPassphrase, '\0');
+            })
+            .show();
     }
     
     /**
@@ -4703,15 +4818,26 @@ public class MainActivity extends AppCompatActivity {
             // Verify passphrase
             if (encryptionManager.unlockWithPassphrase(passphrase)) {
                 // Enable biometric unlock with this passphrase
-                if (biometricAuthManager.enableBiometricUnlock(passphrase)) {
-                    Toast.makeText(this, "✅ Biometric unlock enabled successfully", 
-                        Toast.LENGTH_LONG).show();
-                    addLogMessage("INFO: Biometric unlock enabled");
-                } else {
-                    Toast.makeText(this, "❌ Failed to enable biometric unlock", 
-                        Toast.LENGTH_LONG).show();
-                    addLogMessage("ERROR: Failed to enable biometric unlock");
-                }
+                biometricAuthManager.enableBiometricUnlock(this, passphrase, 
+                    new BiometricAuthManager.BiometricEnrollCallback() {
+                        @Override
+                        public void onEnrollSuccess() {
+                            runOnUiThread(() -> {
+                                Toast.makeText(MainActivity.this, "✅ Biometric unlock enabled successfully", 
+                                    Toast.LENGTH_LONG).show();
+                                addLogMessage("INFO: Biometric unlock enabled");
+                            });
+                        }
+                        
+                        @Override
+                        public void onEnrollFailed(String error) {
+                            runOnUiThread(() -> {
+                                Toast.makeText(MainActivity.this, "❌ Failed to enable biometric unlock: " + error, 
+                                    Toast.LENGTH_LONG).show();
+                                addLogMessage("ERROR: Failed to enable biometric unlock - " + error);
+                            });
+                        }
+                    });
             } else {
                 Toast.makeText(this, "❌ Incorrect passphrase", Toast.LENGTH_SHORT).show();
             }

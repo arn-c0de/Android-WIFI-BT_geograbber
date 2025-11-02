@@ -16,6 +16,7 @@ import androidx.fragment.app.FragmentActivity;
 
 import java.nio.charset.StandardCharsets;
 import java.security.KeyStore;
+import java.security.MessageDigest;
 import java.util.Arrays;
 
 import javax.crypto.Cipher;
@@ -116,18 +117,22 @@ public class BiometricAuthManager {
     
     /**
      * Enable biometric unlock by encrypting passphrase with biometric-protected key
+     * Requires biometric authentication before encrypting
+     * @param activity FragmentActivity for showing biometric prompt
      * @param passphrase User's current passphrase (will be encrypted and stored)
-     * @return true if setup successful
+     * @param callback Callback for result
      */
-    public boolean enableBiometricUnlock(char[] passphrase) {
+    public void enableBiometricUnlock(FragmentActivity activity, char[] passphrase, BiometricEnrollCallback callback) {
         if (!isBiometricSupported()) {
             Log.e(TAG, "Biometric authentication not supported");
-            return false;
+            callback.onEnrollFailed("Biometric authentication not supported on this device");
+            return;
         }
         
         if (passphrase == null || passphrase.length == 0) {
             Log.e(TAG, "Invalid passphrase");
-            return false;
+            callback.onEnrollFailed("Invalid passphrase");
+            return;
         }
         
         try {
@@ -136,31 +141,85 @@ public class BiometricAuthManager {
             
             if (secretKey == null) {
                 Log.e(TAG, "Failed to create biometric key");
-                return false;
+                callback.onEnrollFailed("Failed to create encryption key");
+                return;
             }
             
-            // Encrypt passphrase with biometric key
+            // Initialize cipher for encryption
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.ENCRYPT_MODE, secretKey);
             
-            byte[] iv = cipher.getIV();
-            String passphraseStr = new String(passphrase);
-            byte[] encryptedData = cipher.doFinal(passphraseStr.getBytes(StandardCharsets.UTF_8));
+            // Show biometric prompt to authenticate before encrypting
+            BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
+                .setTitle("Enable Biometric Unlock")
+                .setSubtitle("Authenticate to secure your passphrase")
+                .setNegativeButtonText("Cancel")
+                .build();
             
-            // Store encrypted passphrase and IV
-            SharedPreferences.Editor editor = prefs.edit();
-            editor.putString(KEY_ENCRYPTED_PASSPHRASE_BIO, Base64.encodeToString(encryptedData, Base64.NO_WRAP));
-            editor.putString(KEY_IV_BIO, Base64.encodeToString(iv, Base64.NO_WRAP));
-            editor.putBoolean(KEY_BIOMETRIC_ENABLED, true);
-            editor.apply();
+            BiometricPrompt biometricPrompt = new BiometricPrompt(activity,
+                new BiometricPrompt.AuthenticationCallback() {
+                    @Override
+                    public void onAuthenticationSucceeded(BiometricPrompt.AuthenticationResult result) {
+                        super.onAuthenticationSucceeded(result);
+                        
+                        try {
+                            // Now encrypt the passphrase after authentication
+                            BiometricPrompt.CryptoObject cryptoObject = result.getCryptoObject();
+                            Cipher authenticatedCipher = cryptoObject != null ? cryptoObject.getCipher() : cipher;
+                            
+                            byte[] iv = authenticatedCipher.getIV();
+                            
+                            // DEBUG: Log passphrase being stored
+                            String testHash = testHashPassphrase(passphrase);
+                            Log.d(TAG, "Storing passphrase for biometric - length: " + passphrase.length 
+                                + ", test hash preview: " + testHash);
+                            
+                            String passphraseStr = new String(passphrase);
+                            byte[] encryptedData = authenticatedCipher.doFinal(passphraseStr.getBytes(StandardCharsets.UTF_8));
+                            
+                            // Store encrypted passphrase and IV
+                            SharedPreferences.Editor editor = prefs.edit();
+                            editor.putString(KEY_ENCRYPTED_PASSPHRASE_BIO, Base64.encodeToString(encryptedData, Base64.NO_WRAP));
+                            editor.putString(KEY_IV_BIO, Base64.encodeToString(iv, Base64.NO_WRAP));
+                            editor.putBoolean(KEY_BIOMETRIC_ENABLED, true);
+                            editor.apply();
+                            
+                            Log.i(TAG, "Biometric unlock enabled successfully");
+                            callback.onEnrollSuccess();
+                            
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error encrypting passphrase after authentication", e);
+                            callback.onEnrollFailed("Failed to encrypt passphrase");
+                        }
+                    }
+                    
+                    @Override
+                    public void onAuthenticationError(int errorCode, CharSequence errString) {
+                        super.onAuthenticationError(errorCode, errString);
+                        callback.onEnrollFailed(errString.toString());
+                    }
+                    
+                    @Override
+                    public void onAuthenticationFailed() {
+                        super.onAuthenticationFailed();
+                        // Don't call callback here, let user retry
+                    }
+                });
             
-            Log.i(TAG, "Biometric unlock enabled successfully");
-            return true;
+            biometricPrompt.authenticate(promptInfo, new BiometricPrompt.CryptoObject(cipher));
             
         } catch (Exception e) {
-            Log.e(TAG, "Error enabling biometric unlock", e);
-            return false;
+            Log.e(TAG, "Error setting up biometric unlock", e);
+            callback.onEnrollFailed("Setup error: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Callback for biometric enrollment
+     */
+    public interface BiometricEnrollCallback {
+        void onEnrollSuccess();
+        void onEnrollFailed(String error);
     }
     
     /**
@@ -254,10 +313,11 @@ public class BiometricAuthManager {
                                 String passphraseStr = new String(decryptedData, StandardCharsets.UTF_8);
                                 char[] passphrase = passphraseStr.toCharArray();
                                 
+                                Log.i(TAG, "Biometric authentication successful - decrypted passphrase length: " + passphrase.length);
+                                
                                 // Clear sensitive data
                                 Arrays.fill(decryptedData, (byte) 0);
                                 
-                                Log.i(TAG, "Biometric authentication successful");
                                 callback.onAuthenticationSucceeded(passphrase);
                             } else {
                                 callback.onAuthenticationError("Crypto object unavailable");
@@ -381,15 +441,35 @@ public class BiometricAuthManager {
     
     /**
      * Update biometric enrollment (call when passphrase changes)
-     * @param newPassphrase The new passphrase to encrypt with biometric protection
+     * Note: Biometric unlock will be disabled when passphrase changes.
+     * User must re-enable biometric unlock with the new passphrase.
+     * @param newPassphrase The new passphrase (not used, kept for API compatibility)
      */
     public boolean updateBiometricPassphrase(char[] newPassphrase) {
         if (!isBiometricEnabled()) {
             return true; // Nothing to update
         }
         
-        // Disable and re-enable with new passphrase
+        // Disable biometric unlock - user must re-enable manually with new passphrase
         disableBiometricUnlock();
-        return enableBiometricUnlock(newPassphrase);
+        Log.i(TAG, "Biometric unlock disabled due to passphrase change. User must re-enable manually.");
+        return true;
+    }
+    
+    /**
+     * Helper method to create a test hash of a passphrase for debugging
+     * @param passphrase Passphrase to hash
+     * @return First 16 characters of Base64-encoded hash
+     */
+    private String testHashPassphrase(char[] passphrase) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            String passphraseStr = new String(passphrase);
+            byte[] hash = digest.digest(passphraseStr.getBytes(StandardCharsets.UTF_8));
+            String encoded = Base64.encodeToString(hash, Base64.NO_WRAP);
+            return encoded.length() > 16 ? encoded.substring(0, 16) : encoded;
+        } catch (Exception e) {
+            return "ERROR";
+        }
     }
 }

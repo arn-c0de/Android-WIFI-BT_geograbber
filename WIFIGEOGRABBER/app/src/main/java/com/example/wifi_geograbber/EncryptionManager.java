@@ -155,6 +155,10 @@ public class EncryptionManager {
             // Verify passphrase
             String inputHash = hashPassphrase(passphrase, salt);
             
+            Log.d(TAG, "Unlock attempt - passphrase length: " + passphrase.length + 
+                      ", input hash preview: " + inputHash.substring(0, Math.min(16, inputHash.length())) + 
+                      ", stored hash preview: " + storedHash.substring(0, Math.min(16, storedHash.length())));
+            
             if (!MessageDigest.isEqual(inputHash.getBytes(), storedHash.getBytes())) {
                 Log.w(TAG, "Invalid passphrase");
                 return false;
@@ -194,6 +198,22 @@ public class EncryptionManager {
             Log.e(TAG, "Error getting cached key", e);
             return null;
         }
+    }
+    
+    /**
+     * Get the cached passphrase as char array
+     * WARNING: Caller must clear the returned array after use!
+     * @return passphrase char array or null if not cached
+     */
+    public char[] getCachedPassphraseChars() {
+        if (!isPassphraseCached() || cachedPassphrase == null) {
+            return null;
+        }
+        
+        // Return a copy to avoid external modification
+        char[] copy = new char[cachedPassphrase.length];
+        System.arraycopy(cachedPassphrase, 0, copy, 0, cachedPassphrase.length);
+        return copy;
     }
     
     /**

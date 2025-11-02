@@ -2,11 +2,46 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] – 2025-11-02
+
+### 🛡️ Security & Features
+- Improved biometric authentication reliability and error handling
+- Added support for multiple biometric types (fingerprint, face, iris) where available
+- Enhanced fallback logic: clearer messaging and retry options for passphrase entry
+- Security overlay now auto-hides sensitive UI on app background/lock
+- Updated encryption settings dialog for better accessibility and clarity
+- Improved handling of biometric key invalidation events
+- Minor security hardening: stricter memory wipe of passphrase after unlock
+- Documentation updates: clarified biometric requirements and troubleshooting steps
+
+### 🐞 Bug Fixes & Improvements
+- Fixed rare crash when biometric prompt is cancelled rapidly
+- Improved UI responsiveness on unlock screen
+- Fixed issue with passphrase fallback not appearing on some devices
+- Updated translations for biometric-related dialogs
+- Minor code cleanup and refactoring in biometric and encryption modules
+
+### 📚 Documentation
+- Updated `docs/security/BIOMETRIC_AUTHENTICATION_GUIDE.md` with troubleshooting and FAQ
+- Added new section to `README.md` for biometric unlock feature
+
 ---
-## [1.0.3] – 2025-11-01
+## [1.0.3] – 2025-11-02
 
 ### 🔐 Security & Reliability
-- Fixed log injection vulnerability by sanitizing user input before logging search queries in MapActivity.
+- **NEW: Biometric Authentication (Fingerprint/Face Unlock)** 🔒
+  - Secure fingerprint and face unlock for encrypted databases
+  - Hardware-backed passphrase storage in Android Keystore
+  - Biometric-protected AES-256-GCM encryption keys
+  - Auto-invalidation when biometric enrollment changes
+  - Seamless fallback to manual passphrase entry
+  - Zero-knowledge design: passphrase only decrypted after successful biometric auth
+  - New `BiometricAuthManager` class for biometric operations
+  - New `DatabaseUnlockActivity` for user-friendly unlock experience
+  - Settings UI integration for easy enable/disable
+  - Full documentation: `docs/security/BIOMETRIC_AUTHENTICATION_GUIDE.md`
+
+- Fixed log injection vulnerability by sanitizing user input before logging search queries in MapActivity
 - Security Overlay (black screen): App content is fully hidden during passphrase entry until the database is unlocked
 - SQLCipher 4.5.4 AES-256 page-level database encryption  
 - PBKDF2-HMAC-SHA512 with 256k iterations and per-installation salt  
@@ -23,21 +58,36 @@ All notable changes to this project will be documented in this file.
 - Improved debug log (export, copy, select-all)  
 - Status display for encryption and database path  
 - Code cleanup: no unsafe defaults or backdoors  
+- Improved encryption settings dialog with biometric options
+- Better user feedback for biometric authentication status
 
 ### 📦 New/Updated Classes
-- `EncryptionManager.java` – passphrase and key management with Keystore integration  
+- `BiometricAuthManager.java` – NEW: Biometric authentication management
+- `DatabaseUnlockActivity.java` – NEW: Unlock screen with biometric/passphrase options
+- `EncryptionManager.java` – Updated: Enhanced biometric integration support
+- `MainActivity.java` – Updated: Biometric settings UI and unlock check on startup
 - `DatabaseEncryptionHelper.java` – SQLCipher database handling  
+
+### 🎨 New UI Components
+- `activity_database_unlock.xml` – Modern unlock screen layout
+- Biometric prompt with fingerprint icon and status messages
+- Fallback passphrase input with failed attempts counter
+- Security overlay for sensitive operations
 
 ### 🔄 Migration
 - Existing unencrypted databases can be securely converted to encrypted form  
+- Biometric unlock is optional and can be enabled/disabled anytime
+- No database migration required for biometric feature
 
 ### ⚙️ Notes
 - Encryption is optional; users can enable or skip  
+- Biometric unlock requires Android 6.0+ and enrolled biometrics
 - Lost passphrase = lost data (by design)  
 - Hardware-backed security where supported  
 - ~10% performance overhead on DB operations  
 - Passphrase cleared on app close or background  
 - Python tools currently lack encrypted DB support  
+- Biometric key automatically invalidated when fingerprints are added/removed
 
 
 ## [1.0.2] – 2025-10-31

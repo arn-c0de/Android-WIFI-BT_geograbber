@@ -118,7 +118,7 @@ public class DatabaseUnlockActivity extends AppCompatActivity {
         passphraseSection.setVisibility(View.GONE);
         
         statusText.setText("Unlock Database");
-        biometricStatusText.setText(biometricAuthManager.getBiometricStatusMessage());
+        biometricStatusText.setText("Touch sensor to unlock");
         
         // Automatically show biometric prompt
         showBiometricPrompt();
