@@ -1,6 +1,10 @@
 package com.example.wifi_geograbber;
 
 import android.Manifest;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -43,6 +47,9 @@ public class MapActivity extends AppCompatActivity {
     private android.widget.TextView dbStatusText;
     private List<DeviceData> deviceList;
     private boolean isMapInitialized = false;
+    
+    // BroadcastReceiver for screen off event
+    private BroadcastReceiver screenOffReceiver;
     
     // Bounding box for performance optimization (only load visible markers)
     private double bboxMinLat = -90, bboxMinLon = -180, bboxMaxLat = 90, bboxMaxLon = 180;
@@ -129,6 +136,9 @@ public class MapActivity extends AppCompatActivity {
 
         // Initialize encryption manager
         encryptionManager = new EncryptionManager(this);
+
+        // Register screen off receiver to clear encryption key
+        registerScreenOffReceiver();
 
         // Initialize database - check if encryption is enabled
         initializeDatabase();
@@ -1509,6 +1519,10 @@ public class MapActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        
+        // Unregister screen off receiver
+        unregisterScreenOffReceiver();
+        
         if (database != null) {
             dbClose();
         }
@@ -1520,6 +1534,52 @@ public class MapActivity extends AppCompatActivity {
             if (tempFile.exists() && tempFile.getAbsolutePath().contains("cache")) {
                 tempFile.delete();
                 Log.d("MapActivity", "Temporary external database file deleted");
+            }
+        }
+    }
+    
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Clear encryption key when activity pauses (screen off, switching apps, etc.)
+        clearEncryptionKey();
+    }
+    
+    private void registerScreenOffReceiver() {
+        screenOffReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (Intent.ACTION_SCREEN_OFF.equals(intent.getAction())) {
+                    Log.d("MapActivity", "Screen turned off - clearing encryption key");
+                    clearEncryptionKey();
+                }
+            }
+        };
+        IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_OFF);
+        registerReceiver(screenOffReceiver, filter);
+        Log.d("MapActivity", "Screen off receiver registered");
+    }
+
+    private void unregisterScreenOffReceiver() {
+        if (screenOffReceiver != null) {
+            try {
+                unregisterReceiver(screenOffReceiver);
+                Log.d("MapActivity", "Screen off receiver unregistered");
+            } catch (IllegalArgumentException e) {
+                // Receiver was not registered
+            }
+        }
+    }
+
+    private void clearEncryptionKey() {
+        if (encryptionManager != null) {
+            encryptionManager.clearKey();
+            Log.d("MapActivity", "Encryption key cleared from RAM");
+            
+            // Close database if it's encrypted
+            if (isDatabaseEncrypted && database != null) {
+                dbClose();
+                Log.d("MapActivity", "Encrypted database closed");
             }
         }
     }

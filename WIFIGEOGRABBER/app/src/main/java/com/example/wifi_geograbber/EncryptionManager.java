@@ -240,6 +240,17 @@ public class EncryptionManager {
     }
     
     /**
+     * Clears the cached passphrase from memory (RAM)
+     */
+    public void clearKey() {
+        if (cachedPassphrase != null) {
+            Arrays.fill(cachedPassphrase, '\0');
+            cachedPassphrase = null;
+            Log.d(TAG, "EncryptionManager: cached passphrase cleared from RAM");
+        }
+    }
+    
+    /**
      * Cache passphrase in memory
      */
     private void cachePassphrase(char[] passphrase) {
