@@ -666,6 +666,7 @@ public class MapActivity extends AppCompatActivity {
             "    let allCircles = [];\n" +
             "    let activeFilters = new Set();\n" +
             "    let deviceFilterMap = new Map();\n" +
+            "    let highlightedMarkerIndices = new Set(); // Indices of markers that should stay visible\n" +
             "    let userMarker = null;\n" +
             "    let currentCenter = null;\n" +
             "    let currentZoom = 15;\n" +
@@ -737,26 +738,57 @@ public class MapActivity extends AppCompatActivity {
             "        \n" +
             "        function updateMapData(devices) {\n" +
             "            deviceData = devices;\n" +
-            "            console.log('Updating map with', devices.length, 'devices');\n" +
+            "            console.log('UpdateMapData called with', devices.length, 'devices. Highlighted indices:', Array.from(highlightedMarkerIndices));\n" +
+            "            \n" +
+            "            // If there are highlighted markers, DON'T update the map at all\n" +
+            "            if (highlightedMarkerIndices.size > 0) {\n" +
+            "                console.log('Highlighted markers present - skipping map update to preserve them');\n" +
+            "                return;\n" +
+            "            }\n" +
             "            \n" +
             "            if (devices.length === 0) {\n" +
             "                document.getElementById('info-panel').textContent = 'No devices in visible area';\n" +
-            "                // Remove all existing markers\n" +
-            "                allMarkers.forEach(marker => map.removeLayer(marker));\n" +
-            "                allCircles.forEach(circle => map.removeLayer(circle));\n" +
+            "                // Remove all existing markers except highlighted ones\n" +
+            "                allMarkers.forEach((marker, index) => {\n" +
+            "                    if (!highlightedMarkerIndices.has(index)) {\n" +
+            "                        map.removeLayer(marker);\n" +
+            "                    }\n" +
+            "                });\n" +
+            "                allCircles.forEach((circle, index) => {\n" +
+            "                    if (!highlightedMarkerIndices.has(index)) {\n" +
+            "                        map.removeLayer(circle);\n" +
+            "                    }\n" +
+            "                });\n" +
             "                allMarkers = [];\n" +
             "                allCircles = [];\n" +
             "                deviceFilterMap.clear();\n" +
             "                return;\n" +
             "            }\n" +
             "            \n" +
+            "            // Store highlighted device addresses before clearing\n" +
+            "            const highlightedAddresses = new Set();\n" +
+            "            highlightedMarkerIndices.forEach(index => {\n" +
+            "                if (deviceData[index]) {\n" +
+            "                    highlightedAddresses.add(deviceData[index].address);\n" +
+            "                }\n" +
+            "            });\n" +
+            "            \n" +
             "            allMarkers.forEach(marker => map.removeLayer(marker));\n" +
             "            allCircles.forEach(circle => map.removeLayer(circle));\n" +
             "            allMarkers = [];\n" +
             "            allCircles = [];\n" +
             "            deviceFilterMap.clear();\n" +
+            "            highlightedMarkerIndices.clear();\n" +
             "            \n" +
             "            addMarkers();\n" +
+            "            \n" +
+            "            // Restore highlighted markers by address\n" +
+            "            highlightedAddresses.forEach(address => {\n" +
+            "                const index = deviceData.findIndex(d => d.address === address);\n" +
+            "                if (index !== -1) {\n" +
+            "                    highlightedMarkerIndices.add(index);\n" +
+            "                }\n" +
+            "            });\n" +
             "            \n" +
             "            updateMarkerVisibility();\n" +
             "            updateInfoPanel();\n" +
@@ -808,8 +840,8 @@ public class MapActivity extends AppCompatActivity {
             "                    iconColor = 'blue';\n" +
             "                }\n" +
             "                \n" +
-            "                // Create marker\n" +
-            "                let marker = L.marker([device.lat, device.lon]).addTo(map);\n" +
+            "                // Create marker (don't add to map yet - updateMarkerVisibility will do it)\n" +
+            "                let marker = L.marker([device.lat, device.lon]);\n" +
             "                \n" +
             "                // Popup content\n" +
             "                let popupContent = `\n" +
@@ -830,7 +862,7 @@ public class MapActivity extends AppCompatActivity {
             "                \n" +
             "                marker.bindPopup(popupContent);\n" +
             "                \n" +
-            "                // Circle around marker\n" +
+            "                // Circle around marker (don't add to map yet)\n" +
             "                let radius = device.signal >= -50 ? 10 : device.signal >= -70 ? 20 : 30;\n" +
             "                let circle = L.circle([device.lat, device.lon], {\n" +
             "                    color: iconColor,\n" +
@@ -838,7 +870,7 @@ public class MapActivity extends AppCompatActivity {
             "                    fillOpacity: 0.2,\n" +
             "                    radius: radius,\n" +
             "                    weight: 2\n" +
-            "                }).addTo(map);\n" +
+            "                });\n" +
             "                \n" +
             "                allMarkers.push(marker);\n" +
             "                allCircles.push(circle);\n" +
@@ -873,16 +905,45 @@ public class MapActivity extends AppCompatActivity {
             "        }\n" +
             "        \n" +
             "        function updateMarkerVisibility() {\n" +
+            "            console.log('updateMarkerVisibility called. Active filters:', activeFilters.size, 'Highlighted:', highlightedMarkerIndices.size);\n" +
+            "            \n" +
             "            if (activeFilters.size === 0) {\n" +
-            "                // Alle verstecken\n" +
-            "                allMarkers.forEach(marker => map.removeLayer(marker));\n" +
-            "                allCircles.forEach(circle => map.removeLayer(circle));\n" +
+            "                // Alle verstecken, außer die hervorgehobenen\n" +
+            "                console.log('No filters active - showing only highlighted markers');\n" +
+            "                allMarkers.forEach((marker, index) => {\n" +
+            "                    if (highlightedMarkerIndices.has(index)) {\n" +
+            "                        if (!map.hasLayer(marker)) {\n" +
+            "                            map.addLayer(marker);\n" +
+            "                            console.log('Added highlighted marker', index);\n" +
+            "                        }\n" +
+            "                    } else {\n" +
+            "                        if (map.hasLayer(marker)) {\n" +
+            "                            map.removeLayer(marker);\n" +
+            "                        }\n" +
+            "                    }\n" +
+            "                });\n" +
+            "                allCircles.forEach((circle, index) => {\n" +
+            "                    if (highlightedMarkerIndices.has(index)) {\n" +
+            "                        if (!map.hasLayer(circle)) {\n" +
+            "                            map.addLayer(circle);\n" +
+            "                            console.log('Added highlighted circle', index);\n" +
+            "                        }\n" +
+            "                    } else {\n" +
+            "                        if (map.hasLayer(circle)) {\n" +
+            "                            map.removeLayer(circle);\n" +
+            "                        }\n" +
+            "                    }\n" +
+            "                });\n" +
+            "                updateInfoPanel();\n" +
             "                return;\n" +
             "            }\n" +
             "            \n" +
+            "            console.log('Filters active - showing filter matches + highlighted markers');\n" +
             "            deviceData.forEach((device, index) => {\n" +
             "                const deviceFilters = deviceFilterMap.get(device.address) || [];\n" +
-            "                const shouldShow = deviceFilters.some(cls => activeFilters.has(cls));\n" +
+            "                const matchesFilter = deviceFilters.some(cls => activeFilters.has(cls));\n" +
+            "                const isHighlighted = highlightedMarkerIndices.has(index);\n" +
+            "                const shouldShow = matchesFilter || isHighlighted;\n" +
             "                \n" +
             "                const marker = allMarkers[index];\n" +
             "                const circle = allCircles[index];\n" +
@@ -1039,6 +1100,10 @@ public class MapActivity extends AppCompatActivity {
             "            searchResults = [];\n" +
             "            currentSearchIndex = -1;\n" +
             "            \n" +
+            "            // Clear highlighted markers\n" +
+            "            highlightedMarkerIndices.clear();\n" +
+            "            updateMarkerVisibility();\n" +
+            "            \n" +
             "            if (typeof Android !== 'undefined' && Android.showToast) {\n" +
             "                Android.showToast('Search cleared');\n" +
             "            }\n" +
@@ -1047,27 +1112,137 @@ public class MapActivity extends AppCompatActivity {
             "        function zoomToDevice(deviceAddress, lat, lon) {\n" +
             "            if (!map) return;\n" +
             "            \n" +
+            "            console.log('Zooming to device:', deviceAddress, 'at', lat, lon);\n" +
+            "            \n" +
+            "            // Clear previous highlights\n" +
+            "            highlightedMarkerIndices.clear();\n" +
+            "            \n" +
             "            // Find the device by address\n" +
             "            let deviceIndex = -1;\n" +
             "            for (let i = 0; i < deviceData.length; i++) {\n" +
             "                if (deviceData[i].address === deviceAddress) {\n" +
             "                    deviceIndex = i;\n" +
+            "                    console.log('Found device at index', i, 'with coords', deviceData[i].lat, deviceData[i].lon);\n" +
             "                    break;\n" +
             "                }\n" +
             "            }\n" +
             "            \n" +
-            "            if (deviceIndex === -1) return;\n" +
+            "            if (deviceIndex === -1) {\n" +
+            "                console.log('Device not found:', deviceAddress);\n" +
+            "                // Fallback: use provided coordinates\n" +
+            "                map.setView([lat, lon], 18);\n" +
+            "                if (typeof Android !== 'undefined' && Android.showToast) {\n" +
+            "                    Android.showToast('Device marker not in current view');\n" +
+            "                }\n" +
+            "                return;\n" +
+            "            }\n" +
+            "            \n" +
+            "            // Use the actual device coordinates from deviceData\n" +
+            "            const actualLat = deviceData[deviceIndex].lat;\n" +
+            "            const actualLon = deviceData[deviceIndex].lon;\n" +
+            "            const device = deviceData[deviceIndex];\n" +
+            "            \n" +
+            "            // Add to highlighted markers\n" +
+            "            highlightedMarkerIndices.add(deviceIndex);\n" +
+            "            \n" +
+            "            console.log('Highlighted marker indices:', Array.from(highlightedMarkerIndices));\n" +
+            "            \n" +
+            "            // Ensure marker is visible by showing it directly\n" +
+            "            const marker = allMarkers[deviceIndex];\n" +
+            "            const circle = allCircles[deviceIndex];\n" +
+            "            \n" +
+            "            if (marker) {\n" +
+            "                if (!map.hasLayer(marker)) {\n" +
+            "                    map.addLayer(marker);\n" +
+            "                    console.log('Added main marker to map at index', deviceIndex);\n" +
+            "                }\n" +
+            "            }\n" +
+            "            if (circle) {\n" +
+            "                if (!map.hasLayer(circle)) {\n" +
+            "                    map.addLayer(circle);\n" +
+            "                    console.log('Added main circle to map at index', deviceIndex);\n" +
+            "                }\n" +
+            "            }\n" +
             "            \n" +
             "            // Zoom to location\n" +
-            "            map.setView([lat, lon], 18);\n" +
+            "            map.setView([actualLat, actualLon], 18);\n" +
+            "            \n" +
+            "            // Find and show nearby Bluetooth devices (only known ones, within 50m)\n" +
+            "            if (device.type === 'WIFI') {\n" +
+            "                const nearbyBluetooth = [];\n" +
+            "                for (let i = 0; i < deviceData.length; i++) {\n" +
+            "                    const btDevice = deviceData[i];\n" +
+            "                    if (btDevice.type === 'BLUETOOTH') {\n" +
+            "                        // Check if device is known (not unknown/hidden)\n" +
+            "                        const isUnknown = !btDevice.name || btDevice.name === '' || \n" +
+            "                                        btDevice.name === '[Hidden/Unknown]' || \n" +
+            "                                        btDevice.name === '[Unknown Device]' || \n" +
+            "                                        btDevice.name.toLowerCase().includes('unknown');\n" +
+            "                        \n" +
+            "                        if (isUnknown) continue;\n" +
+            "                        \n" +
+            "                        // Calculate distance\n" +
+            "                        const R = 6371e3; // Earth radius in meters\n" +
+            "                        const φ1 = actualLat * Math.PI / 180;\n" +
+            "                        const φ2 = btDevice.lat * Math.PI / 180;\n" +
+            "                        const Δφ = (btDevice.lat - actualLat) * Math.PI / 180;\n" +
+            "                        const Δλ = (btDevice.lon - actualLon) * Math.PI / 180;\n" +
+            "                        \n" +
+            "                        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +\n" +
+            "                                  Math.cos(φ1) * Math.cos(φ2) *\n" +
+            "                                  Math.sin(Δλ/2) * Math.sin(Δλ/2);\n" +
+            "                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));\n" +
+            "                        const distance = R * c;\n" +
+            "                        \n" +
+            "                        if (distance <= 50) {\n" +
+            "                            nearbyBluetooth.push({index: i, device: btDevice, distance: distance});\n" +
+            "                        }\n" +
+            "                    }\n" +
+            "                }\n" +
+            "                \n" +
+            "                // Show nearby Bluetooth devices and add to highlighted set\n" +
+            "                console.log('Found', nearbyBluetooth.length, 'known Bluetooth devices within 50m');\n" +
+            "                nearbyBluetooth.forEach(item => {\n" +
+            "                    highlightedMarkerIndices.add(item.index);\n" +
+            "                    const btMarker = allMarkers[item.index];\n" +
+            "                    const btCircle = allCircles[item.index];\n" +
+            "                    if (btMarker) {\n" +
+            "                        if (!map.hasLayer(btMarker)) {\n" +
+            "                            map.addLayer(btMarker);\n" +
+            "                            console.log('Added BT marker to map at index', item.index);\n" +
+            "                        }\n" +
+            "                    }\n" +
+            "                    if (btCircle) {\n" +
+            "                        if (!map.hasLayer(btCircle)) {\n" +
+            "                            map.addLayer(btCircle);\n" +
+            "                            console.log('Added BT circle to map at index', item.index);\n" +
+            "                        }\n" +
+            "                    }\n" +
+            "                });\n" +
+            "                \n" +
+            "                // Show 50m radius circle\n" +
+            "                if (typeof L !== 'undefined') {\n" +
+            "                    const radiusCircle = L.circle([actualLat, actualLon], {\n" +
+            "                        color: 'orange',\n" +
+            "                        fillColor: 'orange',\n" +
+            "                        fillOpacity: 0.1,\n" +
+            "                        radius: 50,\n" +
+            "                        weight: 2,\n" +
+            "                        dashArray: '5, 5'\n" +
+            "                    }).addTo(map);\n" +
+            "                    \n" +
+            "                    // Remove radius circle after 5 seconds\n" +
+            "                    setTimeout(() => {\n" +
+            "                        map.removeLayer(radiusCircle);\n" +
+            "                    }, 5000);\n" +
+            "                }\n" +
+            "            }\n" +
             "            \n" +
             "            // Open popup\n" +
-            "            const marker = allMarkers[deviceIndex];\n" +
             "            if (marker) {\n" +
             "                marker.openPopup();\n" +
             "                \n" +
-            "                // Highlight marker\n" +
-            "                const circle = allCircles[deviceIndex];\n" +
+            "                // Highlight marker with yellow circle\n" +
             "                if (circle) {\n" +
             "                    const originalColor = circle.options.color;\n" +
             "                    circle.setStyle({ color: 'yellow', fillColor: 'yellow', weight: 4 });\n" +
@@ -1075,7 +1250,27 @@ public class MapActivity extends AppCompatActivity {
             "                        circle.setStyle({ color: originalColor, fillColor: originalColor, weight: 2 });\n" +
             "                    }, 3000);\n" +
             "                }\n" +
+            "            } else {\n" +
+            "                console.log('Marker not found at index', deviceIndex);\n" +
             "            }\n" +
+            "            \n" +
+            "            // Hide all other markers that are not highlighted\n" +
+            "            console.log('Hiding non-highlighted markers...');\n" +
+            "            allMarkers.forEach((m, idx) => {\n" +
+            "                if (!highlightedMarkerIndices.has(idx)) {\n" +
+            "                    if (map.hasLayer(m)) {\n" +
+            "                        map.removeLayer(m);\n" +
+            "                    }\n" +
+            "                }\n" +
+            "            });\n" +
+            "            allCircles.forEach((c, idx) => {\n" +
+            "                if (!highlightedMarkerIndices.has(idx)) {\n" +
+            "                    if (map.hasLayer(c)) {\n" +
+            "                        map.removeLayer(c);\n" +
+            "                    }\n" +
+            "                }\n" +
+            "            });\n" +
+            "            console.log('Zoom to device complete. Highlighted markers:', Array.from(highlightedMarkerIndices));\n" +
             "        }\n" +
             "\n" +
             "        function updateLocationInDB(deviceAddress, deviceType, newLat, newLon) {\n" +
