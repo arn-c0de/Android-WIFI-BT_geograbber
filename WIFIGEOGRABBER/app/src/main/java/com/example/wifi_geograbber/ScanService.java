@@ -168,12 +168,20 @@ public class ScanService extends Service {
         
         // Register receiver
         IntentFilter wifiFilter = new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
-        registerReceiver(wifiScanReceiver, wifiFilter);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(wifiScanReceiver, wifiFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(wifiScanReceiver, wifiFilter);
+        }
         
         IntentFilter bluetoothFilter = new IntentFilter();
         bluetoothFilter.addAction(BluetoothDevice.ACTION_FOUND);
         bluetoothFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-        registerReceiver(bluetoothScanReceiver, bluetoothFilter);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(bluetoothScanReceiver, bluetoothFilter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(bluetoothScanReceiver, bluetoothFilter);
+        }
         
         // Scan Runnable
         scanRunnable = new Runnable() {
@@ -586,6 +594,7 @@ public class ScanService extends Service {
         }
         
         int newCount = 0;
+        int updateCount = 0;
         for (ScanResult result : results) {
             try {
                 String capabilities = result.capabilities;
@@ -603,21 +612,19 @@ public class ScanService extends Service {
                     continue;
                 }
                 
-                boolean wifiUpdate = false;
                 boolean wifiExists = false;
                 if (wifiCursor.moveToFirst()) {
                     wifiExists = true;
-                    int oldSignal = wifiCursor.getInt(0);
-                    if (result.level > oldSignal) {
-                        wifiUpdate = true;
-                    }
                 }
                 wifiCursor.close();
                 
-                if (wifiUpdate) {
+                if (wifiExists) {
+                    // Update existing WiFi network (always update to refresh timestamp and location)
                     dbExecSQL("UPDATE wifi_data SET ssid=?, signal_strength=?, encryption=?, latitude=?, longitude=?, timestamp=? WHERE bssid=?",
                             new Object[]{result.SSID, result.level, encryption, location.getLatitude(), location.getLongitude(), System.currentTimeMillis(), result.BSSID});
-                } else if (!wifiExists) {
+                    updateCount++;
+                } else {
+                    // Insert new WiFi network
                     dbExecSQL("INSERT INTO wifi_data (ssid, bssid, signal_strength, encryption, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)",
                             new Object[]{result.SSID, result.BSSID, result.level, encryption, location.getLatitude(), location.getLongitude(), System.currentTimeMillis()});
                     newCount++;
@@ -630,9 +637,23 @@ public class ScanService extends Service {
             }
         }
         
-        if (newCount > 0) {
+        // Broadcast data update for live map refresh when new or updated networks are detected
+        if (newCount > 0 || updateCount > 0) {
             wifiCount += newCount;
-            Log.d("ScanService", "Saved " + newCount + " new WiFi networks to wifi_data");
+            if (newCount > 0) {
+                Log.d("ScanService", "Saved " + newCount + " new WiFi networks to wifi_data");
+            }
+            if (updateCount > 0) {
+                Log.d("ScanService", "Updated " + updateCount + " existing WiFi networks in wifi_data");
+            }
+            
+            // Broadcast data update for live map refresh (explicit broadcast for Android 8+)
+            Intent updateIntent = new Intent("com.example.wifi_geograbber.DATA_UPDATED");
+            updateIntent.setPackage(getPackageName()); // Make explicit for same app
+            updateIntent.putExtra("data_type", "wifi");
+            updateIntent.putExtra("count", newCount + updateCount);
+            sendBroadcast(updateIntent);
+            Log.d("ScanService", "Sent broadcast for WiFi data update (total: " + (newCount + updateCount) + ")");
         }
     }
     
@@ -762,6 +783,14 @@ public class ScanService extends Service {
                             new Object[]{deviceName, deviceAddress, "BLUETOOTH", rssi, deviceClass, currentLat, currentLon, currentTimestamp});
                     bluetoothCount++;
                     Log.d("ScanService", "Saved new Bluetooth device: " + deviceName);
+                    
+                    // Broadcast data update for live map refresh (explicit broadcast for Android 8+)
+                    Intent updateIntent = new Intent("com.example.wifi_geograbber.DATA_UPDATED");
+                    updateIntent.setPackage(getPackageName()); // Make explicit for same app
+                    updateIntent.putExtra("data_type", "bluetooth");
+                    updateIntent.putExtra("count", 1);
+                    sendBroadcast(updateIntent);
+                    Log.d("ScanService", "Sent broadcast for Bluetooth data update");
                 }
             }
         } catch (Exception e) {

@@ -1266,6 +1266,12 @@ public class MainActivity extends AppCompatActivity {
             ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, dataList);
             dataListView.setAdapter(adapter);
         }
+        
+        // Broadcast data update for live map refresh
+        Intent updateIntent = new Intent("com.example.wifi_geograbber.DATA_UPDATED");
+        updateIntent.putExtra("data_type", "wifi");
+        updateIntent.putExtra("count", results.size());
+        sendBroadcast(updateIntent);
 
     }
 
@@ -1321,6 +1327,12 @@ public class MainActivity extends AppCompatActivity {
                     dbExecSQL("INSERT INTO device_data (device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                             new Object[]{deviceName, deviceAddress, "BLUETOOTH", rssi, deviceClass, currentLat, currentLon, currentTimestamp});
                 }
+                
+                // Broadcast data update for live map refresh
+                Intent updateIntent = new Intent("com.example.wifi_geograbber.DATA_UPDATED");
+                updateIntent.putExtra("data_type", "bluetooth");
+                updateIntent.putExtra("count", 1);
+                sendBroadcast(updateIntent);
             }
         } catch (Exception e) {
             android.util.Log.e("MainActivity", "Error saving Bluetooth device: " + e.getMessage(), e);

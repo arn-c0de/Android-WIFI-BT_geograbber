@@ -69,6 +69,9 @@ public class MapActivity extends AppCompatActivity {
     // BroadcastReceiver for screen off event
     private BroadcastReceiver screenOffReceiver;
     
+    // BroadcastReceiver for live data updates
+    private BroadcastReceiver dataUpdateReceiver;
+    
     // Bounding box for performance optimization (only load visible markers)
     private double bboxMinLat = -90, bboxMinLon = -180, bboxMaxLat = 90, bboxMaxLon = 180;
     private static final int MAX_MARKERS_PER_LOAD = 500; // Maximum number of markers per load
@@ -157,6 +160,9 @@ public class MapActivity extends AppCompatActivity {
 
         // Register screen off receiver to clear encryption key
         registerScreenOffReceiver();
+        
+        // Register data update receiver for live map updates
+        registerDataUpdateReceiver();
 
         // Initialize database - check if encryption is enabled
         initializeDatabase();
@@ -305,10 +311,8 @@ public class MapActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 super.onPageFinished(view, url);
-                // Pass data to JavaScript when page is loaded (even with empty list)
-                if (deviceList != null) {
-                    injectDeviceData();
-                }
+                // Don't inject data here - wait for JavaScript to signal readiness
+                // Data will be injected when onMapReady() is called from JavaScript
             }
             
             @Override
@@ -525,8 +529,7 @@ public class MapActivity extends AppCompatActivity {
     }
     
     private void refreshMap() {
-        Toast.makeText(this, R.string.map_updating, Toast.LENGTH_SHORT).show();
-        
+        // Silent refresh - no toast spam from automatic updates
         // Only reload data in current viewport
         deviceList = getDevicesInBoundingBox(bboxMinLat, bboxMinLon, bboxMaxLat, bboxMaxLon);
         
@@ -722,6 +725,14 @@ public class MapActivity extends AppCompatActivity {
             "                });\n" +
             "            }\n" +
             "        } catch (e) { console.log('Filter restore error', e); }\n" +
+            "        \n" +
+            "        // Wait for Leaflet to be fully loaded before signaling readiness\n" +
+            "        if (typeof L !== 'undefined' && typeof Android !== 'undefined' && Android.onMapReady) {\n" +
+            "            console.log('Leaflet loaded, signaling Android map is ready');\n" +
+            "            Android.onMapReady();\n" +
+            "        } else {\n" +
+            "            console.error('Leaflet not loaded or Android interface not available');\n" +
+            "        }\n" +
             "    };\n" +
             "\n" +
             "    let map;\n" +
@@ -1413,6 +1424,17 @@ public class MapActivity extends AppCompatActivity {
             runOnUiThread(() -> Toast.makeText(MapActivity.this, safeMessage, Toast.LENGTH_SHORT).show());
         }
 
+        @JavascriptInterface
+        public void onMapReady() {
+            // Called by JavaScript when Leaflet and all scripts are fully loaded
+            runOnUiThread(() -> {
+                Log.d("MapActivity", "JavaScript map is ready - injecting initial data");
+                if (deviceList != null) {
+                    injectDeviceData();
+                }
+            });
+        }
+
         // Save filters and map status
         @JavascriptInterface
         public void saveMapState(String filters, double lat, double lon, int zoom) {
@@ -1871,6 +1893,9 @@ public class MapActivity extends AppCompatActivity {
         // Unregister screen off receiver
         unregisterScreenOffReceiver();
         
+        // Unregister data update receiver
+        unregisterDataUpdateReceiver();
+        
         if (database != null) {
             dbClose();
         }
@@ -1949,8 +1974,41 @@ public class MapActivity extends AppCompatActivity {
             }
         };
         IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_OFF);
-        registerReceiver(screenOffReceiver, filter);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(screenOffReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(screenOffReceiver, filter);
+        }
         Log.d("MapActivity", "Screen off receiver registered");
+    }
+    
+    private void registerDataUpdateReceiver() {
+        try {
+            dataUpdateReceiver = new BroadcastReceiver() {
+                @Override
+                public void onReceive(Context context, Intent intent) {
+                    if ("com.example.wifi_geograbber.DATA_UPDATED".equals(intent.getAction())) {
+                        String dataType = intent.getStringExtra("data_type");
+                        int count = intent.getIntExtra("count", 0);
+                        Log.d("MapActivity", "Live data update received: " + dataType + " (" + count + " items)");
+                        
+                        // Reload map data and update markers
+                        runOnUiThread(() -> {
+                            refreshMap();
+                        });
+                    }
+                }
+            };
+            IntentFilter filter = new IntentFilter("com.example.wifi_geograbber.DATA_UPDATED");
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(dataUpdateReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                registerReceiver(dataUpdateReceiver, filter);
+            }
+            Log.d("MapActivity", "Data update receiver registered for live map refresh");
+        } catch (Exception e) {
+            Log.e("MapActivity", "Failed to register data update receiver: " + e.getMessage(), e);
+        }
     }
 
     private void unregisterScreenOffReceiver() {
@@ -1958,6 +2016,17 @@ public class MapActivity extends AppCompatActivity {
             try {
                 unregisterReceiver(screenOffReceiver);
                 Log.d("MapActivity", "Screen off receiver unregistered");
+            } catch (IllegalArgumentException e) {
+                // Receiver was not registered
+            }
+        }
+    }
+    
+    private void unregisterDataUpdateReceiver() {
+        if (dataUpdateReceiver != null) {
+            try {
+                unregisterReceiver(dataUpdateReceiver);
+                Log.d("MapActivity", "Data update receiver unregistered");
             } catch (IllegalArgumentException e) {
                 // Receiver was not registered
             }
