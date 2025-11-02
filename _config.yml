@@ -1,5 +1,5 @@
-title: GeoGrabber
-description: WiFi & Bluetooth scanner with GPS mapping for Android. Analyze networks locally or on PC with included Python tools.
+title: GeoGrabber – WiFi & Bluetooth Network Mapper
+description: GeoGrabber is an Android app for scanning, mapping, and analyzing WiFi networks and Bluetooth devices with GPS accuracy. Export data to PC and analyze with included Python tools. Ideal for network analysis, signal mapping, and educational wardriving.
 remote_theme: pages-themes/slate@v0.2.0
 plugins:
   - jekyll-remote-theme
