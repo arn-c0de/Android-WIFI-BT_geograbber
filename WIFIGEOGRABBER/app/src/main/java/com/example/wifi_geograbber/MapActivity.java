@@ -61,6 +61,11 @@ public class MapActivity extends AppCompatActivity {
     // Flag to track if we're navigating within the app (no auth needed)
     private boolean isInternalNavigation = false;
     
+    // Live location tracking
+    private boolean isLiveLocationActive = false;
+    private android.os.Handler liveLocationHandler;
+    private Runnable liveLocationRunnable;
+    
     // BroadcastReceiver for screen off event
     private BroadcastReceiver screenOffReceiver;
     
@@ -762,6 +767,16 @@ public class MapActivity extends AppCompatActivity {
             "                setTimeout(notifyAndroidOfViewportChange, 200); // Debounce\n" +
             "            });\n" +
             "            \n" +
+            "            // Close filter panel when clicking on map\n" +
+            "            map.on('click', function() {\n" +
+            "                var content = document.getElementById('filterContent');\n" +
+            "                var btn = document.getElementById('filterToggleBtn');\n" +
+            "                if (!content.classList.contains('filter-content-collapsed')) {\n" +
+            "                    content.classList.add('filter-content-collapsed');\n" +
+            "                    btn.innerHTML = 'Filter ▲';\n" +
+            "                }\n" +
+            "            });\n" +
+            "            \n" +
             "            L.tileLayer('" + tileLayerUrl + "', {\n" +
             "                attribution: '" + tileLayerAttribution + "'\n" +
             "            }).addTo(map);\n" +
@@ -1055,8 +1070,8 @@ public class MapActivity extends AppCompatActivity {
             "        }\n" +
             "        \n" +
             "        function requestCenterOnUser() {\n" +
-            "            if (typeof Android !== 'undefined' && Android.requestDeviceLocation) {\n" +
-            "                Android.requestDeviceLocation();\n" +
+            "            if (typeof Android !== 'undefined' && Android.toggleLiveLocation) {\n" +
+            "                Android.toggleLiveLocation();\n" +
             "            } else {\n" +
             "                alert('Location feature not available.');\n" +
             "            }\n" +
@@ -1077,14 +1092,16 @@ public class MapActivity extends AppCompatActivity {
             "                userMarker.setLatLng(userLatLng);\n" +
             "            } else {\n" +
             "                const userIcon = L.divIcon({\n" +
-            "                    html: '&#128512;',\n" +
+            "                    html: '<span style=\"color:red;font-size:22px;\">&#9679;</span>',\n" +
             "                    className: 'user-location-icon',\n" +
-            "                    iconSize: [20, 20]\n" +
+            "                    iconSize: [22, 22]\n" +
             "                });\n" +
             "                userMarker = L.marker(userLatLng, { icon: userIcon, zIndexOffset: 1000 }).addTo(map);\n" +
             "                userMarker.bindPopup('<b>Your Location</b>');\n" +
             "            }\n" +
-            "            map.setView(userLatLng, 15);\n" +
+            "            // Keep current zoom level instead of resetting to 15\n" +
+            "            const currentZoom = map.getZoom();\n" +
+            "            map.setView(userLatLng, currentZoom);\n" +
             "        }\n" +
             "\n" +
             "        let searchResults = [];\n" +
@@ -1128,6 +1145,11 @@ public class MapActivity extends AppCompatActivity {
             "        \n" +
             "        function showSearchResult() {\n" +
             "            if (searchResults.length === 0 || currentSearchIndex < 0) return;\n" +
+            "            \n" +
+            "            // Stop live location tracking if active\n" +
+            "            if (typeof Android !== 'undefined' && Android.stopLiveLocationIfActive) {\n" +
+            "                Android.stopLiveLocationIfActive();\n" +
+            "            }\n" +
             "            \n" +
             "            const result = searchResults[currentSearchIndex];\n" +
             "            const marker = allMarkers[result.index];\n" +
@@ -1416,6 +1438,31 @@ public class MapActivity extends AppCompatActivity {
         @JavascriptInterface
         public void requestDeviceLocation() {
             runOnUiThread(() -> requestLocationAndCenterMap());
+        }
+
+        @JavascriptInterface
+        public void toggleLiveLocation() {
+            runOnUiThread(() -> {
+                if (isLiveLocationActive) {
+                    // Stop live location tracking
+                    stopLiveLocationTracking();
+                    Toast.makeText(MapActivity.this, "Live Location: OFF", Toast.LENGTH_SHORT).show();
+                } else {
+                    // Start live location tracking
+                    startLiveLocationTracking();
+                    Toast.makeText(MapActivity.this, "Live Location: ON (updating every second)", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void stopLiveLocationIfActive() {
+            runOnUiThread(() -> {
+                if (isLiveLocationActive) {
+                    stopLiveLocationTracking();
+                    Toast.makeText(MapActivity.this, "Live Location stopped (search active)", Toast.LENGTH_SHORT).show();
+                }
+            });
         }
 
         // NEW METHOD: Bounding box update for performance optimization
@@ -1723,6 +1770,11 @@ public class MapActivity extends AppCompatActivity {
         builder.setTitle(String.format(getString(R.string.search_results), results.size()) + " for: " + safeQuery);
         builder.setItems(items, (dialog, which) -> {
             // User selected a result - zoom to it on map
+            // Stop live location tracking if active
+            if (isLiveLocationActive) {
+                stopLiveLocationTracking();
+                Toast.makeText(MapActivity.this, "Live Location stopped (search active)", Toast.LENGTH_SHORT).show();
+            }
             DeviceData selectedDevice = results.get(which);
             String jsCode = String.format("javascript:zoomToDevice('%s', %f, %f);", 
                 selectedDevice.address.replace("'", "\\'"),
@@ -1745,6 +1797,38 @@ public class MapActivity extends AppCompatActivity {
         mapWebView.evaluateJavascript("javascript:clearSearch();", null);
     }
     
+    private void startLiveLocationTracking() {
+        isLiveLocationActive = true;
+        
+        if (liveLocationHandler == null) {
+            liveLocationHandler = new android.os.Handler();
+        }
+        
+        liveLocationRunnable = new Runnable() {
+            @Override
+            public void run() {
+                if (isLiveLocationActive) {
+                    requestLocationAndCenterMap();
+                    liveLocationHandler.postDelayed(this, 1000); // Run every 1 second
+                }
+            }
+        };
+        
+        // Start immediately
+        liveLocationHandler.post(liveLocationRunnable);
+        Log.d("MapActivity", "Live location tracking started");
+    }
+    
+    private void stopLiveLocationTracking() {
+        isLiveLocationActive = false;
+        
+        if (liveLocationHandler != null && liveLocationRunnable != null) {
+            liveLocationHandler.removeCallbacks(liveLocationRunnable);
+        }
+        
+        Log.d("MapActivity", "Live location tracking stopped");
+    }
+    
     private void requestLocationAndCenterMap() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, LOCATION_PERMISSION_REQUEST_CODE);
@@ -1755,7 +1839,10 @@ public class MapActivity extends AppCompatActivity {
                 .addOnSuccessListener(this, location -> {
                     if (location != null) {
                         mapWebView.evaluateJavascript("javascript:centerOnUserLocation(" + location.getLatitude() + ", " + location.getLongitude() + ");", null);
-                        Toast.makeText(MapActivity.this, R.string.centering_on_location, Toast.LENGTH_SHORT).show();
+                            // Only show toast if NOT live location mode
+                            if (!isLiveLocationActive) {
+                                Toast.makeText(MapActivity.this, R.string.centering_on_location, Toast.LENGTH_SHORT).show();
+                            }
                     } else {
                         Toast.makeText(MapActivity.this, R.string.location_unavailable, Toast.LENGTH_LONG).show();
                     }
@@ -1777,6 +1864,9 @@ public class MapActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        
+        // Stop live location tracking
+        stopLiveLocationTracking();
         
         // Unregister screen off receiver
         unregisterScreenOffReceiver();
