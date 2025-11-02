@@ -41,20 +41,41 @@
 <body>
     <nav style="width:100%; display:flex; justify-content:center; margin:32px 0 24px 0;">
       <ul style="display:flex; gap:24px; list-style:none; padding:0; margin:0; font-size:1.1em;">
-        <li><a href="/docs/">Documentation</a></li>
-        <li><a href="/docs/quickstart/database_combiner_quickstart.md">Database Combiner Guide</a></li>
-        <li><a href="/docs/quickstart/map_viewer_quickstart.md">Map Viewer Guide</a></li>
-        <li><a href="/PROJECT_STRUCTURE.md">Project Structure</a></li>
-        <li><a href="/docs/project-structure/PROJECT_STRUCTURE.md">Detailed Structure</a></li>
-        <li><a href="/CHANGELOG.md">Changelog</a></li>
-        <li><a href="/CONTRIBUTING.md">Contributing</a></li>
-        <li><a href="/SECURITY.md">Security</a></li>
-        <li><a href="/CODE_OF_CONDUCT.md">Code of Conduct</a></li>
+  <li><a href="/Geograbber/docs/">Documentation</a></li>
+  <li><a href="/Geograbber/docs/quickstart/database_combiner_quickstart.md">Database Combiner Guide</a></li>
+  <li><a href="/Geograbber/docs/quickstart/map_viewer_quickstart.md">Map Viewer Guide</a></li>
+  <li><a href="/Geograbber/PROJECT_STRUCTURE.md">Project Structure</a></li>
+  <li><a href="/Geograbber/docs/project-structure/PROJECT_STRUCTURE.md">Detailed Structure</a></li>
+  <li><a href="/Geograbber/CHANGELOG.md">Changelog</a></li>
+  <li><a href="/Geograbber/CONTRIBUTING.md">Contributing</a></li>
+  <li><a href="/Geograbber/SECURITY.md">Security</a></li>
+  <li><a href="/Geograbber/CODE_OF_CONDUCT.md">Code of Conduct</a></li>
       </ul>
     </nav>
+    <style>
+      .section-container {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        margin: 32px 0;
+        padding: 32px 28px;
+        width: 100%;
+        max-width: 900px;
+        transition: box-shadow 0.2s;
+      }
+      .section-container:hover {
+        box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+      }
+    </style>
     <div style="display: flex; flex-direction: column; align-items: center; width: 100%;">
-      <!-- Page content -->
-      {{ content }}
+      <!-- Page content with section containers -->
+      {% assign sections = content | split: '<hr />' %}
+      {% for section in sections %}
+        <div class="section-container">
+          {{ section }}
+        </div>
+      {% endfor %}
     </div>
   </body>
 </html>
