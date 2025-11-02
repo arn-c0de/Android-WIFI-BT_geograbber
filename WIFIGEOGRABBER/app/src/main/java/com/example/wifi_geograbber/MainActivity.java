@@ -3407,6 +3407,14 @@ public class MainActivity extends AppCompatActivity {
         new android.app.AlertDialog.Builder(this)
             .setTitle("Enable Biometric Unlock?")
             .setMessage("Would you like to enable fingerprint or face unlock for quick access to your encrypted database?\n\n" +
+                       "🔒 Security Information:\n" +
+                       "• Your passphrase is never stored in plain text\n" +
+                       "• It's encrypted with AES-256 in Android Keystore (hardware-secured)\n" +
+                       "• Only unlocked after successful biometric authentication\n" +
+                       "• Biometric data never leaves your device\n\n" +
+                       "📊 Security Comparison:\n" +
+                       "• Manual passphrase only = Maximum security (never stored)\n" +
+                       "• Biometric unlock = Very secure + convenient (encrypted storage)\n\n" +
                        "You can change this setting later in the encryption settings.")
             .setPositiveButton("Enable", (dialog, which) -> {
                 // Use the ORIGINAL passphrase from setup, not the cached one

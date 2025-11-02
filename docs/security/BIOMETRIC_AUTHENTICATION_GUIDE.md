@@ -437,6 +437,35 @@ dependencies {
 
 ---
 
-**Implementation Date:** November 2, 2025  
-**Status:** ✅ Complete and Ready for Testing  
-**Security Review:** Pending
+# 🧬 Biometric Authentication Guide
+
+## First Setup & Security Information
+
+**Sicherheit beim Biometric Unlock:**
+- Dein Passkey wird niemals im Klartext gespeichert.
+- Er wird mit dem Android Keystore verschlüsselt (AES-256, hardware-gesichert).
+- Nur nach erfolgreicher Biometrie (Fingerabdruck/Gesicht) kann der Passkey entschlüsselt werden.
+- Biometrische Daten verlassen das Gerät nie und werden nicht in der App gespeichert.
+- Nach der Entschlüsselung wird der Passkey sofort aus dem Speicher gelöscht.
+
+**Was ist sicherer?**
+- Ein langer, starker Passkey, den du nur manuell eingibst und nie speicherst, ist maximal sicher.
+- Biometric Unlock ist sehr sicher und komfortabel, aber der Passkey wird einmalig verschlüsselt im Keystore abgelegt.
+- Für die meisten Nutzer ist Biometric Unlock mit starkem Passkey ein sehr guter Kompromiss aus Sicherheit und Komfort.
+
+## Schritt-für-Schritt Einrichtung
+
+1. **Öffne die App** und gehe zu den **Einstellungen**.
+2. Tippe auf **Biometric Unlock aktivieren**.
+3. **Bestätige deinen aktuellen Passphrase**, wenn du dazu aufgefordert wirst.
+4. **Berühre den Fingerabdrucksensor** oder schaue auf die Kamera für die Gesichtserkennung.
+5. Bei erfolgreicher Authentifizierung siehst du eine Bestätigung.
+6. **Fertig!** Ab sofort kannst du die biometrische Authentifizierung zum Entsperren der App verwenden.
+
+## Nutzung der Biometric Authentication
+
+- Bei jedem Start der App wirst du aufgefordert, deine Identität mit deinem Fingerabdruck oder Gesicht zu bestätigen.
+- Wenn die biometrische Authentifizierung fehlschlägt, kannst du alternativ deine Passphrase eingeben.
+- Deine biometrischen Daten werden niemals gespeichert oder an Dritte weitergegeben.
+
+---
