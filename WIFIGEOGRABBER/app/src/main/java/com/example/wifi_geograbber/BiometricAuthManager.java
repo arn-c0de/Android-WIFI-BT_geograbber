@@ -153,6 +153,7 @@ public class BiometricAuthManager {
             BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
                 .setTitle("Enable Biometric Unlock")
                 .setSubtitle("Authenticate to secure your passphrase")
+                .setDescription("Use fingerprint, face, or other biometric authentication")
                 .setNegativeButtonText("Cancel")
                 .build();
             
@@ -288,8 +289,8 @@ public class BiometricAuthManager {
             // Create biometric prompt
             BiometricPrompt.PromptInfo promptInfo = new BiometricPrompt.PromptInfo.Builder()
                 .setTitle("Unlock Database")
-                .setSubtitle("Use your fingerprint to unlock encrypted database")
-                .setDescription("Authentication is required to access your scan data")
+                .setSubtitle("Use biometric authentication to unlock")
+                .setDescription("Fingerprint, face, or other biometric authentication required")
                 .setNegativeButtonText("Use Passphrase")
                 .setConfirmationRequired(true)
                 .build();

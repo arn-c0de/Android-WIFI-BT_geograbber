@@ -71,6 +71,7 @@ public class MainActivity extends AppCompatActivity {
     private View securityOverlay;  // Black overlay to hide content during passphrase entry
     private boolean isNavigatingInternally = false;  // Flag to track internal navigation (e.g., to MapActivity)
     private boolean isUnlockDialogShowing = false;  // Flag to prevent multiple unlock dialogs
+    private android.app.AlertDialog currentDialog = null;  // Track currently open dialog to dismiss it
     private Handler handler;
     private Runnable scanRunnable;
     private boolean isScanning = false;
@@ -520,6 +521,10 @@ public class MainActivity extends AppCompatActivity {
         // Check if database needs to be unlocked
         if (encryptionManager != null && encryptionManager.isEncryptionEnabled() && 
             !encryptionManager.isPassphraseCached() && !isUnlockDialogShowing) {
+            
+            // Close all open dialogs before showing unlock dialog
+            dismissAllDialogs();
+            
             // Show overlay and unlock dialog
             if (securityOverlay != null) {
                 securityOverlay.setVisibility(View.VISIBLE);
@@ -1576,7 +1581,10 @@ public class MainActivity extends AppCompatActivity {
                     break;
             }
         });
-        builder.show();
+        
+        // Track this dialog so it can be dismissed when needed
+        currentDialog = builder.create();
+        currentDialog.show();
     }
 
     // No longer needed - all databases are transferred to the internal database.
@@ -3111,6 +3119,22 @@ public class MainActivity extends AppCompatActivity {
                 encryptionStatusText.setText(getString(R.string.encryption_disabled));
                 encryptionStatusText.setVisibility(View.GONE); // Hide if not encrypted
             }
+        }
+    }
+    
+    /**
+     * Dismiss all open dialogs to prevent overlapping with unlock dialog
+     */
+    private void dismissAllDialogs() {
+        try {
+            // Dismiss any currently tracked dialog
+            if (currentDialog != null && currentDialog.isShowing()) {
+                currentDialog.dismiss();
+                currentDialog = null;
+                Log.d("MainActivity", "Dismissed open dialog");
+            }
+        } catch (Exception e) {
+            Log.e("MainActivity", "Error dismissing dialogs: " + e.getMessage());
         }
     }
     
