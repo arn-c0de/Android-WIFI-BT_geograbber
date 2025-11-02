@@ -1686,9 +1686,8 @@ public class MapActivity extends AppCompatActivity {
     
     @Override
     protected void onPause() {
-        super.onPause();
-        // Clear encryption key when activity pauses (screen off, switching apps, etc.)
-        clearEncryptionKey();
+    super.onPause();
+    // Do not clear encryption key on pause; only clear on screen off or app destroy
     }
     
     private void registerScreenOffReceiver() {
