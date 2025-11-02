@@ -1127,16 +1127,37 @@ public class MapActivity extends AppCompatActivity {
             "            searchResults = [];\n" +
             "            currentSearchIndex = -1;\n" +
             "            \n" +
-            "            // Search through all devices\n" +
-            "            deviceData.forEach((device, index) => {\n" +
-            "                const name = (device.name || '').toLowerCase();\n" +
-            "                const address = (device.address || '').toLowerCase();\n" +
-            "                const vendor = (device.vendor || '').toLowerCase();\n" +
-            "                \n" +
-            "                if (name.includes(lowerQuery) || address.includes(lowerQuery) || vendor.includes(lowerQuery)) {\n" +
-            "                    searchResults.push({ device: device, index: index });\n" +
+            "            // First search in entire database via Android\n" +
+            "            if (typeof Android !== 'undefined' && Android.searchInDatabase) {\n" +
+            "                try {\n" +
+            "                    const dbResultsJson = Android.searchInDatabase(query);\n" +
+            "                    const dbResults = JSON.parse(dbResultsJson);\n" +
+            "                    \n" +
+            "                    console.log('Database search found', dbResults.length, 'results');\n" +
+            "                    \n" +
+            "                    if (dbResults.length > 0) {\n" +
+            "                        // Found results in database - use them\n" +
+            "                        dbResults.forEach((device, index) => {\n" +
+            "                            searchResults.push({ device: device, index: -1, fromDb: true });\n" +
+            "                        });\n" +
+            "                    }\n" +
+            "                } catch (e) {\n" +
+            "                    console.error('Database search error:', e);\n" +
             "                }\n" +
-            "            });\n" +
+            "            }\n" +
+            "            \n" +
+            "            // If no database results, fall back to searching current viewport\n" +
+            "            if (searchResults.length === 0) {\n" +
+            "                deviceData.forEach((device, index) => {\n" +
+            "                    const name = (device.name || '').toLowerCase();\n" +
+            "                    const address = (device.address || '').toLowerCase();\n" +
+            "                    const vendor = (device.vendor || '').toLowerCase();\n" +
+            "                    \n" +
+            "                    if (name.includes(lowerQuery) || address.includes(lowerQuery) || vendor.includes(lowerQuery)) {\n" +
+            "                        searchResults.push({ device: device, index: index, fromDb: false });\n" +
+            "                    }\n" +
+            "                });\n" +
+            "            }\n" +
             "            \n" +
             "            if (searchResults.length === 0) {\n" +
             "                if (typeof Android !== 'undefined' && Android.showToast) {\n" +
@@ -1163,6 +1184,21 @@ public class MapActivity extends AppCompatActivity {
             "            }\n" +
             "            \n" +
             "            const result = searchResults[currentSearchIndex];\n" +
+            "            \n" +
+            "            // If result is from database (not in current viewport), just center on it\n" +
+            "            if (result.fromDb) {\n" +
+            "                // Center map on the device location\n" +
+            "                map.setView([result.device.lat, result.device.lon], 18);\n" +
+            "                \n" +
+            "                // Show info in toast\n" +
+            "                if (typeof Android !== 'undefined' && Android.showToast) {\n" +
+            "                    const deviceInfo = result.device.name + ' (' + result.device.address + ')';\n" +
+            "                    Android.showToast('Result ' + (currentSearchIndex + 1) + '/' + searchResults.length + ': ' + deviceInfo);\n" +
+            "                }\n" +
+            "                return;\n" +
+            "            }\n" +
+            "            \n" +
+            "            // Result is in current viewport - show marker\n" +
             "            const marker = allMarkers[result.index];\n" +
             "            \n" +
             "            if (marker) {\n" +
@@ -1543,6 +1579,46 @@ public class MapActivity extends AppCompatActivity {
                 Log.e("MapActivity", "Error getting total device count: " + e.getMessage());
             }
             return getString(R.string.total_unknown);
+        }
+
+        @JavascriptInterface
+        public String searchInDatabase(String query) {
+            // Search in the entire database, not just current viewport
+            try {
+                String safeQuery = sanitizeForLogging(query);
+                String sqlQuery = "SELECT device_address, device_name, device_type, latitude, longitude, vendor " +
+                                  "FROM device_data WHERE " +
+                                  "(device_name LIKE ? OR device_address LIKE ? OR vendor LIKE ?) " +
+                                  "AND latitude != 0 AND longitude != 0 " +
+                                  "LIMIT 100";
+                
+                String searchPattern = "%" + query + "%";
+                Cursor cursor = dbRawQuery(sqlQuery, new String[]{searchPattern, searchPattern, searchPattern});
+                
+                JSONArray results = new JSONArray();
+                while (cursor.moveToNext()) {
+                    try {
+                        JSONObject device = new JSONObject();
+                        device.put("address", cursor.getString(0));
+                        device.put("name", cursor.getString(1));
+                        device.put("type", cursor.getString(2));
+                        device.put("lat", cursor.getDouble(3));
+                        device.put("lon", cursor.getDouble(4));
+                        device.put("vendor", cursor.getString(5));
+                        results.put(device);
+                    } catch (JSONException e) {
+                        Log.e("MapActivity", "Error creating device JSON: " + e.getMessage());
+                    }
+                }
+                cursor.close();
+                
+                Log.d("MapActivity", "Database search for '" + safeQuery + "' found " + results.length() + " results");
+                return results.toString();
+                
+            } catch (Exception e) {
+                Log.e("MapActivity", "Error searching database: " + e.getMessage());
+                return "[]";
+            }
         }
 
         @JavascriptInterface
