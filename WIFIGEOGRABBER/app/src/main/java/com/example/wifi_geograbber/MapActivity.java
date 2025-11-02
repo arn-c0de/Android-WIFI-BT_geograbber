@@ -278,7 +278,13 @@ public class MapActivity extends AppCompatActivity {
         webSettings.setAllowContentAccess(true);
         webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
-        // Add JavaScript interface
+        // SECURITY: Add JavaScript interface
+        // This is safe because:
+        // 1. WebView ONLY loads locally-generated HTML content via loadDataWithBaseURL()
+        // 2. No user-controlled or external URLs are loaded
+        // 3. External resources (Leaflet, OSM tiles) are from trusted CDNs
+        // 4. All methods exposed via @JavascriptInterface sanitize user input
+        // 5. No navigation to untrusted content is allowed (see WebViewClient below)
         mapWebView.addJavascriptInterface(new WebAppInterface(), "Android");
         
         mapWebView.setWebViewClient(new WebViewClient() {
@@ -289,6 +295,14 @@ public class MapActivity extends AppCompatActivity {
                 if (deviceList != null) {
                     injectDeviceData();
                 }
+            }
+            
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                // SECURITY: Block all navigation attempts to prevent loading untrusted content
+                // Only allow the initial locally-generated content
+                Log.w("MapActivity", "Blocked navigation attempt to: " + sanitizeForLogging(url));
+                return true; // Block the navigation
             }
         });
     }
@@ -467,6 +481,8 @@ public class MapActivity extends AppCompatActivity {
         int zoomLevel = prefs.getInt(PREF_ZOOM, 15);
 
         String htmlContent = generateMapHTML(savedFilters, centerLat, centerLon, zoomLevel);
+        // SECURITY: Only locally-generated, trusted HTML content is loaded
+        // No external or user-controlled URLs are ever loaded into this WebView
         mapWebView.loadDataWithBaseURL("https://localhost/", htmlContent, "text/html", "UTF-8", null);
     }
     
@@ -1338,14 +1354,27 @@ public class MapActivity extends AppCompatActivity {
 
         @JavascriptInterface
         public void showToast(String message) {
-            runOnUiThread(() -> Toast.makeText(MapActivity.this, message, Toast.LENGTH_SHORT).show());
+            // Sanitize message to prevent issues with special characters or injection attempts
+            String safeMessage = sanitizeForLogging(message);
+            runOnUiThread(() -> Toast.makeText(MapActivity.this, safeMessage, Toast.LENGTH_SHORT).show());
         }
 
         // Save filters and map status
         @JavascriptInterface
         public void saveMapState(String filters, double lat, double lon, int zoom) {
+            // Validate filters is valid JSON array format to prevent injection
+            String safeFilters = filters;
+            if (filters != null) {
+                try {
+                    new JSONArray(filters); // Validate JSON format
+                } catch (JSONException e) {
+                    Log.w("MapActivity", "Invalid filter JSON, ignoring: " + sanitizeForLogging(filters));
+                    safeFilters = "[]"; // Default to empty array
+                }
+            }
+            
             getSharedPreferences(PREFS_NAME, MODE_PRIVATE).edit()
-                .putString(PREF_FILTERS, filters)
+                .putString(PREF_FILTERS, safeFilters)
                 .putLong(PREF_CENTER_LAT, Double.doubleToLongBits(lat))
                 .putLong(PREF_CENTER_LON, Double.doubleToLongBits(lon))
                 .putInt(PREF_ZOOM, zoom)
