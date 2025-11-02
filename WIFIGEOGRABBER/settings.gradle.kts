@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "WIFI-GEOGRABBER"
+rootProject.name = "GEOGRABBER"
 include(":app")
  

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">WIFI-GEOGRABBER</string>
+    <string name="app_name">GeoGrabber</string>
 
     <!-- Main Activity -->
     <string name="status_stopped">Status: Stopped</string>
