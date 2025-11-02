@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 ## [1.0.4] – 2025-11-02
 
 ### 🛡️ Security & Features
+### 🗺️ Map & UI
+- Added dark mode toggle for map (OSM/CartoDB)
+- Map style persists user choice (SharedPreferences)
+- Live location tracking: keeps user zoom level, disables popup spam
+- Live location auto-disables when jumping to search result
+- Filter popup can be closed by clicking on map
+- Location marker icon is now a red dot
+- Search bar text color is now black for better readability
+- Various UI/UX improvements for map usability
 - Improved biometric authentication reliability and error handling
 - Added support for multiple biometric types (fingerprint, face, iris) where available
 - Enhanced fallback logic: clearer messaging and retry options for passphrase entry

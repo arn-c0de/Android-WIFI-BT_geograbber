@@ -99,9 +99,15 @@ GeoGrabber is ideal for network analysis, signal mapping, and understanding wire
 ### 🗺️ Location & Mapping
 
 - 📍 **GPS Integration** – Records precise GPS coordinates for each scan
-- 🌐 **Interactive Map** – Visualize collected data on a Leaflet-based web map
-- 🔍 **Location Filtering** – View devices within specific geographic boundaries
-- 🎯 **Live Location** – Center map on your current GPS position
+   - 🌐 **Interactive Map** – Visualize collected data on a Leaflet-based web map
+   - 🌓 **Dark Mode Toggle** – Switch between light and dark map styles (OSM/CartoDB)
+   - 🖍️ **Persistent Map Style** – User map style choice is saved and restored
+   - 🔍 **Location Filtering** – View devices within specific geographic boundaries
+   - 🎯 **Live Location** – Center map on your current GPS position (auto-tracking, keeps user zoom)
+   - 🛑 **Live Location Auto-Off** – Live location tracking disables when jumping to search result
+   - 📍 **Custom Location Marker** – Your position is shown as a red dot
+   - 🧹 **Filter Popup UX** – Filter popup can be closed by clicking on the map
+   - 🖤 **Improved Search Bar** – Search bar text is now black for better readability
 
 ### 💾 Data Management
 
