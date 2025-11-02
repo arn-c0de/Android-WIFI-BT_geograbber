@@ -275,7 +275,8 @@ public class MapActivity extends AppCompatActivity {
         webSettings.setJavaScriptEnabled(true);
         webSettings.setDomStorageEnabled(true);
         webSettings.setAllowFileAccess(false);
-        webSettings.setAllowContentAccess(true);
+        // SECURITY: Prevent access to content:// URLs
+        webSettings.setAllowContentAccess(false);
         webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
         // SECURITY: Add JavaScript interface
