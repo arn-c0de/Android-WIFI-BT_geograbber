@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0d1117"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp">
+
+        <!-- App Logo/Icon -->
+        <ImageView
+            android:layout_width="96dp"
+            android:layout_height="96dp"
+            android:src="@mipmap/ic_launcher"
+            android:layout_marginBottom="24dp"
+            android:contentDescription="App Icon" />
+
+        <!-- Title -->
+        <TextView
+            android:id="@+id/status_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Unlock Database"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:textColor="#c9d1d9"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Subtitle -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Your scan data is encrypted"
+            android:textSize="16sp"
+            android:textColor="#8b949e"
+            android:layout_marginBottom="32dp" />
+
+        <!-- Biometric Section -->
+        <LinearLayout
+            android:id="@+id/biometric_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:visibility="gone"
+            android:background="@drawable/rounded_background"
+            android:padding="24dp"
+            android:layout_marginBottom="16dp">
+
+            <!-- Fingerprint Icon -->
+            <ImageView
+                android:id="@+id/fingerprint_icon"
+                android:layout_width="80dp"
+                android:layout_height="80dp"
+                android:src="@android:drawable/ic_secure"
+                android:tint="#58a6ff"
+                android:layout_marginBottom="16dp"
+                android:contentDescription="Fingerprint Icon" />
+
+            <!-- Biometric Status -->
+            <TextView
+                android:id="@+id/biometric_status_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Touch sensor to unlock"
+                android:textSize="14sp"
+                android:textColor="#8b949e"
+                android:gravity="center"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Use Passphrase Button -->
+            <Button
+                android:id="@+id/use_passphrase_fallback_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Use Passphrase Instead"
+                android:textColor="#58a6ff"
+                android:background="@android:color/transparent"
+                android:textAllCaps="false"
+                android:onClick="showPassphraseUnlock" />
+        </LinearLayout>
+
+        <!-- Passphrase Section -->
+        <LinearLayout
+            android:id="@+id/passphrase_section"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone"
+            android:background="@drawable/rounded_background"
+            android:padding="24dp">
+
+            <!-- Passphrase Input -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Enter Passphrase"
+                android:textSize="14sp"
+                android:textColor="#8b949e"
+                android:layout_marginBottom="8dp" />
+
+            <EditText
+                android:id="@+id/passphrase_input"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="Passphrase"
+                android:inputType="textPassword"
+                android:textColor="#c9d1d9"
+                android:textColorHint="#6e7681"
+                android:background="@drawable/input_background"
+                android:padding="16dp"
+                android:layout_marginBottom="16dp"
+                android:importantForAutofill="no" />
+
+            <!-- Unlock Button -->
+            <Button
+                android:id="@+id/unlock_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Unlock"
+                android:textColor="#ffffff"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:background="@drawable/button_background"
+                android:padding="16dp"
+                android:layout_marginBottom="16dp" />
+
+            <!-- Use Biometric Button (shown if biometric available) -->
+            <Button
+                android:id="@+id/use_biometric_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🔒 Use Fingerprint"
+                android:textColor="#58a6ff"
+                android:background="@android:color/transparent"
+                android:textAllCaps="false"
+                android:layout_gravity="center"
+                android:visibility="gone" />
+
+            <!-- Attempts Warning -->
+            <TextView
+                android:id="@+id/attempts_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="⚠️ 3 attempts remaining"
+                android:textSize="13sp"
+                android:textColor="#f85149"
+                android:gravity="center"
+                android:layout_marginTop="8dp"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <!-- Help Text -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Forgot your passphrase? You'll need to reset the database."
+            android:textSize="12sp"
+            android:textColor="#6e7681"
+            android:gravity="center"
+            android:layout_marginTop="24dp" />
+
+    </LinearLayout>
+
+</ScrollView>

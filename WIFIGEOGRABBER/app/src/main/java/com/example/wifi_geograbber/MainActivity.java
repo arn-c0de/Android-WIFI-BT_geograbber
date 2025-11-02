@@ -56,6 +56,7 @@ public class MainActivity extends AppCompatActivity {
     
     // Database encryption support
     private EncryptionManager encryptionManager;
+    private BiometricAuthManager biometricAuthManager;
     private DatabaseEncryptionHelper encryptedDbHelper;
     private boolean isDatabaseEncrypted = false;
     
@@ -290,6 +291,23 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        
+        // Initialize encryption manager first
+        encryptionManager = new EncryptionManager(this);
+        
+        // Initialize biometric auth manager
+        biometricAuthManager = new BiometricAuthManager(this, encryptionManager);
+        
+        // Check if database is encrypted and needs unlocking
+        if (encryptionManager.isEncryptionEnabled() && !encryptionManager.isPassphraseCached()) {
+            // Database is locked - redirect to unlock activity
+            Intent unlockIntent = new Intent(this, DatabaseUnlockActivity.class);
+            unlockIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+            startActivity(unlockIntent);
+            finish();
+            return;
+        }
+        
         setContentView(R.layout.activity_main);
         
         // Activate full-screen mode - hide the navigation bar (after setContentView!)
@@ -298,8 +316,8 @@ public class MainActivity extends AppCompatActivity {
         // Ensure ScanService is stopped on app start
         stopService(new Intent(this, ScanService.class));
 
-        // Initialize encryption manager
-        encryptionManager = new EncryptionManager(this);
+        // Re-initialize encryption manager (already initialized above, but keeping for consistency)
+        // encryptionManager = new EncryptionManager(this);
 
         // initialization
         statusText = findViewById(R.id.status_text);
@@ -3466,22 +3484,50 @@ public class MainActivity extends AppCompatActivity {
         String status = encryptionManager.isEncryptionEnabled() ?
             getString(R.string.encryption_enabled) : getString(R.string.encryption_disabled);
 
-        String[] options = encryptionManager.isEncryptionEnabled() ?
-            new String[]{getString(R.string.change_passphrase), getString(R.string.disable_encryption)} :
-            new String[]{getString(R.string.enable_encryption)};
+        // Build options list
+        java.util.ArrayList<String> optionsList = new java.util.ArrayList<>();
+        if (encryptionManager.isEncryptionEnabled()) {
+            optionsList.add(getString(R.string.change_passphrase));
+            
+            // Add biometric option if supported
+            if (biometricAuthManager.isBiometricSupported()) {
+                if (biometricAuthManager.isBiometricEnabled()) {
+                    optionsList.add("🔓 Disable Biometric Unlock");
+                } else {
+                    optionsList.add("🔒 Enable Biometric Unlock");
+                }
+            }
+            
+            optionsList.add(getString(R.string.disable_encryption));
+        } else {
+            optionsList.add(getString(R.string.enable_encryption));
+        }
+
+        String[] options = optionsList.toArray(new String[0]);
 
         android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
         layout.setOrientation(android.widget.LinearLayout.VERTICAL);
         layout.setPadding(40, 30, 40, 10);
 
         android.widget.TextView statusText = new android.widget.TextView(this);
-        statusText.setText(getString(R.string.encryption_status) + ": " + status + "\n\nOptions:");
+        String statusMessage = getString(R.string.encryption_status) + ": " + status;
+        
+        // Add biometric status if encryption is enabled
+        if (encryptionManager.isEncryptionEnabled() && biometricAuthManager.isBiometricSupported()) {
+            String bioStatus = biometricAuthManager.isBiometricEnabled() ? 
+                "\n🔒 Biometric Unlock: Enabled" : 
+                "\n🔓 Biometric Unlock: Disabled";
+            statusMessage += bioStatus;
+        }
+        
+        statusMessage += "\n\nOptions:";
+        statusText.setText(statusMessage);
         layout.addView(statusText);
 
-        android.widget.ListView optionsList = new android.widget.ListView(this);
+        android.widget.ListView optionsListView = new android.widget.ListView(this);
         android.widget.ArrayAdapter<String> adapter = new android.widget.ArrayAdapter<>(this, android.R.layout.simple_list_item_1, options);
-        optionsList.setAdapter(adapter);
-        layout.addView(optionsList);
+        optionsListView.setAdapter(adapter);
+        layout.addView(optionsListView);
 
         if (encryptionManager.isEncryptionEnabled()) {
             android.widget.Button resetButton = new android.widget.Button(this);
@@ -3497,11 +3543,26 @@ public class MainActivity extends AppCompatActivity {
         android.app.AlertDialog dialog = builder.create();
         dialog.show();
 
-        optionsList.setOnItemClickListener((parent, view, position, id) -> {
+        optionsListView.setOnItemClickListener((parent, view, position, id) -> {
             if (encryptionManager.isEncryptionEnabled()) {
+                // When encryption is enabled, we have: Change Passphrase, [Biometric Option], Disable Encryption
                 if (position == 0) {
                     showChangePassphraseDialog();
                 } else if (position == 1) {
+                    // Check if this is biometric option or disable encryption
+                    if (biometricAuthManager.isBiometricSupported() && position == 1) {
+                        // Toggle biometric unlock
+                        if (biometricAuthManager.isBiometricEnabled()) {
+                            showDisableBiometricDialog();
+                        } else {
+                            showEnableBiometricDialog();
+                        }
+                    } else {
+                        // Disable encryption
+                        showDisableEncryptionDialog();
+                    }
+                } else if (position == 2) {
+                    // This must be disable encryption (when biometric is present)
                     showDisableEncryptionDialog();
                 }
             } else {
@@ -4594,5 +4655,97 @@ public class MainActivity extends AppCompatActivity {
         builder.setNeutralButton("Cancel", null);
         builder.show();
     }
+    
+    /**
+     * Show dialog to enable biometric unlock
+     */
+    private void showEnableBiometricDialog() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("🔒 Enable Biometric Unlock");
+        builder.setMessage("Enable fingerprint/face unlock for quick database access?\n\n" +
+            "Your passphrase will be encrypted and stored securely in the Android Keystore, " +
+            "accessible only via biometric authentication.\n\n" +
+            "You can still use your passphrase as a fallback.");
+        
+        builder.setPositiveButton("Enable", (dialog, which) -> {
+            // Verify current passphrase first
+            showVerifyPassphraseForBiometric();
+        });
+        
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
+    }
+    
+    /**
+     * Verify passphrase before enabling biometric unlock
+     */
+    private void showVerifyPassphraseForBiometric() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("Verify Passphrase");
+        builder.setMessage("Enter your current passphrase to enable biometric unlock:");
+        
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+        
+        final android.widget.EditText passphraseInput = new android.widget.EditText(this);
+        passphraseInput.setHint("Current Passphrase");
+        passphraseInput.setInputType(android.text.InputType.TYPE_CLASS_TEXT | 
+                                     android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        layout.addView(passphraseInput);
+        
+        builder.setView(layout);
+        
+        builder.setPositiveButton("Verify", (dialog, which) -> {
+            String passphraseStr = passphraseInput.getText().toString();
+            char[] passphrase = passphraseStr.toCharArray();
+            
+            // Verify passphrase
+            if (encryptionManager.unlockWithPassphrase(passphrase)) {
+                // Enable biometric unlock with this passphrase
+                if (biometricAuthManager.enableBiometricUnlock(passphrase)) {
+                    Toast.makeText(this, "✅ Biometric unlock enabled successfully", 
+                        Toast.LENGTH_LONG).show();
+                    addLogMessage("INFO: Biometric unlock enabled");
+                } else {
+                    Toast.makeText(this, "❌ Failed to enable biometric unlock", 
+                        Toast.LENGTH_LONG).show();
+                    addLogMessage("ERROR: Failed to enable biometric unlock");
+                }
+            } else {
+                Toast.makeText(this, "❌ Incorrect passphrase", Toast.LENGTH_SHORT).show();
+            }
+            
+            // Clear passphrase from memory
+            java.util.Arrays.fill(passphrase, '\0');
+            passphraseInput.setText("");
+        });
+        
+        builder.setNegativeButton("Cancel", (dialog, which) -> {
+            passphraseInput.setText("");
+        });
+        
+        builder.show();
+    }
+    
+    /**
+     * Show dialog to disable biometric unlock
+     */
+    private void showDisableBiometricDialog() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("🔓 Disable Biometric Unlock");
+        builder.setMessage("Disable fingerprint/face unlock?\n\n" +
+            "You will need to enter your passphrase manually to unlock the database.");
+        
+        builder.setPositiveButton("Disable", (dialog, which) -> {
+            biometricAuthManager.disableBiometricUnlock();
+            Toast.makeText(this, "Biometric unlock disabled", Toast.LENGTH_SHORT).show();
+            addLogMessage("INFO: Biometric unlock disabled");
+        });
+        
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
+    }
 }
+
 

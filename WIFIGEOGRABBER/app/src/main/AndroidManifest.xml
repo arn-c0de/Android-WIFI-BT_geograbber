@@ -19,6 +19,10 @@
     
     <uses-feature android:name="android.hardware.bluetooth" android:required="false"/>
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false"/>
+    
+    <!-- Biometric authentication -->
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <uses-feature android:name="android.hardware.fingerprint" android:required="false"/>
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
@@ -38,6 +42,14 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        
+        <!-- Database Unlock Activity -->
+        <activity android:name=".DatabaseUnlockActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|keyboardHidden"/>
         
         <!-- Karten-Activity -->
         <activity android:name=".MapActivity" 
