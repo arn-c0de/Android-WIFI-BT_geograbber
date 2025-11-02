@@ -30,7 +30,8 @@ No experience required for some tasks! You can contribute in multiple areas:
 ### 💻 Development
 - 🔍 Review PRs
 - ♻️ Refactor code for clarity
-- ✨ Add features or fix bugs ([see open issues](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/issues))
+- ✨ Add features or fix bugs ([see open issues](https://github.com/arn-c0de/Geograbber/issues))
+- 📖 Improve documentation
 
 ### 📚 Community Support
 - 💬 Answer questions on GitHub
@@ -49,7 +50,7 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 ## 🤝 How to Contribute
 
 ### 🐛 Bug Reports
-1. Check if the issue already exists ([Issues](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/issues))
+1. Check if the issue already exists ([Issues](https://github.com/arn-c0de/Geograbber/issues))
 2. Open a new issue including:
    - Description, steps to reproduce, expected vs actual behavior
    - Environment: Android version, device, GeoGrabber version
@@ -88,8 +89,8 @@ This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.
 
 ```bash
 # Clone the repository
-git clone https://github.com/arn-c0de/Android-WIFI-BT_geograbber.git
-cd Android-WIFI-BT_geograbber
+git clone https://github.com/arn-c0de/Geograbber.git
+cd Geograbber
 
 # Open in Android Studio
 # Sync Gradle and build the app
@@ -161,8 +162,8 @@ git commit -m "feat(scan): add Bluetooth LE support\n\n- Implement BLE scanning\
 
 ## ❓ Questions?
 
-* 💬 [GitHub Discussions](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/discussions)
-* 🐞 [GitHub Issues](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/issues)
+* 💬 [GitHub Discussions](https://github.com/arn-c0de/Geograbber/discussions)
+* 🐞 [GitHub Issues](https://github.com/arn-c0de/Geograbber/issues)
 
 ---
 

@@ -59,7 +59,7 @@ This Code of Conduct applies:
 
 ## Enforcement
 
-- Report abusive, harassing, or unacceptable behavior via [GitHub Issues](https://github.com/arn-c0de/Android_WIFI_BT_GEOGRABBER/issues)  
+- Report abusive, harassing, or unacceptable behavior via [GitHub Issues](https://github.com/arn-c0de/Geograbber/issues)  
 - All complaints are reviewed and investigated promptly and fairly  
 - Community leaders must respect the privacy and security of reporters  
 

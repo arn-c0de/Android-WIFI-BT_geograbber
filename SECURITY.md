@@ -31,7 +31,7 @@ Please report vulnerabilities responsibly via:
 
 #### GitHub Security Advisory (preferred)
 
-1. Go to [Security Advisories](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/security/advisories)
+1. Go to [Security Advisories](https://github.com/arn-c0de/Geograbber/security/advisories)
 2. Click "Report a vulnerability"
 3. Fill out the form with details
 
@@ -233,7 +233,7 @@ However, we honor all security reports with:
 
 ## Contact
 
-- **GitHub Security**: [Security Advisories](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/security/advisories)
+- **GitHub Security**: [Security Advisories](https://github.com/arn-c0de/Geograbber/security/advisories)
 
 ## Further Resources
 

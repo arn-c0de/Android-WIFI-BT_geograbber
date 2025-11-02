@@ -8,7 +8,7 @@
 
 📚 **[Documentation](docs/)** · 🚀 **[Database Combiner Guide](docs/quickstart/database_combiner_quickstart.md)** · 🗺️ **[Map Viewer Guide](docs/quickstart/map_viewer_quickstart.md)** · 📁 **[Project Structure](PROJECT_STRUCTURE.md)** · 📂 **[Detailed Structure](docs/project-structure/PROJECT_STRUCTURE.md)** · � **[Changelog](CHANGELOG.md)** · 🤝 **[Contributing](CONTRIBUTING.md)** · 🔒 **[Security](SECURITY.md)** · 📜 **[Code of Conduct](CODE_OF_CONDUCT.md)**
 
-[🌐 Project Website](https://arn-c0de.github.io/Android-WIFI-BT_geograbber/)
+[🌐 Project Website](https://arn-c0de.github.io/Geograbber)
 
 <div align="left" style="display:flex;align-items:center;gap:16px;">
    <img src="images/logo.png" alt="GeoGrabber Logo" width="96" height="96" style="vertical-align:middle; margin-right:12px;" />
@@ -232,8 +232,8 @@ The screenshot above demonstrates the main scanning interface, live network list
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/arn-c0de/Android_WIFI_BT_GEOGRABBER.git
-cd Android_WIFI_BT_GEOGRABBER
+git clone https://github.com/arn-c0de/Geograbber.git
+cd Geograbber
 
 # 2. Open in Android Studio
 # Open Android Studio -> Open -> Select 'WIFIGEOGRABBER' directory
@@ -250,7 +250,7 @@ cd Android_WIFI_BT_GEOGRABBER
 
 ### Option 2: Install APK
 
-1. Download the latest APK from the [Releases](https://github.com/arn-c0de/Android_WIFI_BT_GEOGRABBER/releases) page
+1. Download the latest APK from the [Releases](https://github.com/arn-c0de/Geograbber/releases) page
 2. Enable "Install from Unknown Sources" in your Android settings:
    - **Settings → Security → Unknown Sources** (Android 7 and below)
    - **Settings → Apps → Special Access → Install Unknown Apps** (Android 8+)
@@ -536,8 +536,8 @@ We welcome contributions from the community! Here's how you can help:
 1. **Fork the Repository**
    ```bash
    # Click 'Fork' on GitHub
-   git clone https://github.com/arn-c0de/Android_WIFI_BT_GEOGRABBER.git
-   cd Android_WIFI_BT_GEOGRABBER
+   git clone https://github.com/arn-c0de/Geograbber.git
+   cd Geograbber
    ```
 
 2. **Create a Feature Branch**
@@ -630,8 +630,8 @@ This application is provided **"AS IS"** for educational and research purposes o
 
 | Contact Method | Link |
 |----------------|------|
-| 🐛 **Issues** | [GitHub Issues](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/issues) |
-| 💬 **Discussions** | [GitHub Discussions](https://github.com/arn-c0de/Android-WIFI-BT_geograbber/discussions) |
+| 🐛 **Issues** | [GitHub Issues](https://github.com/arn-c0de/Geograbber/issues) |
+| 💬 **Discussions** | [GitHub Discussions](https://github.com/arn-c0de/Geograbber/discussions) |
 | 📧 **Email** | arn-c0de@protonmail.com |
 | 🌐 **Website** |  |
 
