@@ -30,6 +30,15 @@ import java.util.ArrayList;
 
 public class MapActivity extends AppCompatActivity {
     private static final String PREFS_NAME = "MapPrefs";
+
+    /**
+     * Sanitize user input for safe logging by removing all line breaking/control characters.
+     */
+    private static String sanitizeForLogging(String input) {
+        if (input == null) return "";
+        // Remove CR, LF, Vertical Tab, Form Feed, Unicode Next Line, Unicode Line Separator, Unicode Paragraph Separator
+        return input.replaceAll("[\\r\\n\\u000B\\u000C\\u0085\\u2028\\u2029]", "");
+    }
     private static final String PREF_FILTERS = "activeFilters";
     private static final String PREF_CENTER_LAT = "centerLat";
     private static final String PREF_CENTER_LON = "centerLon";
@@ -1459,7 +1468,7 @@ public class MapActivity extends AppCompatActivity {
         String lowerQuery = query.toLowerCase();
         
         // Sanitize query for logging to prevent log injection
-        String safeQuery = (query == null) ? "" : query.replaceAll("[\r\n]", "");
+        String safeQuery = sanitizeForLogging(query);
         Log.d("MapActivity", "Starting database search for: '" + safeQuery + "', encrypted=" + isDatabaseEncrypted);
         
         if (database == null) {
