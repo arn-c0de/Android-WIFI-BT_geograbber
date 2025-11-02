@@ -23,19 +23,65 @@
 
   <!-- Stylesheet -->
   <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
   <!-- Darkmode CSS -->
   <style>
     body, html {
       background-color: #0d1117;
       color: #c9d1d9;
-      font-family: sans-serif;
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
     }
-    a { color: #58a6ff; }
-    a:hover { color: #1f6feb; }
-    h1,h2,h3,h4,h5,h6 { color: #c9d1d9; }
+    a { color: #58a6ff; text-decoration: none; }
+    a:hover { color: #1f6feb; text-decoration: underline; }
+    h1,h2,h3,h4,h5,h6 {
+      color: #c9d1d9;
+      font-weight: 700;
+      margin-top: 0.5em;
+      margin-bottom: 0.5em;
+    }
+    h1 { font-size: 2.2em; }
+    h2 { font-size: 1.7em; }
+    h3 { font-size: 1.3em; }
     table { border-color: #30363d; color: #c9d1d9; }
     code, pre { background-color: #161b22; color: #c9d1d9; }
+    .section-container {
+      background: linear-gradient(135deg, #161b22 80%, #202736 100%);
+      border: 1px solid #30363d;
+      border-radius: 16px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.14);
+      margin: 40px 0;
+      padding: 36px 24px;
+      width: 100%;
+      max-width: 900px;
+      transition: box-shadow 0.2s, transform 0.2s;
+      text-align: center;
+      line-height: 1.7;
+      font-size: 1.08em;
+    }
+    .section-container:hover {
+      box-shadow: 0 6px 24px rgba(0,0,0,0.22);
+      transform: scale(1.01);
+    }
+    @media (max-width: 600px) {
+      .section-container {
+        padding: 18px 4px;
+        font-size: 1em;
+      }
+      nav ul {
+        gap: 10px;
+        font-size: 1em;
+      }
+    }
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: #161b22;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    }
   </style>
 </head>
 <body>
@@ -63,6 +109,7 @@
         width: 100%;
         max-width: 900px;
         transition: box-shadow 0.2s;
+        text-align: center;
       }
       .section-container:hover {
         box-shadow: 0 4px 16px rgba(0,0,0,0.18);
