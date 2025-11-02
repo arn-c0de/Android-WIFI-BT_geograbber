@@ -278,7 +278,7 @@ When you export your database with encryption enabled:
 **A:** Unfortunately, there is no recovery option. This is by design to ensure maximum security. Your data will be inaccessible. Always keep a secure backup of your passphrase.
 
 ### Q: Can someone break the encryption?
-**A:** We use AES-256 encryption (military-grade). With a strong passphrase, it would take billions of years to crack with current technology.
+**A:** We use AES-256 encryption. With a strong passphrase, it would take billions of years to crack with **current** technology.
 
 ### Q: Does encryption slow down the app?
 **A:** Minimal impact. You might notice ~200ms slower startup, but day-to-day scanning and viewing is barely affected (<5% slower).
@@ -292,7 +292,7 @@ When you export your database with encryption enabled:
 ### Q: Is this really secure?
 **A:** Yes. We use:
 - ✅ SQLCipher (industry-standard database encryption)
-- ✅ AES-256 encryption (government-grade)
+- ✅ AES-256 encryption 
 - ✅ Android Keystore (hardware-backed security)
 - ✅ No cloud storage (data stays on your device)
 
