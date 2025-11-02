@@ -1617,7 +1617,8 @@ public class MapActivity extends AppCompatActivity {
         
         // Create and show dialog
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
-        builder.setTitle(String.format(getString(R.string.search_results), results.size()) + " for: " + query);
+        String safeQuery = sanitizeForLogging(query);
+        builder.setTitle(String.format(getString(R.string.search_results), results.size()) + " for: " + safeQuery);
         builder.setItems(items, (dialog, which) -> {
             // User selected a result - zoom to it on map
             DeviceData selectedDevice = results.get(which);
