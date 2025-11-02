@@ -1,0 +1,5 @@
+title: GeoGrabber
+description: WiFi & Bluetooth scanner with GPS mapping for Android. Analyze networks locally or on PC with included Python tools.
+remote_theme: pages-themes/slate@v0.2.0
+plugins:
+  - jekyll-remote-theme
