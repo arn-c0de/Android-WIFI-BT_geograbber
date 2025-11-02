@@ -8,7 +8,7 @@
 
 📚 **[Documentation](docs/)** · 🚀 **[Database Combiner Guide](docs/quickstart/database_combiner_quickstart.md)** · 🗺️ **[Map Viewer Guide](docs/quickstart/map_viewer_quickstart.md)** · 📁 **[Project Structure](PROJECT_STRUCTURE.md)** · 📂 **[Detailed Structure](docs/project-structure/PROJECT_STRUCTURE.md)** · � **[Changelog](CHANGELOG.md)** · 🤝 **[Contributing](CONTRIBUTING.md)** · 🔒 **[Security](SECURITY.md)** · 📜 **[Code of Conduct](CODE_OF_CONDUCT.md)**
 
-[🌐 Project Website](https://arn-c0de.github.io/Geograbber)
+## [🌐 Project Website](https://arn-c0de.github.io/Geograbber)
 
 <div align="left" style="display:flex;align-items:center;gap:16px;">
    <img src="images/logo.png" alt="GeoGrabber Logo" width="96" height="96" style="vertical-align:middle; margin-right:12px;" />
