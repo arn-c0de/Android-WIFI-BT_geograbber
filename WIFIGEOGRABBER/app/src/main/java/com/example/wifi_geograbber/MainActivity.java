@@ -4922,9 +4922,11 @@ public class MainActivity extends AppCompatActivity {
             String passphraseStr = passphraseInput.getText().toString();
             char[] passphrase = passphraseStr.toCharArray();
             
-            // Verify passphrase
-            if (encryptionManager.unlockWithPassphrase(passphrase)) {
-                // Enable biometric unlock with this passphrase
+            // CRITICAL: Verify passphrase actually unlocks the database, not just hash match
+            // Test with the actual encrypted database
+            if (encryptionManager.testPassphraseWithDatabase(passphrase)) {
+                // Passphrase verified - it works with the actual DB
+                // Now enable biometric unlock with this passphrase
                 biometricAuthManager.enableBiometricUnlock(this, passphrase, 
                     new BiometricAuthManager.BiometricEnrollCallback() {
                         @Override
@@ -4946,7 +4948,8 @@ public class MainActivity extends AppCompatActivity {
                         }
                     });
             } else {
-                Toast.makeText(this, "❌ Incorrect passphrase", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "❌ Incorrect passphrase - cannot unlock database", Toast.LENGTH_LONG).show();
+                addLogMessage("ERROR: Passphrase verification failed for biometric enrollment");
             }
             
             // Clear passphrase from memory

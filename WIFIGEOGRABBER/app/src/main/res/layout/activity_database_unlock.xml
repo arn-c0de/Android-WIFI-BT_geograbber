@@ -15,11 +15,11 @@
 
         <!-- App Logo/Icon -->
         <ImageView
-            android:layout_width="96dp"
-            android:layout_height="96dp"
-            android:src="@mipmap/ic_launcher"
+            android:layout_width="157dp"
+            android:layout_height="159dp"
             android:layout_marginBottom="24dp"
-            android:contentDescription="App Icon" />
+            android:contentDescription="App Icon"
+            android:src="@mipmap/ic_launcher" />
 
         <!-- Title -->
         <TextView

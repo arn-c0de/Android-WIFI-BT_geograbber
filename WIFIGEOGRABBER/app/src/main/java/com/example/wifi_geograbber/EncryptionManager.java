@@ -217,6 +217,94 @@ public class EncryptionManager {
     }
     
     /**
+     * Test if passphrase actually works with the encrypted database
+     * This is more reliable than just hash checking, as it verifies DB can be opened
+     * @param passphrase Passphrase to test
+     * @return true if passphrase successfully opens the database
+     */
+    public boolean testPassphraseWithDatabase(char[] passphrase) {
+        if (!isPassphraseSet()) {
+            Log.e(TAG, "No passphrase configured");
+            return false;
+        }
+        
+        try {
+            // Get stored salt and hash
+            String saltStr = prefs.getString(KEY_SALT, null);
+            String storedHash = prefs.getString(KEY_PASSPHRASE_HASH, null);
+            
+            if (saltStr == null || storedHash == null) {
+                Log.e(TAG, "Missing encryption data");
+                return false;
+            }
+            
+            byte[] salt = Base64.decode(saltStr, Base64.NO_WRAP);
+            
+            // First verify hash (quick check)
+            String inputHash = hashPassphrase(passphrase, salt);
+            
+            Log.d(TAG, "Testing passphrase - length: " + passphrase.length + 
+                      ", input hash preview: " + inputHash.substring(0, Math.min(16, inputHash.length())) + 
+                      ", stored hash preview: " + storedHash.substring(0, Math.min(16, storedHash.length())));
+            
+            if (!MessageDigest.isEqual(inputHash.getBytes(), storedHash.getBytes())) {
+                Log.w(TAG, "Hash mismatch - passphrase incorrect");
+                return false;
+            }
+            
+            // Hash matches - now try to open database if it exists
+            String dbPath = context.getDatabasePath("geograbber.db").getAbsolutePath();
+            java.io.File dbFile = new java.io.File(dbPath);
+            
+            if (!dbFile.exists()) {
+                Log.i(TAG, "Database file doesn't exist yet - hash verification passed");
+                // Cache the passphrase since hash is correct
+                cachePassphrase(passphrase);
+                return true;
+            }
+            
+            // Database exists - try to open it
+            String dbKey = deriveKey(passphrase, salt);
+            net.sqlcipher.database.SQLiteDatabase testDb = null;
+            
+            try {
+                testDb = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                    dbPath,
+                    dbKey,
+                    null,
+                    net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY
+                );
+                
+                // Try a simple query to verify database is accessible
+                android.database.Cursor cursor = testDb.rawQuery("SELECT COUNT(*) FROM sqlite_master", null);
+                if (cursor != null) {
+                    cursor.moveToFirst();
+                    cursor.close();
+                }
+                
+                Log.i(TAG, "Passphrase verified with actual database");
+                
+                // Cache the passphrase since it's verified
+                cachePassphrase(passphrase);
+                
+                return true;
+                
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to open database with provided passphrase: " + e.getMessage());
+                return false;
+            } finally {
+                if (testDb != null && testDb.isOpen()) {
+                    testDb.close();
+                }
+            }
+            
+        } catch (Exception e) {
+            Log.e(TAG, "Error testing passphrase with database", e);
+            return false;
+        }
+    }
+    
+    /**
      * Change the encryption passphrase
      * @param oldPassphrase Current passphrase
      * @param newPassphrase New passphrase

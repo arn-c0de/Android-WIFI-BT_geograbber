@@ -175,7 +175,8 @@ public class BiometricAuthManager {
                             Log.d(TAG, "Storing passphrase for biometric - length: " + passphrase.length 
                                 + ", test hash preview: " + testHash);
                             
-                            String passphraseStr = new String(passphrase);
+                            // CRITICAL: Trim the passphrase to remove any whitespace
+                            String passphraseStr = new String(passphrase).trim();
                             byte[] encryptedData = authenticatedCipher.doFinal(passphraseStr.getBytes(StandardCharsets.UTF_8));
                             
                             // Store encrypted passphrase and IV
@@ -311,7 +312,8 @@ public class BiometricAuthManager {
                                 byte[] encryptedBytes = Base64.decode(encryptedPassphraseStr, Base64.NO_WRAP);
                                 byte[] decryptedData = authCipher.doFinal(encryptedBytes);
                                 
-                                String passphraseStr = new String(decryptedData, StandardCharsets.UTF_8);
+                                // CRITICAL: Trim to remove any whitespace
+                                String passphraseStr = new String(decryptedData, StandardCharsets.UTF_8).trim();
                                 char[] passphrase = passphraseStr.toCharArray();
                                 
                                 Log.i(TAG, "Biometric authentication successful - decrypted passphrase length: " + passphrase.length);

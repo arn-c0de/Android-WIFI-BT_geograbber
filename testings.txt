@@ -1,4 +1,6 @@
-  ⚠️ Security Gaps to Address
+Issue closed: Search now supports SSID, BSSID/MAC, and vendor. All requested features are implemented and tested in the Android app map view.
+
+⚠️ Security Gaps to Address
 
 ● 1. No checksum/signature verification - Can't verify file hasn't been tampered with
   2. No explicit security warning - Users not warned about potential risks
@@ -60,8 +62,6 @@ SHA------FIXED
 
   Metadata JSON Format:
   {
-    "version": "1.0",
-    "algorithm": "SHA-256",
     "filename": "wifiscannerexport_123456.db",
     "checksum": "a1b2c3d4...",
     "fileSize": 1234567,

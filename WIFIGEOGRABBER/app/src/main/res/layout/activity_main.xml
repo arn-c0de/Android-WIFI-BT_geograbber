@@ -54,16 +54,16 @@
         android:orientation="horizontal"
         android:baselineAligned="false">
 
-        <Button
-            android:id="@+id/toggle_scan_button"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:text="@string/wifi_start"
-            android:textSize="10sp"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#0A0A2A"
-            android:layout_margin="2dp" />
+            <Button
+                android:id="@+id/toggle_scan_button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_margin="2dp"
+                android:layout_weight="1"
+                android:backgroundTint="#0A0A2A"
+                android:text="@string/wifi_start"
+                android:textColor="#FFFFFF"
+                android:textSize="10sp" />
 
         <Button
             android:id="@+id/bluetooth_toggle_button"
@@ -138,12 +138,22 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="@string/debug_log"
-        android:textStyle="bold"
-        android:textSize="14sp"
+        android:backgroundTint="#E0E0E0"
         android:paddingTop="8dp"
         android:paddingBottom="4dp"
-        android:backgroundTint="#E0E0E0"/>
+        android:text="@string/debug_log"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/export_log_button"
+        android:layout_width="72dp"
+        android:layout_height="35dp"
+        android:layout_gravity="end"
+        android:layout_marginTop="4dp"
+        android:text="@string/export_log_button"
+        android:textColor="#FFFFFF"
+        app:backgroundTint="#1A237E" />
 
     <ScrollView
         android:id="@+id/logcat_scrollview"
@@ -156,23 +166,13 @@
             android:id="@+id/logcat_text"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/logcat_placeholder"
-            android:textColor="#00FF00"
-            android:textSize="10sp"
             android:fontFamily="monospace"
             android:padding="4dp"
-            android:textIsSelectable="true"/>
+            android:text="@string/logcat_placeholder"
+            android:textColor="#00FF00"
+            android:textIsSelectable="true"
+            android:textSize="10sp" />
 
     </ScrollView>
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/export_log_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/export_log_button"
-        android:layout_marginTop="4dp"
-        android:layout_gravity="end"
-        app:backgroundTint="#1A237E"
-        android:textColor="#FFFFFF"/>
 
 </LinearLayout>
