@@ -1,12 +1,12 @@
-![Android](https://img.shields.io/badge/Android-6.0%2B-green)
-![Platform](https://img.shields.io/badge/platform-Android-lightblue)
-![Language](https://img.shields.io/badge/language-Java-orange)
-![Language](https://img.shields.io/badge/language-Python-blue)
-![License](https://img.shields.io/badge/license-Non--Commercial-orange)
-![Status](https://img.shields.io/badge/status-Active-success)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/arn-c0de/Android-WIFI-BT_geograbber)
-
-📚 **[Documentation](docs/)** · 🚀 **[Database Combiner Guide](docs/quickstart/database_combiner_quickstart.md)** · 🗺️ **[Map Viewer Guide](docs/quickstart/map_viewer_quickstart.md)** · 📁 **[Project Structure](PROJECT_STRUCTURE.md)** · 📂 **[Detailed Structure](docs/project-structure/PROJECT_STRUCTURE.md)** · � **[Changelog](CHANGELOG.md)** · 🤝 **[Contributing](CONTRIBUTING.md)** · 🔒 **[Security](SECURITY.md)** · 📜 **[Code of Conduct](CODE_OF_CONDUCT.md)**
+<!-- Social Media Meta Tags for GeoGrabber -->
+<meta property="og:title" content="GeoGrabber: WiFi & Bluetooth Geolocation App" />
+<meta property="og:description" content="Scan, map, and analyze WiFi networks & Bluetooth devices with GPS precision. Professional wardriving and signal mapping for Android." />
+<meta property="og:image" content="https://raw.githubusercontent.com/arn-c0de/Geograbber/main/images/logo.png" />
+<meta property="og:url" content="https://arn-c0de.github.io/Android-WIFI-BT_geograbber/" />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="GeoGrabber: WiFi & Bluetooth Geolocation App" />
+<meta name="twitter:description" content="Scan, map, and analyze WiFi networks & Bluetooth devices with GPS precision. Professional wardriving and signal mapping for Android." />
 
 [🌐 Project Website](https://arn-c0de.github.io/Geograbber)
 
