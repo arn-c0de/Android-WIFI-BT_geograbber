@@ -58,6 +58,9 @@ public class MapActivity extends AppCompatActivity {
     private List<DeviceData> deviceList;
     private boolean isMapInitialized = false;
     
+    // Flag to track if we're navigating within the app (no auth needed)
+    private boolean isInternalNavigation = false;
+    
     // BroadcastReceiver for screen off event
     private BroadcastReceiver screenOffReceiver;
     
@@ -164,7 +167,11 @@ public class MapActivity extends AppCompatActivity {
         dbStatusText.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
 
         // Button listeners
-        backButton.setOnClickListener(v -> finish());
+        backButton.setOnClickListener(v -> {
+            // Mark as internal navigation so onPause doesn't lock the app
+            isInternalNavigation = true;
+            finish();
+        });
         refreshButton.setOnClickListener(v -> refreshMap());
         locationButton.setOnClickListener(v -> requestLocationAndCenterMap());
         searchToggleButton.setOnClickListener(v -> toggleSearchBar());
@@ -1792,13 +1799,16 @@ public class MapActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        // Clear encryption key and mark as locked when app goes to background
-        if (isDatabaseEncrypted && encryptionManager != null) {
+        // Only clear encryption key if this is NOT an internal navigation
+        // (i.e., user pressed Home button or switched apps, not Back button)
+        if (!isInternalNavigation && isDatabaseEncrypted && encryptionManager != null) {
             String cachedKey = encryptionManager.getCachedDatabaseKey();
             if (cachedKey != null) {
                 clearEncryptionKey();
-                Log.d("MapActivity", "App paused - encryption key cleared");
+                Log.d("MapActivity", "App paused (external) - encryption key cleared");
             }
+        } else if (isInternalNavigation) {
+            Log.d("MapActivity", "App paused (internal navigation) - key NOT cleared");
         }
     }
 
