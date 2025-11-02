@@ -3450,7 +3450,15 @@ public class MainActivity extends AppCompatActivity {
      * Show unlock dialog
      */
     private void showUnlockDialog() {
-        showUnlockDialog(0); // Start with 0 attempts
+        // Check if biometric unlock is enabled
+        BiometricAuthManager biometricAuthManager = new BiometricAuthManager(this, encryptionManager);
+        if (biometricAuthManager.isBiometricEnabled() && biometricAuthManager.isBiometricSupported()) {
+            // Show biometric unlock prompt
+            showBiometricUnlockPrompt();
+        } else {
+            // Fall back to manual passphrase entry
+            showUnlockDialog(0); // Start with 0 attempts
+        }
     }
     
     /**
@@ -3587,6 +3595,73 @@ public class MainActivity extends AppCompatActivity {
         builder.setCancelable(false);
         
         builder.show();
+    }
+    
+    /**
+     * Show biometric unlock prompt
+     */
+    private void showBiometricUnlockPrompt() {
+        // Show security overlay to hide app content
+        if (securityOverlay != null) {
+            securityOverlay.setVisibility(View.VISIBLE);
+            securityOverlay.bringToFront();
+        }
+        
+        BiometricAuthManager biometricAuthManager = new BiometricAuthManager(this, encryptionManager);
+        
+        biometricAuthManager.authenticateWithBiometric(this, new BiometricAuthManager.BiometricAuthCallback() {
+            @Override
+            public void onAuthenticationSucceeded(char[] decryptedPassphrase) {
+                // Try to unlock with decrypted passphrase
+                if (encryptionManager.unlockWithPassphrase(decryptedPassphrase)) {
+                    // Successful unlock
+                    encryptionManager.resetFailedAttempts();
+                    isUnlockDialogShowing = false;
+                    
+                    // Hide security overlay
+                    if (securityOverlay != null) {
+                        securityOverlay.setVisibility(View.GONE);
+                    }
+                    
+                    initializeEncryptedDatabase();
+                    if (dataListView != null) {
+                        dataListView.setVisibility(View.VISIBLE);
+                    }
+                    Toast.makeText(MainActivity.this, "✓ Unlocked with biometric", Toast.LENGTH_SHORT).show();
+                    
+                    // Update database stats
+                    updateTotalNetworksCount();
+                } else {
+                    // Decrypted passphrase is wrong - fall back to manual entry
+                    Toast.makeText(MainActivity.this, 
+                        "Biometric unlock failed. Please enter passphrase manually.", 
+                        Toast.LENGTH_LONG).show();
+                    showUnlockDialog(0);
+                }
+                
+                // Clear decrypted passphrase from memory
+                if (decryptedPassphrase != null) {
+                    Arrays.fill(decryptedPassphrase, '\0');
+                }
+            }
+            
+            @Override
+            public void onAuthenticationError(String error) {
+                // Biometric authentication failed - offer manual entry
+                Toast.makeText(MainActivity.this, 
+                    "Biometric authentication failed: " + error, 
+                    Toast.LENGTH_LONG).show();
+                showUnlockDialog(0);
+            }
+            
+            @Override
+            public void onAuthenticationFailed() {
+                // Biometric not recognized - keep trying
+                Toast.makeText(MainActivity.this, 
+                    "Biometric not recognized. Try again or use passphrase.", 
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
     }
     
     /**

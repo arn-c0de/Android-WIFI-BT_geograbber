@@ -117,6 +117,7 @@ GeoGrabber is ideal for network analysis, signal mapping, and understanding wire
 - 🛡️ **AES-256 Encryption** – Database encryption using SQLCipher
 - 🔑 **Android Keystore Integration** – Hardware-backed secure passphrase storage
 - 🔐 **Passphrase Protection** – User-controlled encryption with customizable passphrase
+- 🧬 **Biometric Unlock (NEW)** – Unlock your encrypted database instantly using fingerprint or face authentication. Passphrase is securely stored with Android Keystore and never leaves the device. Biometric unlock uses the same passphrase as manual login for maximum security and reliability.
 - 🔄 **Database Migration** – Seamless conversion from unencrypted to encrypted databases
 - 💾 **Encrypted Import/Export** – Full support for encrypted database files
 - 🎯 **Zero-Knowledge Design** – Passphrases never logged or transmitted

@@ -15,6 +15,7 @@ First steps with GeoGrabber:
 *Coming soon: Feature-specific guides for Android and Python tools*
 
 ### 🔐 Security Guides
+- [BIOMETRIC_AUTHENTICATION_GUIDE.md](security/BIOMETRIC_AUTHENTICATION_GUIDE.md) – Biometric unlock setup and troubleshooting
 - [DATABASE_ENCRYPTION_GUIDE.md](security/DATABASE_ENCRYPTION_GUIDE.md) – Database encryption details
 - [ENCRYPTION_IMPLEMENTATION_STATUS.md](security/ENCRYPTION_IMPLEMENTATION_STATUS.md) – Encryption implementation status
 - [ENCRYPTION_IMPLEMENTATION_SUMMARY.md](security/ENCRYPTION_IMPLEMENTATION_SUMMARY.md) – Encryption summary
@@ -71,12 +72,13 @@ docs/
 ### 3. Development & Security 🔧
 1. [CONTRIBUTING.md](../CONTRIBUTING.md) – Contribution guidelines
 2. [SECURITY.md](../SECURITY.md) – Security policy
-3. [DATABASE_ENCRYPTION_GUIDE.md](security/DATABASE_ENCRYPTION_GUIDE.md) – Database encryption details
-4. [ENCRYPTION_IMPLEMENTATION_STATUS.md](security/ENCRYPTION_IMPLEMENTATION_STATUS.md) – Encryption implementation status
-5. [ENCRYPTION_IMPLEMENTATION_SUMMARY.md](security/ENCRYPTION_IMPLEMENTATION_SUMMARY.md) – Encryption summary
-6. [SHA-256 Checksum Verification Guide](security/SHA256_CHECKSUM_VERIFICATION.md) – Database integrity
-7. [SECRET_MANAGEMENT_QUICKSTART.md](security/SECRET_MANAGEMENT_QUICKSTART.md) – Secret Quickstart
-8. [SECRET_MANAGEMENT.md](security/SECRET_MANAGEMENT.md) – Secret management full guide
+3. [BIOMETRIC_AUTHENTICATION_GUIDE.md](security/BIOMETRIC_AUTHENTICATION_GUIDE.md) – Biometric unlock setup and troubleshooting
+4. [DATABASE_ENCRYPTION_GUIDE.md](security/DATABASE_ENCRYPTION_GUIDE.md) – Database encryption details
+5. [ENCRYPTION_IMPLEMENTATION_STATUS.md](security/ENCRYPTION_IMPLEMENTATION_STATUS.md) – Encryption implementation status
+6. [ENCRYPTION_IMPLEMENTATION_SUMMARY.md](security/ENCRYPTION_IMPLEMENTATION_SUMMARY.md) – Encryption summary
+7. [SHA-256 Checksum Verification Guide](security/SHA256_CHECKSUM_VERIFICATION.md) – Database integrity
+8. [SECRET_MANAGEMENT_QUICKSTART.md](security/SECRET_MANAGEMENT_QUICKSTART.md) – Secret Quickstart
+9. [SECRET_MANAGEMENT.md](security/SECRET_MANAGEMENT.md) – Secret management full guide
 
 
 ---
