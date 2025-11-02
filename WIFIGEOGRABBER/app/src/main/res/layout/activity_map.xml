@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_above="@+id/button_layout"
-        android:layout_below="@+id/db_status_text" />
+        android:layout_below="@+id/search_bar_layout" />
 
     <!-- Status text for database -->
     <TextView
@@ -24,6 +24,51 @@
         android:textSize="12sp"
         android:padding="4dp"
         android:gravity="center" />
+
+    <!-- Search bar for markers -->
+    <LinearLayout
+        android:id="@+id/search_bar_layout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/db_status_text"
+        android:orientation="horizontal"
+        android:background="#AA000000"
+        android:padding="4dp"
+        android:visibility="gone">
+
+        <EditText
+            android:id="@+id/search_input"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:hint="@string/search_markers"
+            android:textColorHint="#888888"
+            android:textColor="#FFFFFF"
+            android:background="@android:drawable/editbox_background"
+            android:padding="8dp"
+            android:inputType="text"
+            android:imeOptions="actionSearch" />
+
+        <Button
+            android:id="@+id/search_button"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="4dp"
+            android:text="@string/search"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#0A0A2A"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/clear_search_button"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:layout_marginStart="4dp"
+            android:text="@string/clear"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#AA0000"
+            android:textSize="12sp" />
+    </LinearLayout>
 
     <!-- Button layout at bottom -->
     <LinearLayout
@@ -60,6 +105,19 @@
             android:textColor="#FFFFFF"
             android:backgroundTint="#0A0A2A"
             android:textSize="12sp" />
+
+        <!-- Search Toggle Button -->
+        <Button
+            android:id="@+id/search_toggle_button"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:layout_marginStart="4dp"
+            android:layout_marginEnd="4dp"
+            android:text="🔍"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#0A0A2A"
+            android:textSize="16sp" />
 
         <!-- Live Location Button -->
         <Button

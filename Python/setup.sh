@@ -38,9 +38,22 @@ echo "[INFO] Upgrading pip..."
 pip install --upgrade pip
 ## Upgrade pip skipped for faster setup
 
-# Install dependencies
+# Install system SQLCipher (required for encryption support)
+echo "[INFO] Installing system SQLCipher (if not present)..."
+if ! command -v sqlcipher &> /dev/null; then
+    sudo apt update
+    sudo apt install -y sqlcipher
+else
+    echo "[INFO] SQLCipher is already installed."
+fi
+
+# Install Python dependencies
 echo "[INFO] Installing dependencies from requirements.txt..."
 pip install -r requirements.txt
+
+# Install sqlcipher3-binary for Python encryption support
+echo "[INFO] Installing sqlcipher3-binary for Python..."
+pip install sqlcipher3-binary
 
 echo "\n========================================"
 echo "[SUCCESS] Setup completed successfully!"

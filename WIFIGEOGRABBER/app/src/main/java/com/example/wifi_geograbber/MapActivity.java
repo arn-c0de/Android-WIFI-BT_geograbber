@@ -35,6 +35,9 @@ public class MapActivity extends AppCompatActivity {
     private boolean isDatabaseEncrypted = false;
     private EncryptionManager encryptionManager;
     private Button backButton, refreshButton, locationButton;
+    private Button searchToggleButton, searchButton, clearSearchButton;
+    private android.widget.EditText searchInput;
+    private android.widget.LinearLayout searchBarLayout;
     private FusedLocationProviderClient fusedLocationClient;
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
     private android.widget.TextView dbStatusText;
@@ -115,6 +118,11 @@ public class MapActivity extends AppCompatActivity {
         backButton = findViewById(R.id.back_button);
         refreshButton = findViewById(R.id.refresh_button);
         locationButton = findViewById(R.id.location_button);
+        searchToggleButton = findViewById(R.id.search_toggle_button);
+        searchButton = findViewById(R.id.search_button);
+        clearSearchButton = findViewById(R.id.clear_search_button);
+        searchInput = findViewById(R.id.search_input);
+        searchBarLayout = findViewById(R.id.search_bar_layout);
         dbStatusText = findViewById(R.id.db_status_text);
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
@@ -139,6 +147,18 @@ public class MapActivity extends AppCompatActivity {
         backButton.setOnClickListener(v -> finish());
         refreshButton.setOnClickListener(v -> refreshMap());
         locationButton.setOnClickListener(v -> requestLocationAndCenterMap());
+        searchToggleButton.setOnClickListener(v -> toggleSearchBar());
+        searchButton.setOnClickListener(v -> performSearch());
+        clearSearchButton.setOnClickListener(v -> clearSearch());
+        
+        // Search on enter key
+        searchInput.setOnEditorActionListener((v, actionId, event) -> {
+            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                performSearch();
+                return true;
+            }
+            return false;
+        });
 
         // Configure WebView
         setupWebView();
@@ -939,6 +959,125 @@ public class MapActivity extends AppCompatActivity {
             "            map.setView(userLatLng, 15);\n" +
             "        }\n" +
             "\n" +
+            "        let searchResults = [];\n" +
+            "        let currentSearchIndex = -1;\n" +
+            "\n" +
+            "        function searchMarkers(query) {\n" +
+            "            if (!query || query.trim() === '') {\n" +
+            "                return;\n" +
+            "            }\n" +
+            "            \n" +
+            "            const lowerQuery = query.toLowerCase();\n" +
+            "            searchResults = [];\n" +
+            "            currentSearchIndex = -1;\n" +
+            "            \n" +
+            "            // Search through all devices\n" +
+            "            deviceData.forEach((device, index) => {\n" +
+            "                const name = (device.name || '').toLowerCase();\n" +
+            "                const address = (device.address || '').toLowerCase();\n" +
+            "                const vendor = (device.vendor || '').toLowerCase();\n" +
+            "                \n" +
+            "                if (name.includes(lowerQuery) || address.includes(lowerQuery) || vendor.includes(lowerQuery)) {\n" +
+            "                    searchResults.push({ device: device, index: index });\n" +
+            "                }\n" +
+            "            });\n" +
+            "            \n" +
+            "            if (searchResults.length === 0) {\n" +
+            "                if (typeof Android !== 'undefined' && Android.showToast) {\n" +
+            "                    Android.showToast('No results found for: ' + query);\n" +
+            "                }\n" +
+            "                return;\n" +
+            "            }\n" +
+            "            \n" +
+            "            // Show first result\n" +
+            "            currentSearchIndex = 0;\n" +
+            "            showSearchResult();\n" +
+            "            \n" +
+            "            if (typeof Android !== 'undefined' && Android.showToast) {\n" +
+            "                Android.showToast('Found ' + searchResults.length + ' results');\n" +
+            "            }\n" +
+            "        }\n" +
+            "        \n" +
+            "        function showSearchResult() {\n" +
+            "            if (searchResults.length === 0 || currentSearchIndex < 0) return;\n" +
+            "            \n" +
+            "            const result = searchResults[currentSearchIndex];\n" +
+            "            const marker = allMarkers[result.index];\n" +
+            "            \n" +
+            "            if (marker) {\n" +
+            "                // Center on marker\n" +
+            "                map.setView([result.device.lat, result.device.lon], 18);\n" +
+            "                \n" +
+            "                // Open popup\n" +
+            "                marker.openPopup();\n" +
+            "                \n" +
+            "                // Highlight marker temporarily\n" +
+            "                const circle = allCircles[result.index];\n" +
+            "                if (circle) {\n" +
+            "                    const originalColor = circle.options.color;\n" +
+            "                    circle.setStyle({ color: 'yellow', fillColor: 'yellow' });\n" +
+            "                    setTimeout(() => {\n" +
+            "                        circle.setStyle({ color: originalColor, fillColor: originalColor });\n" +
+            "                    }, 2000);\n" +
+            "                }\n" +
+            "            }\n" +
+            "        }\n" +
+            "        \n" +
+            "        function nextSearchResult() {\n" +
+            "            if (searchResults.length === 0) return;\n" +
+            "            currentSearchIndex = (currentSearchIndex + 1) % searchResults.length;\n" +
+            "            showSearchResult();\n" +
+            "        }\n" +
+            "        \n" +
+            "        function previousSearchResult() {\n" +
+            "            if (searchResults.length === 0) return;\n" +
+            "            currentSearchIndex = (currentSearchIndex - 1 + searchResults.length) % searchResults.length;\n" +
+            "            showSearchResult();\n" +
+            "        }\n" +
+            "        \n" +
+            "        function clearSearch() {\n" +
+            "            searchResults = [];\n" +
+            "            currentSearchIndex = -1;\n" +
+            "            \n" +
+            "            if (typeof Android !== 'undefined' && Android.showToast) {\n" +
+            "                Android.showToast('Search cleared');\n" +
+            "            }\n" +
+            "        }\n" +
+            "        \n" +
+            "        function zoomToDevice(deviceAddress, lat, lon) {\n" +
+            "            if (!map) return;\n" +
+            "            \n" +
+            "            // Find the device by address\n" +
+            "            let deviceIndex = -1;\n" +
+            "            for (let i = 0; i < deviceData.length; i++) {\n" +
+            "                if (deviceData[i].address === deviceAddress) {\n" +
+            "                    deviceIndex = i;\n" +
+            "                    break;\n" +
+            "                }\n" +
+            "            }\n" +
+            "            \n" +
+            "            if (deviceIndex === -1) return;\n" +
+            "            \n" +
+            "            // Zoom to location\n" +
+            "            map.setView([lat, lon], 18);\n" +
+            "            \n" +
+            "            // Open popup\n" +
+            "            const marker = allMarkers[deviceIndex];\n" +
+            "            if (marker) {\n" +
+            "                marker.openPopup();\n" +
+            "                \n" +
+            "                // Highlight marker\n" +
+            "                const circle = allCircles[deviceIndex];\n" +
+            "                if (circle) {\n" +
+            "                    const originalColor = circle.options.color;\n" +
+            "                    circle.setStyle({ color: 'yellow', fillColor: 'yellow', weight: 4 });\n" +
+            "                    setTimeout(() => {\n" +
+            "                        circle.setStyle({ color: originalColor, fillColor: originalColor, weight: 2 });\n" +
+            "                    }, 3000);\n" +
+            "                }\n" +
+            "            }\n" +
+            "        }\n" +
+            "\n" +
             "        function updateLocationInDB(deviceAddress, deviceType, newLat, newLon) {\n" +
             "            if (typeof Android !== 'undefined') {\n" +
             "                Android.updateDeviceLocation(deviceAddress, deviceType, newLat, newLon);\n" +
@@ -1061,6 +1200,86 @@ public class MapActivity extends AppCompatActivity {
             }
             return getString(R.string.total_unknown);
         }
+    }
+    
+    private void toggleSearchBar() {
+        if (searchBarLayout.getVisibility() == View.VISIBLE) {
+            searchBarLayout.setVisibility(View.GONE);
+        } else {
+            searchBarLayout.setVisibility(View.VISIBLE);
+        }
+    }
+    
+    private void performSearch() {
+        String query = searchInput.getText().toString().trim();
+        if (query.isEmpty()) {
+            Toast.makeText(this, R.string.no_search_results, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // Hide keyboard
+        android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+        imm.hideSoftInputFromWindow(searchInput.getWindowToken(), 0);
+        
+        // Search in deviceList
+        java.util.List<DeviceData> searchResults = new java.util.ArrayList<>();
+        String lowerQuery = query.toLowerCase();
+        
+        for (DeviceData device : deviceList) {
+            String name = device.name != null ? device.name.toLowerCase() : "";
+            String address = device.address != null ? device.address.toLowerCase() : "";
+            String vendor = device.vendor != null ? device.vendor.toLowerCase() : "";
+            
+            if (name.contains(lowerQuery) || address.contains(lowerQuery) || vendor.contains(lowerQuery)) {
+                searchResults.add(device);
+            }
+        }
+        
+        if (searchResults.isEmpty()) {
+            Toast.makeText(this, R.string.no_search_results, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        
+        // Show results in a dialog
+        showSearchResultsDialog(searchResults, query);
+    }
+    
+    private void showSearchResultsDialog(java.util.List<DeviceData> results, String query) {
+        // Create dialog items
+        String[] items = new String[results.size()];
+        for (int i = 0; i < results.size(); i++) {
+            DeviceData device = results.get(i);
+            String name = device.name != null && !device.name.isEmpty() ? device.name : "[Hidden/Unknown]";
+            String type = device.type.equals("WIFI") ? "📶" : "🔵";
+            String signal = device.signal + " dBm";
+            items[i] = String.format("%s %s\n%s | %s", type, name, device.address, signal);
+        }
+        
+        // Create and show dialog
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle(String.format(getString(R.string.search_results), results.size()) + " for: " + query);
+        builder.setItems(items, (dialog, which) -> {
+            // User selected a result - zoom to it on map
+            DeviceData selectedDevice = results.get(which);
+            String jsCode = String.format("javascript:zoomToDevice('%s', %f, %f);", 
+                selectedDevice.address.replace("'", "\\'"),
+                selectedDevice.lat,
+                selectedDevice.lon);
+            mapWebView.evaluateJavascript(jsCode, null);
+        });
+        builder.setNegativeButton(getString(R.string.cancel), null);
+        builder.show();
+    }
+    
+    private void clearSearch() {
+        searchInput.setText("");
+        
+        // Hide keyboard
+        android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
+        imm.hideSoftInputFromWindow(searchInput.getWindowToken(), 0);
+        
+        // Clear search in JavaScript
+        mapWebView.evaluateJavascript("javascript:clearSearch();", null);
     }
     
     private void requestLocationAndCenterMap() {

@@ -6,17 +6,25 @@ The Python tools now support SQLCipher encrypted databases from the Android app!
 
 ## Requirements
 
-Install the required Python package:
+### Windows Users (RECOMMENDED)
+
+Use the pre-compiled binary package that works perfectly on Windows:
+
+```bash
+pip install sqlcipher3-binary
+```
+
+### Linux/Mac Users
 
 ```bash
 pip install pysqlcipher3
 ```
 
-Or install all requirements:
+### Installation Note
 
-```bash
-pip install -r requirements.txt
-```
+The `requirements.txt` file no longer includes SQLCipher by default, as it's **optional** and platform-specific. Install manually based on your OS (see above).
+
+**Why?** `pysqlcipher3` has known installation issues on Windows. The Python tools work fine with **unencrypted** databases without any SQLCipher installation.
 
 ## Features
 
@@ -78,16 +86,52 @@ python scripts/database_encryption.py path/to/database.db yourpassphrase
 - ✅ Supports same database format
 - ✅ Works with databases exported from Android app
 
+### Platform Support
+| Platform | Package | Status |
+|----------|---------|--------|
+| Windows | `sqlcipher3-binary` | ✅ **Recommended** |
+| Windows | `pysqlcipher3` | ❌ Often fails to install |
+| Linux | `pysqlcipher3` | ✅ Works well |
+| macOS | `pysqlcipher3` | ✅ Works well |
+
 ### Important Notes
 
 1. **Passphrase Storage**: Passphrases are stored in memory only during operation
 2. **Multiple Databases**: Each database can have a different passphrase
-3. **Fallback**: If `pysqlcipher3` not installed, unencrypted databases still work
+3. **Fallback**: If SQLCipher not installed, unencrypted databases still work perfectly
+4. **Android Independence**: The Android app's encryption works independently - Python tools are optional
 
 ## Troubleshooting
 
-### "pysqlcipher3 not found"
-Install with: `pip install pysqlcipher3`
+### Windows: "pysqlcipher3 not found" or Installation Fails
+
+**Solution:** Use `sqlcipher3-binary` instead (pre-compiled for Windows):
+```bash
+pip install sqlcipher3-binary
+```
+
+### "ERROR: Could not find a version that satisfies the requirement pysqlcipher3"
+
+**Solution:** This is a known Windows issue. Use `sqlcipher3-binary`:
+```bash
+pip install sqlcipher3-binary
+```
+
+### "error: Microsoft Visual C++ 14.0 or greater is required"
+
+**Solution:** Use the pre-compiled `sqlcipher3-binary` package:
+```bash
+pip install sqlcipher3-binary
+```
+
+### Still Can't Install SQLCipher?
+
+**No Problem!** You have two options:
+
+1. **Use unencrypted databases**: The Python tools work perfectly with unencrypted databases (no SQLCipher needed)
+2. **Temporarily disable encryption**: In the Android app, disable encryption, export the DB, use Python tools, then re-enable encryption
+
+See `WINDOWS_ENCRYPTION_SETUP.md` for detailed workflow options.
 
 ### "Wrong passphrase"
 - Make sure you're using the correct passphrase from the Android app

@@ -27,6 +27,12 @@
     <string name="total_stats">Total: %1$d (%2$d WiFi, %3$d BT)</string>
     <string name="total_unknown">Total: Unknown</string>
     <string name="location_unavailable">Location unavailable. Enable GPS.</string>
+    <string name="centering_on_location">Centering on your location…</string>
+    <string name="search_markers">Search markers…</string>
+    <string name="search">Search</string>
+    <string name="clear">Clear</string>
+    <string name="search_results">Found %d results</string>
+    <string name="no_search_results">No results found</string>
 
     <!-- Dialogs and Messages -->
     <string name="location_services_disabled">Location services are disabled. Please enable GPS or Network Location for WiFi scans to work.</string>
@@ -74,9 +80,6 @@
 
     <!-- Database Status Messages -->
     <string name="internal_database_loaded">Internal database loaded</string>
-
-    <!-- Location Messages -->
-    <string name="centering_on_location">Centering on your location</string>
     
     <!-- Database Encryption -->
     <string name="encryption_settings">🔐 Database Encryption</string>

@@ -9,9 +9,17 @@ echo WiFi/BT GeoGrabber - Python Setup
 echo ========================================
 echo.
 
-REM Check if Python is installed
+echo [INFO] Python found:
+
+REM Check if Python is installed (try python, python3, py)
+set PYTHON_CMD=
 python --version >nul 2>&1
-if %errorlevel% neq 0 (
+if %errorlevel%==0 set PYTHON_CMD=python
+if not defined PYTHON_CMD python3 --version >nul 2>&1
+if %errorlevel%==0 set PYTHON_CMD=python3
+if not defined PYTHON_CMD py --version >nul 2>&1
+if %errorlevel%==0 set PYTHON_CMD=py
+if not defined PYTHON_CMD (
     echo [ERROR] Python is not installed or not in PATH!
     echo Please install Python 3.8 or higher from https://www.python.org/
     echo.
@@ -20,7 +28,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [INFO] Python found:
-python --version
+%PYTHON_CMD% --version
 echo.
 
 REM Check if venv already exists
@@ -36,7 +44,7 @@ if exist "venv" (
 
 REM Create virtual environment
 echo [INFO] Creating virtual environment...
-python -m venv venv
+%PYTHON_CMD% -m venv venv
 if %errorlevel% neq 0 (
     echo [ERROR] Failed to create virtual environment!
     echo.

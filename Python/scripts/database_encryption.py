@@ -7,13 +7,38 @@ import hashlib
 import base64
 from pathlib import Path
 
+# Try multiple SQLCipher libraries for better Windows compatibility
+SQLCIPHER_AVAILABLE = False
+sqlcipher = None
+
+# Try sqlcipher3-binary first (best for Windows)
 try:
-    from pysqlcipher3 import dbapi2 as sqlcipher
+    import sqlcipher3.dbapi2 as sqlcipher
     SQLCIPHER_AVAILABLE = True
+    print("Using sqlcipher3-binary for encryption support")
 except ImportError:
-    SQLCIPHER_AVAILABLE = False
-    print("Warning: pysqlcipher3 not installed. Encrypted databases cannot be opened.")
-    print("Install with: pip install pysqlcipher3")
+    # Try pysqlcipher3 (works on Linux/Mac)
+    try:
+        from pysqlcipher3 import dbapi2 as sqlcipher
+        SQLCIPHER_AVAILABLE = True
+        print("Using pysqlcipher3 for encryption support")
+    except ImportError:
+        SQLCIPHER_AVAILABLE = False
+        print("=" * 60)
+        print("⚠️  WARNING: No SQLCipher library found!")
+        print("=" * 60)
+        print("Encrypted databases cannot be opened without SQLCipher.")
+        print("")
+        print("INSTALLATION OPTIONS:")
+        print("")
+        print("Windows (recommended):")
+        print("  pip install sqlcipher3-binary")
+        print("")
+        print("Linux/Mac:")
+        print("  pip install pysqlcipher3")
+        print("")
+        print("If installation fails, you can still use unencrypted databases.")
+        print("=" * 60)
 
 
 class DatabaseEncryption:
@@ -62,8 +87,15 @@ class DatabaseEncryption:
     def connect_encrypted(self, passphrase):
         """Connect to encrypted SQLCipher database"""
         if not SQLCIPHER_AVAILABLE:
-            print("ERROR: pysqlcipher3 is not installed!")
-            print("Install with: pip install pysqlcipher3")
+            print("=" * 60)
+            print("❌ ERROR: SQLCipher library not installed!")
+            print("=" * 60)
+            print("Encrypted databases cannot be opened.")
+            print("")
+            print("INSTALLATION:")
+            print("  Windows: pip install sqlcipher3-binary")
+            print("  Linux/Mac: pip install pysqlcipher3")
+            print("=" * 60)
             return False
         
         try:

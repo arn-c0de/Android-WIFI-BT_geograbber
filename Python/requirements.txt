@@ -1,4 +1,7 @@
 folium
 geopy
 python-dotenv>=1.0.0
-pysqlcipher3
+# Encryption support (optional - only for encrypted databases)
+# On Windows, sqlcipher3-binary is recommended instead of pysqlcipher3
+# Install manually if needed: pip install sqlcipher3-binary
+# pysqlcipher3
