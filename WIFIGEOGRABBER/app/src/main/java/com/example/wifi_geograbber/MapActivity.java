@@ -167,19 +167,6 @@ public class MapActivity extends AppCompatActivity {
         // Register data update receiver for live map updates
         registerDataUpdateReceiver();
 
-        // Initialize database - check if encryption is enabled
-        initializeDatabase();
-
-        if (database == null) {
-            Toast.makeText(this, "Failed to open database", Toast.LENGTH_LONG).show();
-            finish();
-            return;
-        }
-
-        Toast.makeText(this, R.string.internal_database_loaded, Toast.LENGTH_SHORT).show();
-        dbStatusText.setText(R.string.internal_app_database);
-        dbStatusText.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
-
         // Button listeners
         backButton.setOnClickListener(v -> {
             // Mark as internal navigation so onPause doesn't lock the app
@@ -204,8 +191,31 @@ public class MapActivity extends AppCompatActivity {
         // Configure WebView
         setupWebView();
 
-        // Load data and show map
-        loadDataAndShowMap();
+        // Defer database initialization and data loading to prevent ANR
+        // This moves ALL heavy operations off the main thread during Activity transition:
+        // 1. Database opening (SQLCipher decryption is CPU-intensive)
+        // 2. Database queries (can scan thousands of rows)
+        // 3. WebView HTML loading
+        // The 250ms delay allows the Activity to fully initialize and transition smoothly
+        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+            if (!isFinishing() && !isDestroyed()) {
+                // Initialize database first
+                initializeDatabase();
+                
+                if (database == null) {
+                    Toast.makeText(this, "Failed to open database", Toast.LENGTH_LONG).show();
+                    finish();
+                    return;
+                }
+                
+                Toast.makeText(this, R.string.internal_database_loaded, Toast.LENGTH_SHORT).show();
+                dbStatusText.setText(R.string.internal_app_database);
+                dbStatusText.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
+                
+                // Then load data and show map
+                loadDataAndShowMap();
+            }
+        }, 250); // 250ms delay allows Activity transition + WebView setup to complete
     }
 
     /**

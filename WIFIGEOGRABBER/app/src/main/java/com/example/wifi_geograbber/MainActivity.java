@@ -45,11 +45,11 @@ public class MainActivity extends AppCompatActivity {
     /**
      * =============================
      *   CODE VERSION MARKER
-     *   APP_VERSION: 1.0.4
+     *   APP_VERSION: 1.0.5
      * =============================
      * Use this variable to visually distinguish code versions.
      */
-    public static final String APP_VERSION = "1.0.4";
+    public static final String APP_VERSION = "1.0.5";
     private WifiManager wifiManager;
     private LocationManager locationManager;
     private BluetoothAdapter bluetoothAdapter;
@@ -525,13 +525,21 @@ public class MainActivity extends AppCompatActivity {
             // Close all open dialogs before showing unlock dialog
             dismissAllDialogs();
             
-            // Show overlay and unlock dialog
+            // Show overlay immediately
             if (securityOverlay != null) {
                 securityOverlay.setVisibility(View.VISIBLE);
                 securityOverlay.bringToFront();
             }
-            isUnlockDialogShowing = true;
-            showUnlockDialog();
+            
+            // Defer showing unlock dialog to prevent ANR during Activity transition
+            // This allows the Activity lifecycle to complete (focus events, window attachment)
+            // before showing the blocking dialog
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                if (!isFinishing() && !isDestroyed()) {
+                    isUnlockDialogShowing = true;
+                    showUnlockDialog();
+                }
+            }, 150); // 150ms delay allows Activity transition to complete
         } else if (encryptionManager != null && encryptionManager.isPassphraseCached()) {
             // Hide overlay if passphrase is cached
             if (securityOverlay != null) {
@@ -3231,12 +3239,24 @@ public class MainActivity extends AppCompatActivity {
     private void showSetupEncryptionDialog() {
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
         builder.setTitle(R.string.setup_encryption_title);
-        builder.setMessage(R.string.setup_encryption_message);
         
         // Create custom layout for passphrase input
         android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
         layout.setOrientation(android.widget.LinearLayout.VERTICAL);
         layout.setPadding(50, 40, 50, 10);
+        
+        // Add password requirements info
+        android.widget.TextView infoText = new android.widget.TextView(this);
+        infoText.setText("Password requirements:\n" +
+                        "• At least 12 characters\n" +
+                        "• At least 1 uppercase letter\n" +
+                        "• At least 1 lowercase letter\n" +
+                        "• At least 1 digit\n" +
+                        "• At least 1 special character");
+        infoText.setTextSize(12);
+        infoText.setPadding(0, 0, 0, 20);
+        infoText.setTextColor(0xFF666666); // Gray color
+        layout.addView(infoText);
         
         final android.widget.EditText passphraseInput = new android.widget.EditText(this);
         passphraseInput.setHint(R.string.passphrase_hint);
@@ -3267,8 +3287,8 @@ public class MainActivity extends AppCompatActivity {
             String passphrase = passphraseInput.getText().toString();
             String confirm = confirmInput.getText().toString();
             
-            if (passphrase.length() < 6) {
-                Toast.makeText(this, R.string.passphrase_too_short, Toast.LENGTH_LONG).show();
+            if (passphrase.isEmpty() || confirm.isEmpty()) {
+                Toast.makeText(this, "Please enter a passphrase", Toast.LENGTH_LONG).show();
                 showSetupEncryptionDialog(); // Show again
                 return;
             }
@@ -3279,10 +3299,15 @@ public class MainActivity extends AppCompatActivity {
                 return;
             }
             
-            // DEBUG: Log passphrase hash before setup
+            // Validate passphrase strength first
             char[] passphraseChars = passphrase.toCharArray();
-            String testHash = testHashPassphrase(passphraseChars);
-            android.util.Log.d("MainActivity", "Setup encryption - passphrase length: " + passphraseChars.length + ", test hash preview: " + testHash);
+            String validationError = EncryptionManager.validatePassphraseStrength(passphraseChars);
+            
+            if (validationError != null) {
+                // Show error message to user
+                android.widget.Toast.makeText(MainActivity.this, validationError, android.widget.Toast.LENGTH_LONG).show();
+                return;
+            }
             
             // Set up encryption
             setupEncryption(passphraseChars);
