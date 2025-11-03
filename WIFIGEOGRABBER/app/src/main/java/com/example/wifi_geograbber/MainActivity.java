@@ -2310,8 +2310,8 @@ public class MainActivity extends AppCompatActivity {
     // Load external database and display map
     private void loadExternalDatabaseAndShowMap(android.net.Uri uri) {
         try {
-            // Create temporary file
-            java.io.File tempFile = new java.io.File(getCacheDir(), "temp_external.db");
+            // Create temporary file in secure files directory (not cache)
+            java.io.File tempFile = new java.io.File(getFilesDir(), "temp_external.db");
 
             // Copy database
             java.io.InputStream inStream = getContentResolver().openInputStream(uri);
