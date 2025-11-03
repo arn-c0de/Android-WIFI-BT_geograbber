@@ -396,8 +396,18 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
                 encryptedFile.delete();
             }
             
+            // CRITICAL FIX: Use the same key format as DatabaseEncryptionHelper constructor
+            // Convert passphrase to hex format if it's a 64-character hex string
+            String formattedPassphrase = passphrase;
+            if (passphrase != null && passphrase.length() == 64 && passphrase.matches("[0-9a-fA-F]+")) {
+                formattedPassphrase = "x'" + passphrase + "'";
+                Log.d(TAG, "Using hex key format for migration (matches constructor format)");
+            } else {
+                Log.d(TAG, "Using raw passphrase for migration");
+            }
+            
             encryptedDb = SQLiteDatabase.openOrCreateDatabase(
-                encryptedDbPath, passphrase, null, null);
+                encryptedDbPath, formattedPassphrase, null, null);
             
             // Create tables in encrypted database
             encryptedDb.execSQL(CREATE_WIFI_TABLE);

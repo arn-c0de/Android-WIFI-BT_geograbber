@@ -154,15 +154,24 @@ public class MapActivity extends AppCompatActivity {
         
         // CRITICAL SECURITY CHECK: If database is encrypted and key not cached, 
         // require unlock IMMEDIATELY before showing any UI (prevents timing attack)
+        // IMPORTANT: This check MUST happen BEFORE setContentView() to prevent UI flash
         if (encryptionManager.isEncryptionEnabled()) {
             String cachedKey = encryptionManager.getCachedDatabaseKey();
             if (cachedKey == null) {
-                Log.d("MapActivity", "onCreate: Encrypted DB with no key - showing unlock screen IMMEDIATELY");
+                Log.d("MapActivity", "onCreate: Encrypted DB with no key - redirecting to unlock WITHOUT showing UI");
                 isWaitingForUnlock = true;
                 isDatabaseEncrypted = true; // Set flag so we know to use encrypted DB later
+                
+                // Set a black screen FIRST before launching unlock activity
+                setContentView(new View(this) {
+                    {
+                        setBackgroundColor(android.graphics.Color.BLACK);
+                    }
+                });
+                
                 Intent unlockIntent = new Intent(this, DatabaseUnlockActivity.class);
                 startActivityForResult(unlockIntent, 9999);
-                // DO NOT call setContentView() or show ANY UI until unlock is successful
+                // DO NOT initialize UI - this will be done in onActivityResult after successful unlock
                 return; // Exit onCreate early - UI will be initialized after unlock
             } else {
                 Log.d("MapActivity", "onCreate: Encrypted DB with cached key - proceeding normally");
@@ -2114,6 +2123,10 @@ public class MapActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        
+        // Reset waiting flag to prevent double unlock prompts
+        isWaitingForUnlock = false;
+        
         // Only clear encryption key if this is NOT an internal navigation
         // (i.e., user pressed Home button or switched apps, not Back button)
         if (!isInternalNavigation && isDatabaseEncrypted && encryptionManager != null) {

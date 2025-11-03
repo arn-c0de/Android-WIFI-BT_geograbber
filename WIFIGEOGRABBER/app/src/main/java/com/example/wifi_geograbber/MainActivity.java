@@ -302,8 +302,11 @@ public class MainActivity extends AppCompatActivity {
         biometricAuthManager = new BiometricAuthManager(this, encryptionManager);
         
         // Check if database is encrypted and needs unlocking
+        // CRITICAL FIX: Do NOT call initializeDatabase() here if DB is locked
+        // because it will fail and leave database = null
         if (encryptionManager.isEncryptionEnabled() && !encryptionManager.isPassphraseCached()) {
-            // Database is locked - redirect to unlock activity
+            // Database is locked - redirect to unlock activity WITHOUT initializing database
+            Log.d("MainActivity", "onCreate: DB locked, redirecting to unlock WITHOUT database init");
             Intent unlockIntent = new Intent(this, DatabaseUnlockActivity.class);
             unlockIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
             startActivity(unlockIntent);
@@ -404,6 +407,7 @@ public class MainActivity extends AppCompatActivity {
         checkLocationServicesEnabled();
 
         // If database is encrypted and needs unlock, show black overlay IMMEDIATELY
+        // NOTE: This should not happen anymore because we redirected to unlock above
         if (encryptionManager.isEncryptionEnabled() && !encryptionManager.isPassphraseCached()) {
             if (securityOverlay != null) {
                 securityOverlay.setVisibility(View.VISIBLE);
@@ -412,6 +416,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         // Initialize database with encryption support
+        // ONLY call this if passphrase is already cached (i.e., DB is already unlocked)
         initializeDatabase();
         
         // Log database encryption status
@@ -517,6 +522,23 @@ public class MainActivity extends AppCompatActivity {
         
         // Reset internal navigation flag when returning to MainActivity
         isNavigatingInternally = false;
+        
+        // CRITICAL FIX: If database is null (because onCreate skipped initialization when DB was locked),
+        // and encryption key is now cached (after successful unlock), reinitialize the database
+        if (database == null && encryptionManager != null && 
+            encryptionManager.isEncryptionEnabled() && encryptionManager.isPassphraseCached()) {
+            Log.d("MainActivity", "onResume: Database is null but key is cached - reinitializing database");
+            initializeDatabase();
+            
+            // Reload data after database is initialized
+            if (database != null) {
+                loadAndDisplayAvailableNetworks();
+                updateInfoSummary(0, 0);
+                Log.d("MainActivity", "onResume: Database reinitialized successfully");
+            } else {
+                Log.e("MainActivity", "onResume: Database reinitialization FAILED");
+            }
+        }
         
         // Check if database needs to be unlocked
         if (encryptionManager != null && encryptionManager.isEncryptionEnabled() && 
