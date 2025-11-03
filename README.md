@@ -40,7 +40,7 @@
 
 - ✅ On Linux, databases can currently be loaded and visualized.  
 - ⚠️ Passphrase unlocking is buggy: correct passphrases may be rejected.  
-- ⚠️ On Windows, passphrase issues still persist.  
+- ⚠️ On Windows, sqlcypher and passphrase issues still persist.  
 
 > Additional development is required to implement full SQLCipher support and reliable key handling.
 
