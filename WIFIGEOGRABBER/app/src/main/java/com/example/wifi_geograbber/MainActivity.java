@@ -3105,8 +3105,24 @@ public class MainActivity extends AppCompatActivity {
                     showUnlockDialog();
                 }
             } else {
-                // Open encrypted database
-                initializeEncryptedDatabase();
+                // Open encrypted database asynchronously to prevent UI freeze during app startup
+                // Database opening can take 100-200ms and should not block the main thread
+                new android.os.AsyncTask<Void, Void, Void>() {
+                    @Override
+                    protected Void doInBackground(Void... voids) {
+                        initializeEncryptedDatabase();
+                        return null;
+                    }
+                    
+                    @Override
+                    protected void onPostExecute(Void result) {
+                        // Update UI after database is ready
+                        if (dataListView != null && database != null) {
+                            dataListView.setVisibility(View.VISIBLE);
+                        }
+                        updateTotalNetworksCount();
+                    }
+                }.execute();
             }
         } else {
             // Check if this is first launch
@@ -3420,12 +3436,25 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(MainActivity.this, R.string.migration_success, 
                                   Toast.LENGTH_LONG).show();
                     isDatabaseEncrypted = true;
-                    initializeEncryptedDatabase();
-                    updateEncryptionStatus();
                     
-                    // Ask user if they want to enable biometric unlock
-                    // Pass the original passphrase, not the cached one
-                    offerBiometricSetup(passphraseCopy);
+                    // Initialize encrypted database asynchronously
+                    new android.os.AsyncTask<Void, Void, Void>() {
+                        @Override
+                        protected Void doInBackground(Void... voids) {
+                            initializeEncryptedDatabase();
+                            return null;
+                        }
+                        
+                        @Override
+                        protected void onPostExecute(Void result) {
+                            updateEncryptionStatus();
+                            updateTotalNetworksCount();
+                            
+                            // Ask user if they want to enable biometric unlock
+                            // Pass the original passphrase, not the cached one
+                            offerBiometricSetup(passphraseCopy);
+                        }
+                    }.execute();
                 } else {
                     Toast.makeText(MainActivity.this, R.string.migration_failed, 
                                   Toast.LENGTH_LONG).show();
@@ -3577,40 +3606,52 @@ public class MainActivity extends AppCompatActivity {
                     securityOverlay.setVisibility(View.GONE);
                 }
                 
-                initializeEncryptedDatabase();
-                // Show data view after successful unlock
-                if (dataListView != null) {
-                    dataListView.setVisibility(View.VISIBLE);
-                }
-                Toast.makeText(this, "✓ Database unlocked", Toast.LENGTH_SHORT).show();
-                
-                // Log database status after unlock
-                if (database != null) {
-                    try {
-                        // Count data in database
-                        Cursor wifiCursor = dbRawQuery("SELECT COUNT(*) FROM wifi_data", null);
-                        int wifiCount = 0;
-                        if (wifiCursor != null) {
-                            if (wifiCursor.moveToFirst()) wifiCount = wifiCursor.getInt(0);
-                            wifiCursor.close();
-                        }
-                        
-                        Cursor btCursor = dbRawQuery("SELECT COUNT(*) FROM device_data WHERE device_type='BLUETOOTH'", null);
-                        int btCount = 0;
-                        if (btCursor != null) {
-                            if (btCursor.moveToFirst()) btCount = btCursor.getInt(0);
-                            btCursor.close();
-                        }
-                        
-                        addLogMessage("📊 After unlock - DB contains: " + wifiCount + " WiFi + " + btCount + " BT");
-                        Log.i("MainActivity", "After unlock - DB contains: " + wifiCount + " WiFi + " + btCount + " BT");
-                        
-                        // Update total count display
-                        updateTotalNetworksCount();
-                    } catch (Exception e) {
-                        Log.e("MainActivity", "Error counting data after unlock: " + e.getMessage());
+                // Initialize database asynchronously to prevent UI freeze
+                // Use AsyncTask to move database opening off the main thread
+                new android.os.AsyncTask<Void, Void, Void>() {
+                    @Override
+                    protected Void doInBackground(Void... voids) {
+                        initializeEncryptedDatabase();
+                        return null;
                     }
-                }
+                    
+                    @Override
+                    protected void onPostExecute(Void result) {
+                        // Show data view after successful unlock
+                        if (dataListView != null) {
+                            dataListView.setVisibility(View.VISIBLE);
+                        }
+                        Toast.makeText(MainActivity.this, "✓ Database unlocked", Toast.LENGTH_SHORT).show();
+                        
+                        // Log database status after unlock
+                        if (database != null) {
+                            try {
+                                // Count data in database
+                                Cursor wifiCursor = dbRawQuery("SELECT COUNT(*) FROM wifi_data", null);
+                                int wifiCount = 0;
+                                if (wifiCursor != null) {
+                                    if (wifiCursor.moveToFirst()) wifiCount = wifiCursor.getInt(0);
+                                    wifiCursor.close();
+                                }
+                                
+                                Cursor btCursor = dbRawQuery("SELECT COUNT(*) FROM device_data WHERE device_type='BLUETOOTH'", null);
+                                int btCount = 0;
+                                if (btCursor != null) {
+                                    if (btCursor.moveToFirst()) btCount = btCursor.getInt(0);
+                                    btCursor.close();
+                                }
+                                
+                                addLogMessage("📊 After unlock - DB contains: " + wifiCount + " WiFi + " + btCount + " BT");
+                                Log.i("MainActivity", "After unlock - DB contains: " + wifiCount + " WiFi + " + btCount + " BT");
+                                
+                                // Update total count display
+                                updateTotalNetworksCount();
+                            } catch (Exception e) {
+                                Log.e("MainActivity", "Error counting data after unlock: " + e.getMessage());
+                            }
+                        }
+                    }
+                }.execute();
             } else {
                 // Wrong passphrase - increment failed attempts
                 encryptionManager.incrementFailedAttempts();
@@ -3692,14 +3733,26 @@ public class MainActivity extends AppCompatActivity {
                         securityOverlay.setVisibility(View.GONE);
                     }
                     
-                    initializeEncryptedDatabase();
-                    if (dataListView != null) {
-                        dataListView.setVisibility(View.VISIBLE);
-                    }
-                    Toast.makeText(MainActivity.this, "✓ Unlocked with biometric", Toast.LENGTH_SHORT).show();
-                    
-                    // Update database stats
-                    updateTotalNetworksCount();
+                    // Initialize database asynchronously to prevent UI freeze
+                    // Use AsyncTask to move database opening off the main thread
+                    new android.os.AsyncTask<Void, Void, Void>() {
+                        @Override
+                        protected Void doInBackground(Void... voids) {
+                            initializeEncryptedDatabase();
+                            return null;
+                        }
+                        
+                        @Override
+                        protected void onPostExecute(Void result) {
+                            if (dataListView != null) {
+                                dataListView.setVisibility(View.VISIBLE);
+                            }
+                            Toast.makeText(MainActivity.this, "✓ Unlocked with biometric", Toast.LENGTH_SHORT).show();
+                            
+                            // Update database stats
+                            updateTotalNetworksCount();
+                        }
+                    }.execute();
                 } else {
                     // Decrypted passphrase is wrong - fall back to manual entry
                     Toast.makeText(MainActivity.this, 
@@ -3959,9 +4012,21 @@ public class MainActivity extends AppCompatActivity {
                     }
                     Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
                     
-                    // Reinitialize database with new key
-                    initializeEncryptedDatabase();
-                    updateEncryptionStatus();
+                    // Reinitialize database with new key asynchronously
+                    final boolean finalBioWasEnabled = bioWasEnabled;
+                    new android.os.AsyncTask<Void, Void, Void>() {
+                        @Override
+                        protected Void doInBackground(Void... voids) {
+                            initializeEncryptedDatabase();
+                            return null;
+                        }
+                        
+                        @Override
+                        protected void onPostExecute(Void result) {
+                            updateEncryptionStatus();
+                            updateTotalNetworksCount();
+                        }
+                    }.execute();
                 } else {
                     Toast.makeText(MainActivity.this, R.string.encryption_key_change_failed, 
                                   Toast.LENGTH_LONG).show();
@@ -4681,24 +4746,12 @@ public class MainActivity extends AppCompatActivity {
                     // Ensure internal database is open before import
                     if (database == null) {
                         Log.e("Import", "Internal database is NULL before import! Opening now...");
-                        runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
-                                // Initialize database if not already open
-                                if (encryptionManager.isEncryptionEnabled() && encryptionManager.isPassphraseCached()) {
-                                    initializeEncryptedDatabase();
-                                } else if (!encryptionManager.isEncryptionEnabled()) {
-                                    DatabaseHelper dbHelper = new DatabaseHelper(MainActivity.this);
-                                    database = dbHelper.getWritableDatabase();
-                                }
-                            }
-                        });
-                        
-                        // Wait a bit for DB to open
-                        try {
-                            Thread.sleep(500);
-                        } catch (InterruptedException e) {
-                            // Ignore
+                        // We are already in background thread (doInBackground), so call directly
+                        if (encryptionManager.isEncryptionEnabled() && encryptionManager.isPassphraseCached()) {
+                            initializeEncryptedDatabase();
+                        } else if (!encryptionManager.isEncryptionEnabled()) {
+                            DatabaseHelper dbHelper = new DatabaseHelper(MainActivity.this);
+                            database = dbHelper.getWritableDatabase();
                         }
                         
                         if (database == null) {

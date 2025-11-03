@@ -27,8 +27,14 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import android.os.Handler;
+import android.os.Looper;
 
 public class MapActivity extends AppCompatActivity {
+    private final ExecutorService executorService = Executors.newSingleThreadExecutor();
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private static final String PREFS_NAME = "MapPrefs";
 
     /**
@@ -63,6 +69,9 @@ public class MapActivity extends AppCompatActivity {
     
     // Flag to prevent double unlock prompts
     private boolean isWaitingForUnlock = false;
+    
+    // Flag to track if database initialization has been started
+    private boolean isDatabaseInitStarted = false;
     
     // Live location tracking
     private boolean isLiveLocationActive = false;
@@ -139,6 +148,46 @@ public class MapActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        
+        // Initialize encryption manager FIRST (before any UI)
+        encryptionManager = new EncryptionManager(this);
+        
+        // CRITICAL SECURITY CHECK: If database is encrypted and key not cached, 
+        // require unlock IMMEDIATELY before showing any UI (prevents timing attack)
+        if (encryptionManager.isEncryptionEnabled()) {
+            String cachedKey = encryptionManager.getCachedDatabaseKey();
+            if (cachedKey == null) {
+                Log.d("MapActivity", "onCreate: Encrypted DB with no key - showing unlock screen IMMEDIATELY");
+                isWaitingForUnlock = true;
+                isDatabaseEncrypted = true; // Set flag so we know to use encrypted DB later
+                Intent unlockIntent = new Intent(this, DatabaseUnlockActivity.class);
+                startActivityForResult(unlockIntent, 9999);
+                // DO NOT call setContentView() or show ANY UI until unlock is successful
+                return; // Exit onCreate early - UI will be initialized after unlock
+            } else {
+                Log.d("MapActivity", "onCreate: Encrypted DB with cached key - proceeding normally");
+                isDatabaseEncrypted = true;
+            }
+        }
+        
+        // Defer UI initialization to prevent ANR during Activity transition
+        // Only show minimal UI immediately, defer heavy setup (WebView, etc.)
+        Log.d("MapActivity", "onCreate: Deferring UI setup to prevent ANR");
+        mainHandler.post(() -> initializeUI());
+        
+        // NOTE: Database initialization is deferred to onResume() to prevent ANR
+        // during Activity creation. This allows onCreate() to complete quickly.
+    }
+    
+    /**
+     * Initialize all UI components (deferred from onCreate to prevent ANR)
+     */
+    private void initializeUI() {
+        if (isFinishing() || isDestroyed()) return;
+        
+        Log.d("MapActivity", "initializeUI: Starting UI setup");
+        
+        // Only initialize UI if database is accessible (unencrypted OR encrypted with cached key)
         setContentView(R.layout.activity_map);
 
         // Hide System UI for fullscreen (status bar, navigation, home button)
@@ -157,9 +206,6 @@ public class MapActivity extends AppCompatActivity {
         dbStatusText = findViewById(R.id.db_status_text);
 
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
-
-        // Initialize encryption manager
-        encryptionManager = new EncryptionManager(this);
 
         // Register screen off receiver to clear encryption key
         registerScreenOffReceiver();
@@ -188,34 +234,45 @@ public class MapActivity extends AppCompatActivity {
             return false;
         });
 
-        // Configure WebView
+        // Configure WebView (heavy operation - ~180ms)
         setupWebView();
+        
+        Log.d("MapActivity", "initializeUI: UI setup complete");
+        
+        // After UI is ready, load database and map data
+        // Schedule database loading after UI setup completes
+        if (database == null && !isDatabaseInitStarted) {
+            Log.d("MapActivity", "initializeUI: Scheduling database load");
+            isDatabaseInitStarted = true;
+            mainHandler.postDelayed(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                
+                Log.d("MapActivity", "Starting database initialization in background");
+                executorService.execute(() -> {
+                    // Initialize database in background thread
+                    initializeDatabase();
+                    final boolean success = database != null;
 
-        // Defer database initialization and data loading to prevent ANR
-        // This moves ALL heavy operations off the main thread during Activity transition:
-        // 1. Database opening (SQLCipher decryption is CPU-intensive)
-        // 2. Database queries (can scan thousands of rows)
-        // 3. WebView HTML loading
-        // The 250ms delay allows the Activity to fully initialize and transition smoothly
-        new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
-            if (!isFinishing() && !isDestroyed()) {
-                // Initialize database first
-                initializeDatabase();
-                
-                if (database == null) {
-                    Toast.makeText(this, "Failed to open database", Toast.LENGTH_LONG).show();
-                    finish();
-                    return;
-                }
-                
-                Toast.makeText(this, R.string.internal_database_loaded, Toast.LENGTH_SHORT).show();
-                dbStatusText.setText(R.string.internal_app_database);
-                dbStatusText.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
-                
-                // Then load data and show map
-                loadDataAndShowMap();
-            }
-        }, 250); // 250ms delay allows Activity transition + WebView setup to complete
+                    // Post result to main thread
+                    mainHandler.post(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+
+                        if (!success) {
+                            Toast.makeText(MapActivity.this, "Failed to open database", Toast.LENGTH_LONG).show();
+                            finish();
+                            return;
+                        }
+
+                        Toast.makeText(MapActivity.this, R.string.internal_database_loaded, Toast.LENGTH_SHORT).show();
+                        dbStatusText.setText(R.string.internal_app_database);
+                        dbStatusText.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
+
+                        // Then load data and show map (also async)
+                        loadDataAndShowMap();
+                    });
+                });
+            }, 100); // 100ms delay to let UI finish rendering
+        }
     }
 
     /**
@@ -339,27 +396,38 @@ public class MapActivity extends AppCompatActivity {
     }
     
     private void loadDataAndShowMap() {
-        // Initially load with default bounding box (will be updated later by map movement)
-        deviceList = getDevicesInBoundingBox(bboxMinLat, bboxMinLon, bboxMaxLat, bboxMaxLon);
-        
-        Log.d("MapActivity", "Initial loaded " + deviceList.size() + " devices in viewport");
+        // Load device data asynchronously using modern ExecutorService to prevent UI freeze
+        // Loading 9000+ devices from database can take 200-300ms and should not block the main thread
+        executorService.execute(() -> {
+            // Load devices in background thread with LIMIT for initial load
+            final List<DeviceData> devices = getDevicesInBoundingBox(bboxMinLat, bboxMinLon, bboxMaxLat, bboxMaxLon);
 
-        // Load HTML map only the first time
-        if (!isMapInitialized) {
-            loadMapHTML();
-        } else {
-            // On subsequent calls only update data (even with empty list)
-            if (deviceList != null) {
-                injectDeviceData();
-            }
-        }
+            // Post result to main thread
+            mainHandler.post(() -> {
+                if (isFinishing() || isDestroyed()) return;
+
+                deviceList = devices;
+                Log.d("MapActivity", "Initial loaded " + deviceList.size() + " devices in viewport");
+
+                // Load HTML map only the first time
+                if (!isMapInitialized) {
+                    loadMapHTML();
+                } else {
+                    // On subsequent calls only update data (even with empty list)
+                    if (deviceList != null) {
+                        injectDeviceData();
+                    }
+                }
+            });
+        });
     }
     
     // Loads only devices in the visible area of the map (performance optimization)
     private List<DeviceData> getDevicesInBoundingBox(double minLat, double minLon, double maxLat, double maxLon) {
         List<DeviceData> filtered = new ArrayList<>();
         try {
-            // SQL query without LIMIT, load all devices in area
+            // SQL query with LIMIT to prevent loading too many devices at once
+            // Load top 5000 strongest signals for performance
             String sql = "SELECT device_name, device_address, device_type, signal_strength, " +
                 "encryption_info, latitude, longitude, timestamp, frequency, channel, " +
                 "wifi_standard, vendor_info, channel_width, max_connection_speed, " +
@@ -369,7 +437,7 @@ public class MapActivity extends AppCompatActivity {
                 "COALESCE(movement_distance, 0) as movement_distance " +
                 "FROM device_data WHERE latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? " +
                 "AND latitude != 0 AND longitude != 0 " +
-                "ORDER BY signal_strength DESC";
+                "ORDER BY signal_strength DESC LIMIT 5000";
 
             Cursor deviceCursor = dbRawQuery(sql, new String[]{
                 String.valueOf(minLat), String.valueOf(maxLat),
@@ -413,7 +481,7 @@ public class MapActivity extends AppCompatActivity {
                 "FROM wifi_data WHERE latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? " +
                 "AND latitude != 0 AND longitude != 0 " +
                 "AND bssid NOT IN (SELECT device_address FROM device_data WHERE device_type = 'WIFI') " +
-                "ORDER BY signal_strength DESC",
+                "ORDER BY signal_strength DESC LIMIT 3000",
                 new String[]{
                     String.valueOf(minLat), String.valueOf(maxLat),
                     String.valueOf(minLon), String.valueOf(maxLon)
@@ -1975,16 +2043,21 @@ public class MapActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        
+
+        // Shutdown executor service to prevent memory leaks
+        if (executorService != null && !executorService.isShutdown()) {
+            executorService.shutdown();
+        }
+
         // Stop live location tracking
         stopLiveLocationTracking();
-        
+
         // Unregister screen off receiver
         unregisterScreenOffReceiver();
-        
+
         // Unregister data update receiver
         unregisterDataUpdateReceiver();
-        
+
         if (database != null) {
             dbClose();
         }
@@ -2020,6 +2093,14 @@ public class MapActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         Log.d("MapActivity", "onResume called - isWaitingForUnlock=" + isWaitingForUnlock);
+        
+        // CRITICAL: If UI was never initialized (onCreate returned early), skip onResume logic
+        // The UI will be initialized in onActivityResult after successful unlock
+        if (mapWebView == null) {
+            Log.d("MapActivity", "onResume: UI not initialized yet (waiting for unlock) - skipping");
+            return;
+        }
+        
         // If database is encrypted and key was cleared, require unlock
         if (isDatabaseEncrypted && encryptionManager != null) {
             String cachedKey = encryptionManager.getCachedDatabaseKey();
@@ -2028,12 +2109,49 @@ public class MapActivity extends AppCompatActivity {
                 isWaitingForUnlock = true; // Prevent double prompts
                 Intent unlockIntent = new Intent(this, DatabaseUnlockActivity.class);
                 startActivityForResult(unlockIntent, 9999);
+                return; // Don't load database until unlocked
             } else if (cachedKey != null) {
                 Log.d("MapActivity", "App resumed with encrypted DB and key present - OK");
                 isWaitingForUnlock = false; // Key is present, reset flag
             } else if (isWaitingForUnlock) {
                 Log.d("MapActivity", "onResume skipped - already waiting for unlock");
+                return; // Don't load database until unlocked
             }
+        }
+        
+        // Initialize database AFTER onResume completes to prevent ANR
+        // Use Handler.postDelayed to defer loading until after Activity transition is complete
+        if (database == null && !isDatabaseInitStarted) {
+            Log.d("MapActivity", "onResume: Scheduling database load after Activity transition");
+            isDatabaseInitStarted = true;
+            mainHandler.postDelayed(() -> {
+                if (isFinishing() || isDestroyed()) return;
+                
+                Log.d("MapActivity", "Starting database initialization in background");
+                executorService.execute(() -> {
+                    // Initialize database in background thread
+                    initializeDatabase();
+                    final boolean success = database != null;
+
+                    // Post result to main thread
+                    mainHandler.post(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+
+                        if (!success) {
+                            Toast.makeText(MapActivity.this, "Failed to open database", Toast.LENGTH_LONG).show();
+                            finish();
+                            return;
+                        }
+
+                        Toast.makeText(MapActivity.this, R.string.internal_database_loaded, Toast.LENGTH_SHORT).show();
+                        dbStatusText.setText(R.string.internal_app_database);
+                        dbStatusText.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
+
+                        // Then load data and show map (also async)
+                        loadDataAndShowMap();
+                    });
+                });
+            }, 100); // 100ms delay to let onResume finish
         }
     }
 
@@ -2042,17 +2160,80 @@ public class MapActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == 9999) {
             if (resultCode == RESULT_OK) {
-                Log.d("MapActivity", "Database unlocked successfully - reloading data");
-                // Reinitialize database connection and reload data
-                initializeDatabase();
-                if (database != null) {
-                    loadDataAndShowMap();
-                    isWaitingForUnlock = false; // Reset flag ONLY after successful load
-                } else {
-                    Toast.makeText(this, "Failed to open database", Toast.LENGTH_SHORT).show();
-                    // Don't reset flag here, so onResume doesn't trigger again
-                    finish();
+                Log.d("MapActivity", "Database unlocked successfully");
+                isWaitingForUnlock = false;
+                
+                // Check if UI was never initialized (early return from onCreate)
+                if (mapWebView == null) {
+                    Log.d("MapActivity", "UI not initialized yet - initializing now after unlock");
+                    // Initialize UI after successful unlock
+                    setContentView(R.layout.activity_map);
+                    hideSystemUI();
+                    
+                    // Initialize all views
+                    mapWebView = findViewById(R.id.map_webview);
+                    backButton = findViewById(R.id.back_button);
+                    refreshButton = findViewById(R.id.refresh_button);
+                    locationButton = findViewById(R.id.location_button);
+                    searchToggleButton = findViewById(R.id.search_toggle_button);
+                    searchButton = findViewById(R.id.search_button);
+                    clearSearchButton = findViewById(R.id.clear_search_button);
+                    searchInput = findViewById(R.id.search_input);
+                    searchBarLayout = findViewById(R.id.search_bar_layout);
+                    dbStatusText = findViewById(R.id.db_status_text);
+                    
+                    fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+                    
+                    // Setup button listeners
+                    backButton.setOnClickListener(v -> {
+                        isInternalNavigation = true;
+                        finish();
+                    });
+                    refreshButton.setOnClickListener(v -> refreshMap());
+                    locationButton.setOnClickListener(v -> requestLocationAndCenterMap());
+                    searchToggleButton.setOnClickListener(v -> toggleSearchBar());
+                    searchButton.setOnClickListener(v -> performSearch());
+                    clearSearchButton.setOnClickListener(v -> clearSearch());
+                    searchInput.setOnEditorActionListener((v, actionId, event) -> {
+                        if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
+                            performSearch();
+                            return true;
+                        }
+                        return false;
+                    });
+                    
+                    // Configure WebView
+                    setupWebView();
+                    
+                    // Register receivers
+                    registerScreenOffReceiver();
+                    registerDataUpdateReceiver();
                 }
+                
+                // Initialize database and load map data using ExecutorService
+                executorService.execute(() -> {
+                    // Initialize database in background thread
+                    initializeDatabase();
+                    final boolean success = database != null;
+
+                    // Post result to main thread
+                    mainHandler.post(() -> {
+                        if (isFinishing() || isDestroyed()) return;
+
+                        if (!success) {
+                            Toast.makeText(MapActivity.this, "Failed to open database", Toast.LENGTH_LONG).show();
+                            finish();
+                            return;
+                        }
+
+                        Toast.makeText(MapActivity.this, R.string.internal_database_loaded, Toast.LENGTH_SHORT).show();
+                        dbStatusText.setText(R.string.internal_app_database);
+                        dbStatusText.setBackgroundColor(getResources().getColor(android.R.color.holo_green_light));
+                        
+                        // Then load data and show map (also async)
+                        loadDataAndShowMap();
+                    });
+                });
             } else {
                 Log.w("MapActivity", "Database unlock failed or cancelled - closing activity");
                 Toast.makeText(this, "Database unlock required", Toast.LENGTH_SHORT).show();
