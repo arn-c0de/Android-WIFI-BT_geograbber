@@ -61,6 +61,9 @@ public class MapActivity extends AppCompatActivity {
     // Flag to track if we're navigating within the app (no auth needed)
     private boolean isInternalNavigation = false;
     
+    // Flag to prevent double unlock prompts
+    private boolean isWaitingForUnlock = false;
+    
     // Live location tracking
     private boolean isLiveLocationActive = false;
     private android.os.Handler liveLocationHandler;
@@ -2006,13 +2009,20 @@ public class MapActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
+        Log.d("MapActivity", "onResume called - isWaitingForUnlock=" + isWaitingForUnlock);
         // If database is encrypted and key was cleared, require unlock
         if (isDatabaseEncrypted && encryptionManager != null) {
             String cachedKey = encryptionManager.getCachedDatabaseKey();
-            if (cachedKey == null) {
+            if (cachedKey == null && !isWaitingForUnlock) {
                 Log.d("MapActivity", "App resumed with encrypted DB but no key - showing unlock screen");
+                isWaitingForUnlock = true; // Prevent double prompts
                 Intent unlockIntent = new Intent(this, DatabaseUnlockActivity.class);
                 startActivityForResult(unlockIntent, 9999);
+            } else if (cachedKey != null) {
+                Log.d("MapActivity", "App resumed with encrypted DB and key present - OK");
+                isWaitingForUnlock = false; // Key is present, reset flag
+            } else if (isWaitingForUnlock) {
+                Log.d("MapActivity", "onResume skipped - already waiting for unlock");
             }
         }
     }
@@ -2027,13 +2037,16 @@ public class MapActivity extends AppCompatActivity {
                 initializeDatabase();
                 if (database != null) {
                     loadDataAndShowMap();
+                    isWaitingForUnlock = false; // Reset flag ONLY after successful load
                 } else {
                     Toast.makeText(this, "Failed to open database", Toast.LENGTH_SHORT).show();
+                    // Don't reset flag here, so onResume doesn't trigger again
                     finish();
                 }
             } else {
                 Log.w("MapActivity", "Database unlock failed or cancelled - closing activity");
                 Toast.makeText(this, "Database unlock required", Toast.LENGTH_SHORT).show();
+                isWaitingForUnlock = false;
                 finish();
             }
         }

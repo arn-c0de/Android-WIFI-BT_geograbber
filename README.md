@@ -36,11 +36,16 @@
 
 ---
 
-### ⚠️ Python Integration Notice (v1.0.4)
-The two Python tools are not yet fully compatible with the new encrypted databases.  
-Additional development is required to implement full SQLCipher support and key handling.  
+⚠️ **Python Integration Notice (v1.0.4)**
 
-> ➡️ If you need to work **without encryption**, please use **version 1.0.2**.
+- ✅ On Linux, databases can currently be loaded and visualized.  
+- ⚠️ Passphrase unlocking is buggy: correct passphrases may be rejected.  
+- ⚠️ On Windows, passphrase issues still persist.  
+
+> Additional development is required to implement full SQLCipher support and reliable key handling.
+
+➡️ **Workaround:** To use without encryption, please use version **1.0.2**.
+
 
 ---
 
