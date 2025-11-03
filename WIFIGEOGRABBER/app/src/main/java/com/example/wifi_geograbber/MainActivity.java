@@ -4081,89 +4081,364 @@ public class MainActivity extends AppCompatActivity {
         android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
         builder.setTitle(R.string.disable_encryption_title);
         builder.setMessage(R.string.disable_encryption_message);
-        
+
         builder.setPositiveButton(R.string.yes_disable, (dialog, which) -> {
-            disableEncryption();
+            // Request authentication before disabling encryption
+            requestAuthenticationForDisableEncryption();
         });
-        
+
         builder.setNegativeButton(R.string.cancel, null);
         builder.show();
     }
-    
+
     /**
-     * Disable encryption (decrypt database)
+     * Request authentication (fingerprint or password) before disabling encryption
      */
-    private void disableEncryption() {
+    private void requestAuthenticationForDisableEncryption() {
+        // Check if biometric authentication is enabled
+        if (biometricAuthManager != null && biometricAuthManager.isBiometricEnabled()) {
+            // Use biometric authentication
+            biometricAuthManager.authenticateWithBiometric(
+                MainActivity.this,
+                new BiometricAuthManager.BiometricAuthCallback() {
+                    @Override
+                    public void onAuthenticationSucceeded(char[] passphrase) {
+                        // Authentication successful, proceed with decryption
+                        String passphraseStr = new String(passphrase);
+
+                        // Convert to database key format
+                        String dbKey = encryptionManager.getCachedDatabaseKey();
+                        if (dbKey != null && !dbKey.isEmpty()) {
+                            disableEncryptionWithPassphrase(dbKey);
+                        } else {
+                            Toast.makeText(MainActivity.this, "Failed to retrieve database key", Toast.LENGTH_SHORT).show();
+                        }
+
+                        // Clear sensitive data
+                        java.util.Arrays.fill(passphrase, '\0');
+                    }
+
+                    @Override
+                    public void onAuthenticationFailed() {
+                        Toast.makeText(MainActivity.this, "Authentication failed", Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override
+                    public void onAuthenticationError(String errorMessage) {
+                        Toast.makeText(MainActivity.this, "Authentication error: " + errorMessage, Toast.LENGTH_SHORT).show();
+                        // Fallback to password input if biometric fails
+                        showPasswordInputForDisableEncryption();
+                    }
+                }
+            );
+        } else {
+            // Biometric not available, ask for password manually
+            showPasswordInputForDisableEncryption();
+        }
+    }
+
+    /**
+     * Show password input dialog for disabling encryption
+     */
+    private void showPasswordInputForDisableEncryption() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("Enter Password");
+        builder.setMessage("Enter your database password to decrypt:");
+
+        final android.widget.EditText input = new android.widget.EditText(this);
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT |
+                          android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        input.setHint("Password");
+
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+        layout.addView(input);
+
+        builder.setView(layout);
+
+        builder.setPositiveButton("Decrypt", (dialog, which) -> {
+            String password = input.getText().toString();
+            if (password.isEmpty()) {
+                Toast.makeText(MainActivity.this, "Password cannot be empty",
+                             Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Proceed with decryption using the entered password
+            disableEncryptionWithPassphrase(password);
+        });
+
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
+    }
+
+    /**
+     * Disable encryption with the provided passphrase
+     */
+    private void disableEncryptionWithPassphrase(final String passphrase) {
         new android.os.AsyncTask<Void, Void, Boolean>() {
             android.app.ProgressDialog progressDialog;
-            
+
             @Override
             protected void onPreExecute() {
                 progressDialog = android.app.ProgressDialog.show(
-                    MainActivity.this, 
+                    MainActivity.this,
                     getString(R.string.disable_encryption_title),
-                    getString(R.string.decryption_in_progress), 
+                    getString(R.string.decryption_in_progress),
                     true
                 );
             }
-            
+
             @Override
             protected Boolean doInBackground(Void... params) {
                 try {
                     String encryptedPath = getDatabasePath("wifi_scanner.db").getAbsolutePath();
                     String unencryptedPath = getDatabasePath("wifi_scanner_unencrypted.db").getAbsolutePath();
-                    
-                    String dbKey = encryptionManager.getCachedDatabaseKey();
-                    
+
                     // Close database
                     if (database != null) {
                         dbClose();
                     }
-                    
-                    // Decrypt database
+
+                    // Check if database is actually encrypted
+                    java.io.File dbFile = new java.io.File(encryptedPath);
+                    if (!DatabaseEncryptionHelper.isDatabaseEncrypted(dbFile)) {
+                        Log.i("MainActivity", "Database is already unencrypted");
+                        // Database is already unencrypted, just disable encryption flag
+                        encryptionManager.disableEncryption();
+                        return true;
+                    }
+
+                    Log.i("MainActivity", "Database is encrypted, attempting to decrypt with provided passphrase...");
+
+                    // Decrypt database using the provided passphrase
                     boolean success = DatabaseEncryptionHelper.decryptDatabase(
-                        MainActivity.this, encryptedPath, unencryptedPath, dbKey);
-                    
+                        MainActivity.this, encryptedPath, unencryptedPath, passphrase);
+
                     if (success) {
                         // Delete encrypted database
                         new java.io.File(encryptedPath).delete();
-                        
+
                         // Rename unencrypted database
                         new java.io.File(unencryptedPath).renameTo(new java.io.File(encryptedPath));
-                        
+
                         // Disable encryption in manager
                         encryptionManager.disableEncryption();
+                    } else {
+                        Log.e("MainActivity", "Decryption failed");
                     }
-                    
+
                     return success;
-                    
+
                 } catch (Exception e) {
                     Log.e("MainActivity", "Error disabling encryption", e);
                     return false;
                 }
             }
-            
+
             @Override
             protected void onPostExecute(Boolean success) {
                 progressDialog.dismiss();
-                
+
                 if (success) {
-                    Toast.makeText(MainActivity.this, R.string.decryption_success, 
+                    Toast.makeText(MainActivity.this, R.string.decryption_success,
                                   Toast.LENGTH_LONG).show();
                     isDatabaseEncrypted = false;
-                    
+
                     // Reinitialize with standard database
                     DatabaseHelper dbHelper = new DatabaseHelper(MainActivity.this);
                     database = dbHelper.getWritableDatabase();
                     updateEncryptionStatus();
                 } else {
-                    Toast.makeText(MainActivity.this, R.string.decryption_failed, 
-                                  Toast.LENGTH_LONG).show();
+                    // Show the failed dialog with options
+                    showDecryptionFailedDialog();
                 }
             }
         }.execute();
     }
     
+    /**
+     * Show dialog when decryption fails with options to resolve the issue
+     */
+    private void showDecryptionFailedDialog() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("Decryption Failed");
+        builder.setMessage("Failed to decrypt the database. This may be due to:\n\n" +
+                          "• Wrong passphrase stored\n" +
+                          "• Corrupted database file\n" +
+                          "• Database is already unencrypted\n\n" +
+                          "What would you like to do?");
+
+        builder.setPositiveButton("Delete & Start Fresh", (dialog, which) -> {
+            // Delete the encrypted database and start fresh
+            new android.app.AlertDialog.Builder(MainActivity.this)
+                .setTitle("Confirm Delete")
+                .setMessage("This will delete the current database and all data. Are you sure?")
+                .setPositiveButton("Yes, Delete", (d, w) -> {
+                    try {
+                        String dbPath = getDatabasePath("wifi_scanner.db").getAbsolutePath();
+                        java.io.File dbFile = new java.io.File(dbPath);
+
+                        // Close database if open
+                        if (database != null) {
+                            dbClose();
+                        }
+
+                        // Delete database files
+                        if (dbFile.exists()) {
+                            dbFile.delete();
+                        }
+                        new java.io.File(dbPath + "-journal").delete();
+                        new java.io.File(dbPath + "-wal").delete();
+                        new java.io.File(dbPath + "-shm").delete();
+
+                        // Disable encryption
+                        encryptionManager.disableEncryption();
+                        isDatabaseEncrypted = false;
+
+                        // Create new unencrypted database
+                        DatabaseHelper dbHelper = new DatabaseHelper(MainActivity.this);
+                        database = dbHelper.getWritableDatabase();
+
+                        updateEncryptionStatus();
+
+                        Toast.makeText(MainActivity.this, "Database deleted. Starting fresh with unencrypted database.",
+                                     Toast.LENGTH_LONG).show();
+                    } catch (Exception e) {
+                        Log.e("MainActivity", "Error deleting database", e);
+                        Toast.makeText(MainActivity.this, "Error deleting database: " + e.getMessage(),
+                                     Toast.LENGTH_LONG).show();
+                    }
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+        });
+
+        builder.setNegativeButton("Keep Database", (dialog, which) -> {
+            Toast.makeText(MainActivity.this, "Database kept encrypted. Decryption cancelled.",
+                         Toast.LENGTH_SHORT).show();
+        });
+
+        builder.setNeutralButton("Try Manual Password", (dialog, which) -> {
+            // Show password input dialog
+            showManualDecryptionDialog();
+        });
+
+        builder.setCancelable(false);
+        builder.show();
+    }
+
+    /**
+     * Show dialog for manual password entry to decrypt database
+     */
+    private void showManualDecryptionDialog() {
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle("Enter Decryption Password");
+        builder.setMessage("Enter the password used to encrypt this database:");
+
+        final android.widget.EditText input = new android.widget.EditText(this);
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT |
+                          android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        input.setHint("Password");
+
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+        layout.addView(input);
+
+        builder.setView(layout);
+
+        builder.setPositiveButton("Decrypt", (dialog, which) -> {
+            String password = input.getText().toString();
+            if (password.isEmpty()) {
+                Toast.makeText(MainActivity.this, "Password cannot be empty",
+                             Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Try to decrypt with the provided password
+            tryDecryptionWithPassword(password);
+        });
+
+        builder.setNegativeButton("Cancel", null);
+        builder.show();
+    }
+
+    /**
+     * Try to decrypt database with provided password
+     */
+    private void tryDecryptionWithPassword(final String password) {
+        new android.os.AsyncTask<Void, Void, Boolean>() {
+            android.app.ProgressDialog progressDialog;
+
+            @Override
+            protected void onPreExecute() {
+                progressDialog = android.app.ProgressDialog.show(
+                    MainActivity.this,
+                    "Decrypting",
+                    "Attempting to decrypt database...",
+                    true
+                );
+            }
+
+            @Override
+            protected Boolean doInBackground(Void... params) {
+                try {
+                    String encryptedPath = getDatabasePath("wifi_scanner.db").getAbsolutePath();
+                    String unencryptedPath = getDatabasePath("wifi_scanner_unencrypted.db").getAbsolutePath();
+
+                    // Close database
+                    if (database != null) {
+                        dbClose();
+                    }
+
+                    // Try to decrypt with provided password
+                    boolean success = DatabaseEncryptionHelper.decryptDatabase(
+                        MainActivity.this, encryptedPath, unencryptedPath, password);
+
+                    if (success) {
+                        // Delete encrypted database
+                        new java.io.File(encryptedPath).delete();
+
+                        // Rename unencrypted database
+                        new java.io.File(unencryptedPath).renameTo(new java.io.File(encryptedPath));
+
+                        // Disable encryption in manager
+                        encryptionManager.disableEncryption();
+                    }
+
+                    return success;
+
+                } catch (Exception e) {
+                    Log.e("MainActivity", "Error decrypting with manual password", e);
+                    return false;
+                }
+            }
+
+            @Override
+            protected void onPostExecute(Boolean success) {
+                progressDialog.dismiss();
+
+                if (success) {
+                    Toast.makeText(MainActivity.this, R.string.decryption_success,
+                                  Toast.LENGTH_LONG).show();
+                    isDatabaseEncrypted = false;
+
+                    // Reinitialize with standard database
+                    DatabaseHelper dbHelper = new DatabaseHelper(MainActivity.this);
+                    database = dbHelper.getWritableDatabase();
+                    updateEncryptionStatus();
+                } else {
+                    Toast.makeText(MainActivity.this, "Decryption failed. Wrong password or corrupted database.",
+                                  Toast.LENGTH_LONG).show();
+                    // Show the failed dialog again
+                    showDecryptionFailedDialog();
+                }
+            }
+        }.execute();
+    }
+
     /**
      * Show dialog for importing encrypted database
      */
@@ -4716,7 +4991,7 @@ public class MainActivity extends AppCompatActivity {
     public static class DatabaseHelper extends SQLiteOpenHelper {
         private static final String DATABASE_NAME = "wifi_scanner.db";
         private static final int DATABASE_VERSION = 6; // Motion analysis fields
-        private static final String CREATE_WIFI_TABLE = "CREATE TABLE wifi_data (" +
+        private static final String CREATE_WIFI_TABLE = "CREATE TABLE IF NOT EXISTS wifi_data (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "ssid TEXT, " +
                 "bssid TEXT, " +
@@ -4734,8 +5009,8 @@ public class MainActivity extends AppCompatActivity {
                 "latitude REAL, " +
                 "longitude REAL, " +
                 "timestamp INTEGER)";
-        
-        private static final String CREATE_DEVICE_TABLE = "CREATE TABLE device_data (" +
+
+        private static final String CREATE_DEVICE_TABLE = "CREATE TABLE IF NOT EXISTS device_data (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "device_name TEXT, " +
                 "device_address TEXT, " +

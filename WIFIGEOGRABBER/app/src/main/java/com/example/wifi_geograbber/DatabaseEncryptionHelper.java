@@ -496,49 +496,65 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
      * Decrypt database (convert encrypted to unencrypted)
      * WARNING: This removes encryption protection!
      */
-    public static boolean decryptDatabase(Context context, String encryptedDbPath, 
+    public static boolean decryptDatabase(Context context, String encryptedDbPath,
                                          String unencryptedDbPath, String passphrase) {
         SQLiteDatabase encryptedDb = null;
         android.database.sqlite.SQLiteDatabase unencryptedDb = null;
-        
+
         try {
             Log.i(TAG, "Decrypting database");
-            
+
+            // Check if database is actually encrypted before attempting to decrypt
+            File dbFile = new File(encryptedDbPath);
+            if (!isDatabaseEncrypted(dbFile)) {
+                Log.w(TAG, "Database is not encrypted, cannot decrypt");
+                return false;
+            }
+
             SQLiteDatabase.loadLibs(context);
-            
+
+            // Convert passphrase to correct format if it's a hex key
+            String formattedPassphrase = passphrase;
+            if (passphrase != null && passphrase.length() == 64 && passphrase.matches("[0-9a-fA-F]+")) {
+                formattedPassphrase = "x'" + passphrase + "'";
+                Log.d(TAG, "Using hex key format for decryption");
+            } else {
+                Log.d(TAG, "Using raw passphrase for decryption");
+            }
+
             // Open encrypted database
             encryptedDb = SQLiteDatabase.openDatabase(
-                encryptedDbPath, passphrase, null, SQLiteDatabase.OPEN_READONLY);
-            
+                encryptedDbPath, formattedPassphrase, null, SQLiteDatabase.OPEN_READONLY);
+
             // Create unencrypted database
             File unencryptedFile = new File(unencryptedDbPath);
             if (unencryptedFile.exists()) {
                 unencryptedFile.delete();
             }
-            
+
             unencryptedDb = android.database.sqlite.SQLiteDatabase.openOrCreateDatabase(
                 unencryptedFile, null);
-            
+
             // Create tables
             unencryptedDb.execSQL(CREATE_WIFI_TABLE);
             unencryptedDb.execSQL(CREATE_DEVICE_TABLE);
-            
+
             // Copy data
             if (hasTable(encryptedDb, "wifi_data")) {
                 Cursor cursor = encryptedDb.rawQuery("SELECT * FROM wifi_data", null);
                 copyTableDataToStandardSQLite(cursor, unencryptedDb, "wifi_data");
                 cursor.close();
             }
-            
+
             if (hasTable(encryptedDb, "device_data")) {
                 Cursor cursor = encryptedDb.rawQuery("SELECT * FROM device_data", null);
                 copyTableDataToStandardSQLite(cursor, unencryptedDb, "device_data");
                 cursor.close();
             }
-            
+
             Log.i(TAG, "Database decrypted successfully");
             return true;
-            
+
         } catch (Exception e) {
             Log.e(TAG, "Error decrypting database", e);
             return false;
