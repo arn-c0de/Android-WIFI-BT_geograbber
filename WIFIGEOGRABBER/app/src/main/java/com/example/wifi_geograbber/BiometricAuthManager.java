@@ -182,28 +182,16 @@ public class BiometricAuthManager {
                             Cipher authenticatedCipher = cryptoObject != null ? cryptoObject.getCipher() : cipher;
                             
                             byte[] iv = authenticatedCipher.getIV();
-                            
-                            // DEBUG: Log passphrase being stored
-                            String testHash = testHashPassphrase(passphrase);
-                            Log.d(TAG, "Storing passphrase for biometric - length: " + passphrase.length 
-                                + ", test hash preview: " + testHash);
-                            
+
                             // CRITICAL: Trim the passphrase to remove any whitespace
                             String passphraseStr = new String(passphrase).trim();
-                            Log.d(TAG, "Passphrase to encrypt - length: " + passphraseStr.length() 
-                                + ", first char code: " + (passphraseStr.length() > 0 ? (int)passphraseStr.charAt(0) : -1));
-                            
+
                             byte[] plaintextBytes = passphraseStr.getBytes(StandardCharsets.UTF_8);
-                            Log.d(TAG, "Plaintext bytes to encrypt: " + plaintextBytes.length);
-                            
                             byte[] encryptedData = authenticatedCipher.doFinal(plaintextBytes);
-                            Log.d(TAG, "Encrypted data bytes: " + encryptedData.length);
-                            
+
                             String encryptedB64 = Base64.encodeToString(encryptedData, Base64.NO_WRAP);
                             String ivB64 = Base64.encodeToString(iv, Base64.NO_WRAP);
-                            
-                            Log.d(TAG, "Storing Base64 - IV length: " + ivB64.length() + ", Encrypted length: " + encryptedB64.length());
-                            
+
                             // Store encrypted passphrase and IV
                             SharedPreferences.Editor editor = prefs.edit();
                             editor.putString(KEY_ENCRYPTED_PASSPHRASE_BIO, encryptedB64);
@@ -304,20 +292,15 @@ public class BiometricAuthManager {
             
             String ivStr = prefs.getString(KEY_IV_BIO, null);
             String encryptedPassphraseStr = prefs.getString(KEY_ENCRYPTED_PASSPHRASE_BIO, null);
-            
-            // DEBUG: Log what we're retrieving
-            Log.d(TAG, "Retrieving biometric data - IV length: " + (ivStr != null ? ivStr.length() : 0) 
-                + ", Encrypted data length: " + (encryptedPassphraseStr != null ? encryptedPassphraseStr.length() : 0));
-            
+
             if (ivStr == null || encryptedPassphraseStr == null) {
-                Log.e(TAG, "Biometric data missing - IV: " + (ivStr != null) + ", Encrypted: " + (encryptedPassphraseStr != null));
+                Log.e(TAG, "Biometric data missing");
                 callback.onAuthenticationError("Biometric data corrupted");
                 return;
             }
-            
+
             byte[] iv = Base64.decode(ivStr, Base64.NO_WRAP);
             byte[] encryptedBytes = Base64.decode(encryptedPassphraseStr, Base64.NO_WRAP);
-            Log.d(TAG, "Decoded data - IV bytes: " + iv.length + ", Encrypted bytes: " + encryptedBytes.length);
             
             // Initialize cipher for decryption
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
@@ -347,20 +330,15 @@ public class BiometricAuthManager {
                             if (cryptoObject != null && cryptoObject.getCipher() != null) {
                                 Cipher authCipher = cryptoObject.getCipher();
                                 byte[] encryptedBytes = Base64.decode(encryptedPassphraseStr, Base64.NO_WRAP);
-                                
-                                Log.d(TAG, "About to decrypt " + encryptedBytes.length + " bytes");
+
                                 byte[] decryptedData = authCipher.doFinal(encryptedBytes);
-                                Log.d(TAG, "Decrypted " + decryptedData.length + " bytes");
-                                
+
                                 // CRITICAL: Trim to remove any whitespace
                                 String passphraseStr = new String(decryptedData, StandardCharsets.UTF_8);
-                                Log.d(TAG, "Decrypted string before trim - length: " + passphraseStr.length() 
-                                    + ", first char code: " + (passphraseStr.length() > 0 ? (int)passphraseStr.charAt(0) : -1));
-                                
                                 passphraseStr = passphraseStr.trim();
                                 char[] passphrase = passphraseStr.toCharArray();
-                                
-                                Log.i(TAG, "Biometric authentication successful - decrypted passphrase length: " + passphrase.length);
+
+                                Log.i(TAG, "Biometric authentication successful");
                                 
                                 // Clear sensitive data
                                 Arrays.fill(decryptedData, (byte) 0);

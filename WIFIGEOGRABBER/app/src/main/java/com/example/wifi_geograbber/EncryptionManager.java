@@ -45,9 +45,10 @@ public class EncryptionManager {
     private static final String KEY_SALT = "passphrase_salt";
     private static final String KEY_IV = "encryption_iv";
     private static final String KEY_FAILED_ATTEMPTS = "failed_attempts";
-    
+
     private static final int GCM_TAG_LENGTH = 128;
     private static final int MAX_FAILED_ATTEMPTS = 5;
+    private static final int MIN_PASSPHRASE_LENGTH = 12; // OWASP recommendation
     
     private final Context context;
     private final SharedPreferences prefs;
@@ -79,6 +80,53 @@ public class EncryptionManager {
     public boolean isPassphraseCached() {
         return cachedPassphrase != null && cachedPassphrase.length > 0;
     }
+
+    /**
+     * Validate passphrase strength
+     * @param passphrase Passphrase to validate
+     * @return null if valid, error message if invalid
+     */
+    public static String validatePassphraseStrength(char[] passphrase) {
+        if (passphrase == null) {
+            return "Passphrase cannot be null";
+        }
+
+        if (passphrase.length < MIN_PASSPHRASE_LENGTH) {
+            return "Passphrase must be at least " + MIN_PASSPHRASE_LENGTH + " characters";
+        }
+
+        boolean hasUppercase = false;
+        boolean hasLowercase = false;
+        boolean hasDigit = false;
+        boolean hasSpecial = false;
+
+        for (char c : passphrase) {
+            if (Character.isUpperCase(c)) {
+                hasUppercase = true;
+            } else if (Character.isLowerCase(c)) {
+                hasLowercase = true;
+            } else if (Character.isDigit(c)) {
+                hasDigit = true;
+            } else if (!Character.isWhitespace(c)) {
+                hasSpecial = true;
+            }
+        }
+
+        if (!hasUppercase) {
+            return "Passphrase must contain at least one uppercase letter";
+        }
+        if (!hasLowercase) {
+            return "Passphrase must contain at least one lowercase letter";
+        }
+        if (!hasDigit) {
+            return "Passphrase must contain at least one digit";
+        }
+        if (!hasSpecial) {
+            return "Passphrase must contain at least one special character";
+        }
+
+        return null; // Valid
+    }
     
     /**
      * Set up encryption with a new passphrase
@@ -86,8 +134,9 @@ public class EncryptionManager {
      * @return true if setup successful
      */
     public boolean setupEncryption(char[] passphrase) {
-        if (passphrase == null || passphrase.length < 6) {
-            Log.e(TAG, "Passphrase too short (minimum 6 characters)");
+        String validationError = validatePassphraseStrength(passphrase);
+        if (validationError != null) {
+            Log.e(TAG, "Passphrase validation failed: " + validationError);
             return false;
         }
         
@@ -154,11 +203,7 @@ public class EncryptionManager {
             
             // Verify passphrase
             String inputHash = hashPassphrase(passphrase, salt);
-            
-            Log.d(TAG, "Unlock attempt - passphrase length: " + passphrase.length + 
-                      ", input hash preview: " + inputHash.substring(0, Math.min(16, inputHash.length())) + 
-                      ", stored hash preview: " + storedHash.substring(0, Math.min(16, storedHash.length())));
-            
+
             if (!MessageDigest.isEqual(inputHash.getBytes(), storedHash.getBytes())) {
                 Log.w(TAG, "Invalid passphrase");
                 return false;
@@ -242,11 +287,7 @@ public class EncryptionManager {
             
             // First verify hash (quick check)
             String inputHash = hashPassphrase(passphrase, salt);
-            
-            Log.d(TAG, "Testing passphrase - length: " + passphrase.length + 
-                      ", input hash preview: " + inputHash.substring(0, Math.min(16, inputHash.length())) + 
-                      ", stored hash preview: " + storedHash.substring(0, Math.min(16, storedHash.length())));
-            
+
             if (!MessageDigest.isEqual(inputHash.getBytes(), storedHash.getBytes())) {
                 Log.w(TAG, "Hash mismatch - passphrase incorrect");
                 return false;
@@ -397,7 +438,7 @@ public class EncryptionManager {
         // Use PBKDF2WithHmacSHA256 for key derivation (stronger than SHA1)
         // SQLCipher supports SHA256 and it's recommended for modern security
         SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-        PBEKeySpec spec = new PBEKeySpec(passphrase, salt, 64000, 256); // 64000 iterations, 256-bit key
+        PBEKeySpec spec = new PBEKeySpec(passphrase, salt, 600000, 256); // 600000 iterations (OWASP 2023 recommendation), 256-bit key
         SecretKey secretKey = factory.generateSecret(spec);
         byte[] keyBytes = secretKey.getEncoded();
 
@@ -548,7 +589,6 @@ public class EncryptionManager {
     public void incrementFailedAttempts() {
         int attempts = prefs.getInt(KEY_FAILED_ATTEMPTS, 0);
         prefs.edit().putInt(KEY_FAILED_ATTEMPTS, attempts + 1).apply();
-        Log.w(TAG, "Failed attempts: " + (attempts + 1) + "/" + MAX_FAILED_ATTEMPTS);
     }
     
     /**

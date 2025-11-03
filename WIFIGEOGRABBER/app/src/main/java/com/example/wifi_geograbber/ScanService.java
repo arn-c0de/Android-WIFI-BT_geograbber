@@ -270,21 +270,9 @@ public class ScanService extends Service {
         try {
             java.io.File dbFile = getDatabasePath("wifi_scanner.db");
 
-            // Delete main database file
-            if (dbFile.exists()) {
-                boolean deleted = dbFile.delete();
-                Log.d("ScanService", "Deleted old database file: " + deleted);
-            }
-
-            // Delete associated files
-            java.io.File journalFile = new java.io.File(dbFile.getAbsolutePath() + "-journal");
-            if (journalFile.exists()) journalFile.delete();
-
-            java.io.File walFile = new java.io.File(dbFile.getAbsolutePath() + "-wal");
-            if (walFile.exists()) walFile.delete();
-
-            java.io.File shmFile = new java.io.File(dbFile.getAbsolutePath() + "-shm");
-            if (shmFile.exists()) shmFile.delete();
+            // Securely delete database and associated files
+            boolean deleted = SecureFileDelete.secureDatabaseDelete(dbFile);
+            Log.d("ScanService", "Securely deleted database files: " + deleted);
 
         } catch (Exception e) {
             Log.e("ScanService", "Error deleting database files: " + e.getMessage());

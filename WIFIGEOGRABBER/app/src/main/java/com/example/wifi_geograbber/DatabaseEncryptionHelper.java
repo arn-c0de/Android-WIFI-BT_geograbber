@@ -229,11 +229,9 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
         
         try {
             boolean dbExists = dbFile.exists() && dbFile.length() > 0;
-            
-            Log.d(TAG, "Opening encrypted database at: " + dbFile.getAbsolutePath());
-            Log.d(TAG, "Database file exists: " + dbExists + 
-                     (dbExists ? ", size: " + dbFile.length() + " bytes" : ""));
-            
+
+            Log.d(TAG, "Opening encrypted database");
+
             SQLiteDatabase db = getWritableDatabase(passphrase);
             
             if (db != null) {
@@ -241,22 +239,10 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
                 if (db.isReadOnly()) {
                     Log.w(TAG, "Database is readonly, closing and recreating...");
                     db.close();
-                    
-                    // Delete the readonly database file
-                    if (dbFile.exists()) {
-                        dbFile.delete();
-                    }
-                    
-                    // Delete associated files
-                    File journalFile = new File(dbFile.getAbsolutePath() + "-journal");
-                    if (journalFile.exists()) journalFile.delete();
-                    
-                    File walFile = new File(dbFile.getAbsolutePath() + "-wal");
-                    if (walFile.exists()) walFile.delete();
-                    
-                    File shmFile = new File(dbFile.getAbsolutePath() + "-shm");
-                    if (shmFile.exists()) shmFile.delete();
-                    
+
+                    // Securely delete the readonly database file and associated files
+                    SecureFileDelete.secureDatabaseDelete(dbFile);
+
                     // Create new writable database
                     db = getWritableDatabase(passphrase);
                     Log.d(TAG, "Created new writable encrypted database");
@@ -292,28 +278,10 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
                 Log.w(TAG, "Database file corrupted or incompatible. Creating new database...");
                 
                 try {
-                    // Delete corrupted database file and associated files
-                    if (dbFile.exists()) {
-                        Log.d(TAG, "Deleting corrupted database file");
-                        dbFile.delete();
-                    }
-                    
-                    // Delete journal files
-                    File journalFile = new File(dbFile.getAbsolutePath() + "-journal");
-                    if (journalFile.exists()) {
-                        journalFile.delete();
-                    }
-                    
-                    File walFile = new File(dbFile.getAbsolutePath() + "-wal");
-                    if (walFile.exists()) {
-                        walFile.delete();
-                    }
-                    
-                    File shmFile = new File(dbFile.getAbsolutePath() + "-shm");
-                    if (shmFile.exists()) {
-                        shmFile.delete();
-                    }
-                    
+                    // Securely delete corrupted database file and associated files
+                    Log.d(TAG, "Deleting corrupted database file");
+                    SecureFileDelete.secureDatabaseDelete(dbFile);
+
                     Log.d(TAG, "Creating new encrypted database...");
                     // Try to create new database
                     SQLiteDatabase newDb = getWritableDatabase(passphrase);
@@ -344,7 +312,7 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
                 return null;
             }
 
-            Log.d(TAG, "Opening encrypted database in readonly mode at: " + dbFile.getAbsolutePath());
+            Log.d(TAG, "Opening encrypted database in readonly mode");
 
             // Open database in readonly mode
             SQLiteDatabase db = SQLiteDatabase.openDatabase(
@@ -474,16 +442,28 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
         SQLiteDatabase db = null;
         try {
             Log.i(TAG, "Changing database encryption key");
-            
+
             // Open with old passphrase
             db = SQLiteDatabase.openDatabase(dbPath, oldPassphrase, null, SQLiteDatabase.OPEN_READWRITE);
-            
-            // Change key using SQLCipher PRAGMA
-            db.rawExecSQL("PRAGMA rekey = '" + newPassphrase.replace("'", "''") + "'");
-            
+
+            // Change key using SQLCipher PRAGMA with proper hex format to prevent SQL injection
+            // Convert passphrase to hex format if needed
+            String rekeyValue;
+            if (newPassphrase != null && newPassphrase.length() == 64 && newPassphrase.matches("[0-9a-fA-F]+")) {
+                // Already hex format
+                rekeyValue = "x'" + newPassphrase + "'";
+            } else {
+                // For non-hex passphrases, use SQLCipher's quoted string format
+                // Note: This is less secure than hex keys but required for user passphrases
+                rekeyValue = "'" + newPassphrase.replace("'", "''") + "'";
+            }
+
+            // Use PRAGMA rekey with properly formatted value
+            db.rawExecSQL("PRAGMA rekey = " + rekeyValue);
+
             Log.i(TAG, "Database encryption key changed successfully");
             return true;
-            
+
         } catch (Exception e) {
             Log.e(TAG, "Error changing encryption key", e);
             return false;

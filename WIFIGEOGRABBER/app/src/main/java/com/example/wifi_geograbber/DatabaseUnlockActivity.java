@@ -52,6 +52,13 @@ public class DatabaseUnlockActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Prevent screenshots and screen recording of sensitive unlock screen
+        getWindow().setFlags(
+            android.view.WindowManager.LayoutParams.FLAG_SECURE,
+            android.view.WindowManager.LayoutParams.FLAG_SECURE
+        );
+
         setContentView(R.layout.activity_database_unlock);
         
         // Initialize managers
