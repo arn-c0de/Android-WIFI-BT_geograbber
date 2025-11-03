@@ -36,7 +36,7 @@
 
 ---
 
-⚠️ **Python Integration Notice (v1.0.4)**
+⚠️ **Python Integration Notice (v1.0.5)**
 
 - ✅ On Linux, databases can currently be loaded and visualized.  
 - ⚠️ Passphrase unlocking is buggy: correct passphrases may be rejected.  
