@@ -82,9 +82,9 @@
 
 ## 🎯 Overview
 
-WiFi & Bluetooth GeoGrabber is a powerful geolocation tool for Android, designed as a modern **Wardriving App**. It scans for nearby WiFi networks and Bluetooth devices, records their signal strength and location, and visualizes the collected data on an interactive map. 
+WiFi & Bluetooth GeoGrabber is a powerful geolocation tool for Android, designed as a modern **Wardriving App**. It scans for nearby WiFi networks and Bluetooth devices, records their signal strength and location, and visualizes the collected data on an interactive map.
 
-**Detected networks and devices are shown live on the map within the app.** All scan results are saved in a local SQLite database (`.db`), which can be exported and loaded both on Android and on your PC for further analysis. 
+**Detected networks and devices are shown live on the map within the app.** All scan results are saved in a local SQLite database (`.db`), which can be exported and loaded both on Android and on your PC for further analysis.
 
 On Android, you can view, filter, and manage the data directly in the app. For advanced analysis and visualization, simply transfer the `.db` file to your PC and use the included Python tools to merge, plot, and explore your scan data interactively.
 
@@ -132,6 +132,12 @@ GeoGrabber is ideal for network analysis, signal mapping, and understanding wire
 - 🔄 **Database Migration** – Seamless conversion from unencrypted to encrypted databases
 - 💾 **Encrypted Import/Export** – Full support for encrypted database files
 - 🎯 **Zero-Knowledge Design** – Passphrases never logged or transmitted
+- 🗑️ **Secure File Deletion** – Files deleted with 3-pass overwrite (DoD 5220.22-M standard)
+- 🕵️ **Automatic Log Removal** – Sensitive logs removed in release builds
+- 🛡️ **R8 Code Obfuscation** – Comprehensive ProGuard rules for code protection
+- 🔒 **Enhanced Passphrase Complexity** – Minimum 12 characters, must include uppercase, lowercase, digits, and special characters
+- 🖼️ **Screenshot Protection** – FLAG_SECURE prevents screenshots in unlock activity
+- 📁 **Improved Temp File Security** – Temporary files stored in getFilesDir() instead of getCacheDir()
 - 📖 **[Encryption Guide](docs/quickstart/database_encryption_quickstart.md)** – Complete setup and usage instructions
 
 ### 📋 Network Information Captured

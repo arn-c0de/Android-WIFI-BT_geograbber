@@ -4,35 +4,34 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.5] – 2025-11-03
 
-### 🛡️ Security Fixes
-  **Critical & High Priority Fixes:**
-  - Removed all sensitive debug logs (passphrase lengths, hash
-  previews, encryption details)
-  - Fixed SQL injection vulnerability in PRAGMA rekey with secure hex
-   key formatting
-  - Increased PBKDF2 iterations from 64,000 to 600,000 (OWASP 2023
-  standard)
-  - Implemented secure file deletion with 3-pass overwrite (DoD
-  5220.22-M standard)
-  - Enabled R8 code obfuscation with comprehensive ProGuard rules
-  - Added automatic log removal in release builds
 
-  **Medium Priority Fixes:**
-  - Enhanced passphrase complexity requirements (12+ chars with
-  uppercase, lowercase, digits, special chars)
-  - Added FLAG_SECURE to DatabaseUnlockActivity to prevent
-  screenshots
-  - Changed temp file storage from getCacheDir() to getFilesDir() for
-   better security
+### 🛡️ Security & Privacy
+**Critical & High Priority:**
+- Removed all sensitive debug logs (passphrase lengths, hash previews, encryption details)
+- Fixed SQL injection vulnerability in PRAGMA rekey (secure hex key formatting)
+- Increased PBKDF2 iterations from 64,000 to 600,000 (OWASP 2023 standard)
+- Implemented secure file deletion (3-pass overwrite, DoD 5220.22-M)
+- Enabled R8 code obfuscation (comprehensive ProGuard rules)
+- Automatic log removal in release builds
 
-  **New Files:**
-  - SecureFileDelete.java - Secure file deletion utility
-  - proguard-rules.pro - Comprehensive R8 obfuscation configuration
+**Medium Priority:**
+- Enhanced passphrase complexity (12+ chars, uppercase, lowercase, digits, special chars)
+- FLAG_SECURE added to DatabaseUnlockActivity (prevents screenshots)
+- Temp file storage moved from getCacheDir() to getFilesDir() for better security
 
-  **Security Score Improvement:**
-  - Before: 5/10 (MEDIUM RISK)
-  - After: 8.3/10 (LOW RISK)
-  - 28 of 35 vulnerabilities fixed (80%)
+
+### 🗺️ Map & UI Improvements
+- Marker icons now colored by category: Bluetooth (blue), WiFi open (red), WiFi encrypted (orange)
+- New filter option: "Show Marker Circles" lets users toggle circles around markers on/off in the map filter panel
+
+### 🆕 New Files & Configurations
+- SecureFileDelete.java (secure file deletion utility)
+- proguard-rules.pro (R8 obfuscation configuration)
+
+### 📈 Security Score
+- Before: 5/10 (MEDIUM RISK)
+- After: 8.3/10 (LOW RISK)
+- 28 of 35 vulnerabilities fixed (80%)
 
 
 

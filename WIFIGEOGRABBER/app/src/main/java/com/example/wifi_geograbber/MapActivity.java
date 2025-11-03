@@ -772,6 +772,12 @@ public class MapActivity extends AppCompatActivity {
             "            Signal Weak (<-70 dBm)\n" +
             "        </label>\n" +
             "        <hr style='margin: 10px 0;'>\n" +
+            "        <h4 style='margin: 5px 0; font-size: 13px;'>Display Options</h4>\n" +
+            "        <label class='filter-checkbox'>\n" +
+            "            <input type='checkbox' id='show_circles' onchange='toggleCircles()' checked>\n" +
+            "            Show Marker Circles\n" +
+            "        </label>\n" +
+            "        <hr style='margin: 10px 0;'>\n" +
             "        <button class='filter-action-btn' onclick='toggleAllFilters(true)'>All On</button>\n" +
             "        <button class='filter-action-btn' onclick='toggleAllFilters(false)'>All Off</button>\n" +
             "        <hr style='margin: 10px 0;'>\n" +
@@ -826,8 +832,34 @@ public class MapActivity extends AppCompatActivity {
             "    let userMarker = null;\n" +
             "    let currentCenter = null;\n" +
             "    let currentZoom = 15;\n" +
+            "    let showCircles = true; // Flag to control circle visibility\n" +
             "    const savedFilters = " + filterJson + ";\n" +
             "    const savedCenter = " + centerJson + ";\n" +
+            "        \n" +
+            "        function toggleCircles() {\n" +
+            "            const checkbox = document.getElementById('show_circles');\n" +
+            "            showCircles = checkbox.checked;\n" +
+            "            \n" +
+            "            // Toggle visibility of all circles\n" +
+            "            allCircles.forEach((circle, index) => {\n" +
+            "                if (showCircles) {\n" +
+            "                    // Only show circles for visible markers\n" +
+            "                    const marker = allMarkers[index];\n" +
+            "                    if (marker && map.hasLayer(marker)) {\n" +
+            "                        if (!map.hasLayer(circle)) {\n" +
+            "                            map.addLayer(circle);\n" +
+            "                        }\n" +
+            "                    }\n" +
+            "                } else {\n" +
+            "                    // Hide all circles\n" +
+            "                    if (map.hasLayer(circle)) {\n" +
+            "                        map.removeLayer(circle);\n" +
+            "                    }\n" +
+            "                }\n" +
+            "            });\n" +
+            "            \n" +
+            "            console.log('Circles visibility toggled:', showCircles);\n" +
+            "        }\n" +
             "        \n" +
             "        function initializeMap(devices) {\n" +
             "            deviceData = devices;\n" +
@@ -995,19 +1027,23 @@ public class MapActivity extends AppCompatActivity {
             "                deviceFilterMap.set(device.address, filterClasses);\n" +
             "                \n" +
             "                // Icon and color\n" +
-            "                let iconColor, iconName;\n" +
+            "                // Bluetooth: Blue | WiFi Open: Red | WiFi Encrypted: Orange\n" +
+            "                let iconColor, markerIcon;\n" +
             "                if (device.type === 'WIFI') {\n" +
             "                    if (device.encryption === 'open') {\n" +
-            "                        iconColor = 'red';\n" +
+            "                        iconColor = 'red';  // Open WiFi: Red\n" +
+            "                        markerIcon = L.divIcon({html: '<span style=\"color:red;font-size:22px;\">&#9679;</span>', className: '', iconSize: [22,22]});\n" +
             "                    } else {\n" +
-            "                        iconColor = 'green';\n" +
+            "                        iconColor = 'orange';  // Encrypted WiFi: Orange\n" +
+            "                        markerIcon = L.divIcon({html: '<span style=\"color:orange;font-size:22px;\">&#9679;</span>', className: '', iconSize: [22,22]});\n" +
             "                    }\n" +
             "                } else {\n" +
-            "                    iconColor = 'blue';\n" +
+            "                    iconColor = 'blue';  // Bluetooth: Blue\n" +
+            "                    markerIcon = L.divIcon({html: '<span style=\"color:blue;font-size:22px;\">&#9679;</span>', className: '', iconSize: [22,22]});\n" +
             "                }\n" +
             "                \n" +
             "                // Create marker (don't add to map yet - updateMarkerVisibility will do it)\n" +
-            "                let marker = L.marker([device.lat, device.lon]);\n" +
+            "                let marker = L.marker([device.lat, device.lon], {icon: markerIcon});\n" +
             "                \n" +
             "                // Popup content\n" +
             "                let popupContent = `\n" +
@@ -1089,7 +1125,7 @@ public class MapActivity extends AppCompatActivity {
             "                    }\n" +
             "                });\n" +
             "                allCircles.forEach((circle, index) => {\n" +
-            "                    if (highlightedMarkerIndices.has(index)) {\n" +
+            "                    if (highlightedMarkerIndices.has(index) && showCircles) {\n" +
             "                        if (!map.hasLayer(circle)) {\n" +
             "                            map.addLayer(circle);\n" +
             "                            console.log('Added highlighted circle', index);\n" +
@@ -1116,7 +1152,9 @@ public class MapActivity extends AppCompatActivity {
             "                \n" +
             "                if (shouldShow) {\n" +
             "                    if (!map.hasLayer(marker)) map.addLayer(marker);\n" +
-            "                    if (!map.hasLayer(circle)) map.addLayer(circle);\n" +
+            "                    // Only show circle if showCircles is enabled\n" +
+            "                    if (showCircles && !map.hasLayer(circle)) map.addLayer(circle);\n" +
+            "                    else if (!showCircles && map.hasLayer(circle)) map.removeLayer(circle);\n" +
             "                } else {\n" +
             "                    if (map.hasLayer(marker)) map.removeLayer(marker);\n" +
             "                    if (map.hasLayer(circle)) map.removeLayer(circle);\n" +
