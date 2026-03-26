@@ -6,20 +6,18 @@
 ![Status](https://img.shields.io/badge/status-Active-success)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/arn-c0de/Android-WIFI-BT_geograbber)
 
-📚 **[Documentation](docs/)** · 🚀 **[Database Combiner Guide](docs/quickstart/database_combiner_quickstart.md)** · 🗺️ **[Map Viewer Guide](docs/quickstart/map_viewer_quickstart.md)** · 📁 **[Project Structure](PROJECT_STRUCTURE.md)** · 📂 **[Detailed Structure](docs/project-structure/PROJECT_STRUCTURE.md)** · � **[Changelog](CHANGELOG.md)** · 🤝 **[Contributing](CONTRIBUTING.md)** · 🔒 **[Security](SECURITY.md)** · 📜 **[Code of Conduct](CODE_OF_CONDUCT.md)**
+**[Documentation](docs/)** · **[Database Combiner Guide](docs/quickstart/database_combiner_quickstart.md)** · **[Map Viewer Guide](docs/quickstart/map_viewer_quickstart.md)** · **[Project Structure](PROJECT_STRUCTURE.md)** · **[Detailed Structure](docs/project-structure/PROJECT_STRUCTURE.md)** · **[Changelog](CHANGELOG.md)** · **[Contributing](CONTRIBUTING.md)** · **[Security](SECURITY.md)** · **[Code of Conduct](CODE_OF_CONDUCT.md)**
 
-## [🌐 Project Website](https://arn-c0de.github.io/Geograbber)
+## [Project Website](https://arn-c0de.github.io/Geograbber)
 
 <div align="left" style="display:flex;align-items:center;gap:16px;">
    <img src="images/logo.png" alt="GeoGrabber Logo" width="96" height="96" style="vertical-align:middle; margin-right:12px;" />
    <div style="display:flex;flex-direction:column;justify-content:center;">
-      <h1 style="margin:0; padding:0; font-size:2em; line-height:1.1;">📡 WiFi & Bluetooth GeoGrabber</h1>
+      <h1 style="margin:0; padding:0; font-size:2em; line-height:1.1;">WiFi & Bluetooth GeoGrabber</h1>
       <span style="font-size:1.1em; color:#555; font-weight:bold;">Professional Geolocation & Signal Mapping</span>
-      
-<div align="left">
-  <b>Scan, Map, and Analyze WiFi Networks & Bluetooth Devices with GPS Precision</b>
-</div>
-
+      <div align="left">
+         <b>Scan, Map, and Analyze WiFi Networks & Bluetooth Devices with GPS Precision</b>
+      </div>
    </div>
 </div>
 
@@ -29,27 +27,25 @@
 
 ---
 
-   > **Project Status Notice**
-   >
-   > This is a very early stage of the program. While it is already functional, it is based on an older project that I have recently resumed. Therefore, extensive refactoring and further development are still required. Expect ongoing changes and improvements as work continues.
-
+> **Project Status Notice**
+>
+> This is a very early stage of the program. While it is already functional, it is based on an older project that has recently been resumed. Extensive refactoring and further development are still required. Expect ongoing changes and improvements as work continues.
 
 ---
 
-⚠️ **Python Integration Notice (v1.0.5)**
+**Python Integration Notice (v1.0.5)**
 
-- ✅ On Linux, databases can currently be loaded and visualized.  
-- ⚠️ Passphrase unlocking is buggy: correct passphrases may be rejected.  
-- ⚠️ On Windows, sqlcypher and passphrase issues still persist.  
+- On Linux, databases can currently be loaded and visualized.
+- Passphrase unlocking is buggy: correct passphrases may be rejected.
+- On Windows, SQLCipher and passphrase issues persist.
 
 > Additional development is required to implement full SQLCipher support and reliable key handling.
 
-➡️ **Workaround:** To use without encryption, please use version **1.0.2**.
-
+**Workaround:** To use without encryption, please use version **1.0.2**.
 
 ---
 
-## 🤝 Contribute to GeoGrabber!
+## Contribute to GeoGrabber!
 
 > **We welcome your ideas, bug reports, and feature requests!**
 
@@ -61,26 +57,26 @@
 
 ---
 
-## 📖 Table of Contents
+## Table of Contents
 
-- [Overview](#-overview)
-- [Features](#-features)
-- [Screenshots](#-screenshots)
-- [Requirements](#-requirements)
-- [Installation](#-installation)
-- [Usage](#-usage)
-- [Python Tools](#-python-tools)
-- [Technical Details](#-technical-details)
-- [Privacy & Ethics](#-privacy--ethics)
-- [Known Limitations](#-known-limitations)
-- [Project Structure](#-project-structure)
-- [Contributing](#-contributing)
-- [License](#-license)
-- [Disclaimer](#-disclaimer)
+- [Overview](#overview)
+- [Features](#features)
+- [Screenshots](#screenshots)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Python Tools](#python-tools)
+- [Technical Details](#technical-details)
+- [Privacy & Ethics](#privacy--ethics)
+- [Known Limitations](#known-limitations)
+- [Project Structure](#project-structure)
+- [Contributing](#contributing)
+- [License](#license)
+- [Disclaimer](#disclaimer)
 
 ---
 
-## 🎯 Overview
+## Overview
 
 WiFi & Bluetooth GeoGrabber is a powerful geolocation tool for Android, designed as a modern **Wardriving App**. It scans for nearby WiFi networks and Bluetooth devices, records their signal strength and location, and visualizes the collected data on an interactive map.
 
@@ -92,57 +88,60 @@ GeoGrabber is ideal for network analysis, signal mapping, and understanding wire
 
 > **Note:** This app is intended for legal, ethical wardriving, educational purposes, and authorized network analysis only. Please respect privacy laws and only scan networks in areas where you have permission.
 
-## ✨ Features
+---
 
-### 📡 Network Scanning
+## Features
 
-- 🔍 **WiFi Network Scanning** – Continuous or on-demand WiFi network detection
-- 📶 **Bluetooth Device Scanning** – Detect nearby Bluetooth devices (Classic and BLE)
-- ⚙️ **Background Scanning** – Service-based scanning that runs in the background
-- 📊 **Signal Strength Tracking** – Records RSSI (signal strength) for each device
+### Network Scanning
 
-### 🗺️ Location & Mapping
+- **WiFi Network Scanning** – Continuous or on-demand WiFi network detection
+- **Bluetooth Device Scanning** – Detect nearby Bluetooth devices (Classic and BLE)
+- **Background Scanning** – Service-based scanning that runs in the background
+- **Signal Strength Tracking** – Records RSSI (signal strength) for each device
 
-- 📍 **GPS Integration** – Records precise GPS coordinates for each scan
-   - 🌐 **Interactive Map** – Visualize collected data on a Leaflet-based web map
-   - 🌓 **Dark Mode Toggle** – Switch between light and dark map styles (OSM/CartoDB)
-   - 🖍️ **Persistent Map Style** – User map style choice is saved and restored
-   - 🔍 **Location Filtering** – View devices within specific geographic boundaries
-   - 🎯 **Live Location** – Center map on your current GPS position (auto-tracking, keeps user zoom)
-   - 🛑 **Live Location Auto-Off** – Live location tracking disables when jumping to search result
-   - 📍 **Custom Location Marker** – Your position is shown as a red dot
-   - 🧹 **Filter Popup UX** – Filter popup can be closed by clicking on the map
-   - 🖤 **Improved Search Bar** – Search bar text is now black for better readability
+### Location & Mapping
 
-### 💾 Data Management
+- **GPS Integration** – Records precise GPS coordinates for each scan
+- **Interactive Map** – Visualize collected data on a Leaflet-based web map
+- **Dark Mode Toggle** – Switch between light and dark map styles (OSM/CartoDB)
+- **Persistent Map Style** – User map style choice is saved and restored
+- **Location Filtering** – View devices within specific geographic boundaries
+- **Live Location** – Center map on your current GPS position (auto-tracking, keeps user zoom)
+- **Live Location Auto-Off** – Live location tracking disables when jumping to search result
+- **Custom Location Marker** – Your position is shown as a red dot
+- **Filter Popup UX** – Filter popup can be closed by clicking on the map
+- **Improved Search Bar** – Search bar text is now black for better readability
 
-- 🗄️ **SQLite Database** – Stores all scanned networks and devices locally
-- � **Database Encryption** – AES-256 encryption with SQLCipher (optional)
-- �💼 **Data Export** – Save database as a file for backup or analysis
-- 📥 **Data Import** – Load external databases to view or merge data (supports encrypted databases)
-- 📊 **Database Statistics** – View total counts of WiFi networks and Bluetooth devices
-- 🗑️ **Clear Database** – Delete all stored data when needed
+### Data Management
 
-### 🔐 Security Features
+- **SQLite Database** – Stores all scanned networks and devices locally
+- **Database Encryption** – AES-256 encryption with SQLCipher (optional)
+- **Data Export** – Save database as a file for backup or analysis
+- **Data Import** – Load external databases to view or merge data (supports encrypted databases)
+- **Database Statistics** – View total counts of WiFi networks and Bluetooth devices
+- **Clear Database** – Delete all stored data when needed
 
-- 🛡️ **AES-256 Encryption** – Database encryption using SQLCipher
-- 🔑 **Android Keystore Integration** – Hardware-backed secure passphrase storage
-- 🔐 **Passphrase Protection** – User-controlled encryption with customizable passphrase
-- 🧬 **Biometric Unlock (NEW)** – Unlock your encrypted database instantly using fingerprint or face authentication. Passphrase is securely stored with Android Keystore and never leaves the device. Biometric unlock uses the same passphrase as manual login for maximum security and reliability.
-- 🔄 **Database Migration** – Seamless conversion from unencrypted to encrypted databases
-- 💾 **Encrypted Import/Export** – Full support for encrypted database files
-- 🎯 **Zero-Knowledge Design** – Passphrases never logged or transmitted
-- 🗑️ **Secure File Deletion** – Files deleted with 3-pass overwrite (DoD 5220.22-M standard)
-- 🕵️ **Automatic Log Removal** – Sensitive logs removed in release builds
-- 🛡️ **R8 Code Obfuscation** – Comprehensive ProGuard rules for code protection
-- 🔒 **Enhanced Passphrase Complexity** – Minimum 12 characters, must include uppercase, lowercase, digits, and special characters
-- 🖼️ **Screenshot Protection** – FLAG_SECURE prevents screenshots in unlock activity
-- 📁 **Improved Temp File Security** – Temporary files stored in getFilesDir() instead of getCacheDir()
-- 📖 **[Encryption Guide](docs/quickstart/database_encryption_quickstart.md)** – Complete setup and usage instructions
+### Security Features
 
-### 📋 Network Information Captured
+- **AES-256 Encryption** – Database encryption using SQLCipher
+- **Android Keystore Integration** – Hardware-backed secure passphrase storage
+- **Passphrase Protection** – User-controlled encryption with customizable passphrase
+- **Biometric Unlock** – Unlock your encrypted database instantly using fingerprint or face authentication. Passphrase is securely stored with Android Keystore and never leaves the device. Biometric unlock uses the same passphrase as manual login for maximum security and reliability.
+- **Database Migration** – Seamless conversion from unencrypted to encrypted databases
+- **Encrypted Import/Export** – Full support for encrypted database files
+- **Zero-Knowledge Design** – Passphrases never logged or transmitted
+- **Secure File Deletion** – Files deleted with 3-pass overwrite (DoD 5220.22-M standard)
+- **Automatic Log Removal** – Sensitive logs removed in release builds
+- **R8 Code Obfuscation** – Comprehensive ProGuard rules for code protection
+- **Enhanced Passphrase Complexity** – Minimum 12 characters, must include uppercase, lowercase, digits, and special characters
+- **Screenshot Protection** – FLAG_SECURE prevents screenshots in unlock activity
+- **Improved Temp File Security** – Temporary files stored in getFilesDir() instead of getCacheDir()
+- **[Encryption Guide](docs/quickstart/database_encryption_quickstart.md)** – Complete setup and usage instructions
+
+### Network Information Captured
 
 **WiFi Networks:**
+
 | Property | Description |
 |----------|-------------|
 | SSID | Network Name |
@@ -156,6 +155,7 @@ GeoGrabber is ideal for network analysis, signal mapping, and understanding wire
 | Timestamp | Scan date & time |
 
 **Bluetooth Devices:**
+
 | Property | Description |
 |----------|-------------|
 | Device Name | Bluetooth device name |
@@ -165,8 +165,9 @@ GeoGrabber is ideal for network analysis, signal mapping, and understanding wire
 | GPS Coordinates | Latitude & Longitude |
 | Timestamp | Scan date & time |
 
+---
 
-## 📸 Screenshots
+## Screenshots
 
 <div align="center">
   <img src="images/screenshots/Screenshot_lock.png" alt="GeoGrabber Lock Screen v1.0.4" width="300" style="display:inline-block;" />
@@ -176,16 +177,16 @@ GeoGrabber is ideal for network analysis, signal mapping, and understanding wire
 
 **Screenshot Description:**
 
-   - *WiFi Scanning Starten*: Start WiFi scanning
-   - *BT AUS*: Bluetooth scanning off
-   - *Show Data*: View all scanned data
-   - *More*: Access advanced features
+- *WiFi Scanning Starten*: Start WiFi scanning
+- *BT AUS*: Bluetooth scanning off
+- *Show Data*: View all scanned data
+- *More*: Access advanced features
 
 The screenshot above demonstrates the main scanning interface, live network list, and debug log. The app provides real-time updates and easy access to mapping and data management features.
 
 ---
 
-## 📋 Requirements
+## Requirements
 
 ### System Requirements
 
@@ -214,18 +215,17 @@ The screenshot above demonstrates the main scanning interface, live network list
 
 ---
 
-## 📦 Installation
+## Installation
 
-
-> **⚠️ Note (October 2025):**
-> 
+> **Note (October 2025):**
+>
 > There are currently issues with automatic dependency installation via the setup scripts (`setup.bat` / `setup.sh`) due to network or PyPI problems. This will be fixed soon. In the meantime, you can manually install the required Python packages in your virtual environment:
 >
 > **Manual Installation:**
 > 1. Activate your virtual environment:
 >    - Windows: `venv\Scripts\activate.bat` or `venv\Scripts\Activate.ps1`
 >    - Linux: `source venv/bin/activate`
-> 2. Download the required wheel files for each package (e.g. from https://pypi.org/project/folium/#files and https://pypi.org/project/branca/#files).
+> 2. Download the required wheel files for each package (e.g., from [PyPI](https://pypi.org)).
 > 3. Install them manually:
 >    ```
 >    pip install path/to/folium-*.whl
@@ -235,10 +235,6 @@ The screenshot above demonstrates the main scanning interface, live network list
 > 4. If you encounter further dependency errors, download and install those packages in the same way.
 >
 > The setup scripts will be updated soon for improved reliability.
-
-
-
-
 
 ### Option 1: Build from Source (Recommended)
 
@@ -281,17 +277,17 @@ cd Geograbber
 2. **Enable Location** – Ensure GPS is enabled for accurate coordinates
 3. **Enable Bluetooth** – Required for Bluetooth device scanning
 
-### 🔐 Secret Management
+### Secret Management
 
 For API key management, environment variables, and security best practices:
-- **Quick Setup**: [Secret Management Quick Start](./SECRET_MANAGEMENT_QUICKSTART.md) (5-minute guide)
-- **Full Documentation**: [Secret Management Guide](./docs/security/SECRET_MANAGEMENT.md)
+- **Quick Setup**: [Secret Management Quick Start](SECRET_MANAGEMENT_QUICKSTART.md) (5-minute guide)
+- **Full Documentation**: [Secret Management Guide](docs/security/SECRET_MANAGEMENT.md)
 
-**Note**: Currently, the project works 100% offline and requires no API keys. The secret management system is provided for future extensibility.
+> **Note:** Currently, the project works 100% offline and requires no API keys. The secret management system is provided for future extensibility.
 
 ---
 
-## 💡 Usage
+## Usage
 
 ### Basic Scanning
 
@@ -333,15 +329,15 @@ Tap "Show Map" → Visualize collected data on interactive map
 
 | Option | Description |
 |--------|-------------|
-| 💾 **Save Database** | Export database as file for backup |
-| 🗑️ **Delete Database** | Clear all stored data |
-| 📊 **Show Network Count** | Display statistics (WiFi + Bluetooth) |
-| 📥 **Import Database** | Load external database for analysis |
-| 📋 **Show Data** | View all stored networks and devices |
+| **Save Database** | Export database as file for backup |
+| **Delete Database** | Clear all stored data |
+| **Show Network Count** | Display statistics (WiFi + Bluetooth) |
+| **Import Database** | Load external database for analysis |
+| **Show Data** | View all stored networks and devices |
 
 ---
 
-## 🐍 Python Tools
+## Python Tools
 
 The project includes Python scripts for advanced data analysis and visualization:
 
@@ -357,7 +353,7 @@ cd Python
 python start_combine_dbs.py
 ```
 
-📚 **[Database Combiner Quickstart](docs/quickstart/database_combiner_quickstart.md)**
+**[Database Combiner Quickstart](docs/quickstart/database_combiner_quickstart.md)**
 
 ### Map Viewer (Plot GUI)
 
@@ -371,17 +367,17 @@ cd Python
 python start_plot_gui.py
 ```
 
-📚 **[Map Viewer Quickstart](docs/quickstart/map_viewer_quickstart.md)**
+**[Map Viewer Quickstart](docs/quickstart/map_viewer_quickstart.md)**
 
 **Features:**
-- 🗺️ Interactive map with multiple layers
-- 🔍 Filter by signal strength, device type, time range
-- 📊 Statistical analysis of collected data
-- 💾 Export filtered data to CSV/JSON
+- Interactive map with multiple layers
+- Filter by signal strength, device type, time range
+- Statistical analysis of collected data
+- Export filtered data to CSV/JSON
 
 ---
 
-## 🏗️ Technical Details
+## Technical Details
 
 ### Architecture Overview
 
@@ -403,11 +399,12 @@ python start_plot_gui.py
 │  Data Layer                                             │
 │  ├─ SQLite Database                                     │
 │  ├─ Database Helper                                     │
-│  └─ Data Models                                         │      
+│  └─ Data Models                                         │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
-- 🔒 **[SHA-256 Checksum Verification](docs/security/SHA256_CHECKSUM_VERIFICATION.md)** – Database integrity & security
+
+- **[SHA-256 Checksum Verification](docs/security/SHA256_CHECKSUM_VERIFICATION.md)** – Database integrity & security
 
 ### Technology Stack
 
@@ -466,18 +463,18 @@ CREATE TABLE device_data (
 
 ---
 
-## 🔒 Privacy & Ethics
+## Privacy & Ethics
 
 ### Intended Use Cases
 
-✅ **Allowed:**
+**Allowed:**
 - Personal network analysis
 - Educational purposes
 - WiFi coverage mapping for home/office
 - Authorized security testing
 - Research and development
 
-❌ **Not Allowed:**
+**Not Allowed:**
 - Unauthorized surveillance
 - Network attacks or hacking
 - Privacy invasion
@@ -485,19 +482,19 @@ CREATE TABLE device_data (
 
 ### Important Notes
 
-⚠️ **Legal Considerations:**
+**Legal Considerations:**
 - Only scan networks in areas where you have permission
 - Respect privacy laws and regulations in your jurisdiction
 - The app only collects publicly broadcasted network information
 - Some jurisdictions may restrict passive WiFi/Bluetooth scanning
 
-⚠️ **Ethical Guidelines:**
+**Ethical Guidelines:**
 - Do not use this app to track individuals without consent
 - Do not attempt to connect to networks you don't own
 - Respect others' privacy and security
 - Use responsibly and legally
 
-🛡️ **Data Security:**
+**Data Security:**
 - All data is stored locally on your device
 - No data is transmitted to external servers
 - You have full control over your collected data
@@ -505,7 +502,7 @@ CREATE TABLE device_data (
 
 ---
 
-## ⚠️ Known Limitations
+## Known Limitations
 
 ### Android Platform Restrictions
 
@@ -531,152 +528,22 @@ CREATE TABLE device_data (
 - Background scanning may stop on low battery
 - Network density affects scan speed
 
-
-📘 **[View Detailed Structure](PROJECT_STRUCTURE.md)** – Complete file tree, database schema, and technical details
-
----
-
-## 🤝 Contributing
-
-We welcome contributions from the community! Here's how you can help:
-
-### Ways to Contribute
-
-| Type | Description |
-|------|-------------|
-| 🐛 **Bug Reports** | Found a bug? Open an issue with details |
-| 💡 **Feature Requests** | Have an idea? Suggest new features |
-| 📝 **Documentation** | Improve docs, add tutorials |
-| 🔧 **Code Contributions** | Submit pull requests |
-| 🌐 **Translations** | Help translate the app |
-
-### Development Workflow
-
-1. **Fork the Repository**
-   ```bash
-   # Click 'Fork' on GitHub
-   git clone https://github.com/arn-c0de/Geograbber.git
-   cd Geograbber
-   ```
-
-2. **Create a Feature Branch**
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-
-3. **Make Your Changes**
-   - Follow Java coding conventions
-   - Add comments and documentation
-   - Test thoroughly on multiple devices
-
-4. **Commit Your Changes**
-   ```bash
-   git add .
-   git commit -m "Add amazing feature: [description]"
-   ```
-
-5. **Push to Your Fork**
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-
-6. **Create a Pull Request**
-   - Go to the original repository
-   - Click "New Pull Request"
-   - Describe your changes in detail
-
-### Coding Standards
-
-- ✅ Follow Java naming conventions
-- ✅ Use meaningful variable/method names
-- ✅ Add JavaDoc comments for public methods
-- ✅ Keep methods focused and concise
-- ✅ Handle exceptions appropriately
-- ✅ Test on Android 6.0+ devices
-
-### Reporting Issues
-
-When reporting bugs, please include:
-- Android version
-- Device model
-- Steps to reproduce
-- Expected vs actual behavior
-- Screenshots (if applicable)
-- Logcat output (if available)
+**[View Detailed Structure](PROJECT_STRUCTURE.md)** – Complete file tree, database schema, and technical details
 
 ---
 
+## Contributing
 
-## 📄 License
-
-This project is licensed under the **GeoGrabber License (Non-Commercial)**.
-
-You are free to use, modify, and share this software for **personal, educational, and research purposes only**. Commercial use, resale, or distribution for profit is **strictly prohibited** without explicit written permission from the project maintainer.
-
-See the [LICENSE](LICENSE) file for full terms and conditions.
+We welcome contributions! Please see our **[Contributing Guide](CONTRIBUTING.md)** for more details.
 
 ---
 
-## ⚠️ Disclaimer
+## License
 
-**IMPORTANT LEGAL NOTICE:**
-
-This application is provided **"AS IS"** for educational and research purposes only. The developers and contributors:
-
-- ❌ Are **NOT responsible** for any misuse of this application
-- ❌ Do **NOT encourage** unauthorized network scanning or surveillance
-- ❌ Do **NOT guarantee** accuracy of collected data
-- ❌ Are **NOT liable** for any legal consequences of use
-
-**Users are solely responsible for:**
-- ✅ Ensuring compliance with local laws and regulations
-- ✅ Obtaining proper authorization before scanning networks
-- ✅ Using the app ethically and responsibly
-- ✅ Respecting privacy rights of others
-
-**By using this application, you agree to:**
-- Only scan networks you own or have explicit permission to scan
-- Comply with all applicable laws in your jurisdiction
-- Use the app for legitimate purposes only
-- Not use the app for illegal surveillance or network attacks
+This project is licensed under a **Non-Commercial License**. See **[LICENSE](LICENSE)** for details.
 
 ---
 
-## 📞 Contact
+## Disclaimer
 
-
-**Project Maintainer:** arn-c0de
-
-| Contact Method | Link |
-|----------------|------|
-| 🐛 **Issues** | [GitHub Issues](https://github.com/arn-c0de/Geograbber/issues) |
-| 💬 **Discussions** | [GitHub Discussions](https://github.com/arn-c0de/Geograbber/discussions) |
-| 📧 **Email** | arn-c0de@protonmail.com |
-| 🌐 **Website** |  |
-
----
-
-## 🙏 Acknowledgments
-
-This project is built with the help of:
-
-- **[Android Open Source Project](https://source.android.com/)** – Android framework
-- **[Leaflet.js](https://leafletjs.com/)** – Interactive mapping library
-- **[OpenStreetMap](https://www.openstreetmap.org/)** – Map tile provider
-- **[Google Play Services](https://developers.google.com/android/guides/overview)** – Location services
-- **Community Contributors** – Thank you to all contributors!
-
-### Special Thanks
-
-- WiFi Scanner community for best practices
-- Stack Overflow contributors for solutions
-- Beta testers for valuable feedback
-
----
-
-
-
-<div align="center">
-  <p>⭐ Star this repo if you find it useful!</p>
-  <p><i>Last Updated: October 30, 2025</i></p>
-</div>
+This software is provided "as is" without warranty of any kind. Use at
