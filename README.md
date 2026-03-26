@@ -41,8 +41,6 @@
 
 > Additional development is required to implement full SQLCipher support and reliable key handling.
 
-**Workaround:** To use without encryption, please use version **1.0.2**.
-
 ---
 
 ## Contribute to GeoGrabber!
