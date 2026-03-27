@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.6] – 2026-03-27
+
+### Map Performance (Issue #27)
+- Leaflet.markercluster: clusters markers at low zoom
+- Canvas renderer for all markers and circles (5-10x faster, no DOM nodes per marker)
+- Circles hidden at zoom < 16, auto-shown at zoom >= 16
+- Lazy popups: HTML built on click only
+- Markers uncluster automatically at zoom >= 18
+
+### Database
+- DB stored in `getExternalFilesDir` — survives Studio reinstalls
+- Auto-migrates existing internal DB on first launch
+
+### Other
+- Added `SearchResultsActivity`
+- Fixed location button height in map layout
+
+---
+
 ## [1.0.5] – 2025-11-03
 
 
