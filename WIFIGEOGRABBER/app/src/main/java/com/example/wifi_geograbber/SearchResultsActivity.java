@@ -23,7 +23,7 @@ public class SearchResultsActivity extends AppCompatActivity {
     private Button backButton;
     private Button showAllOnMapButton;
     
-    private List<DeviceData> searchResults;
+    private List<MapActivity.DeviceData> searchResults;
     private String searchQuery;
 
     @Override
@@ -41,7 +41,7 @@ public class SearchResultsActivity extends AppCompatActivity {
         // Get search results from intent
         Intent intent = getIntent();
         if (intent != null && intent.hasExtra("search_results") && intent.hasExtra("search_query")) {
-            searchResults = (List<DeviceData>) intent.getSerializableExtra("search_results");
+            searchResults = intent.getParcelableArrayListExtra("search_results");
             searchQuery = intent.getStringExtra("search_query");
         }
 
@@ -59,7 +59,7 @@ public class SearchResultsActivity extends AppCompatActivity {
 
         // Create and set adapter
         List<String> resultStrings = new ArrayList<>();
-        for (DeviceData device : searchResults) {
+        for (MapActivity.DeviceData device : searchResults) {
             String name = device.name != null && !device.name.isEmpty() ? device.name : "[Hidden/Unknown]";
             String type = device.type != null && device.type.equals("WIFI") ? "📶" : "🔵";
             String signal = device.signal + " dBm";
@@ -88,7 +88,7 @@ public class SearchResultsActivity extends AppCompatActivity {
 
         // Set item click listener to zoom to specific device
         resultsListView.setOnItemClickListener((parent, view, position, id) -> {
-            DeviceData selectedDevice = searchResults.get(position);
+            MapActivity.DeviceData selectedDevice = searchResults.get(position);
             Intent resultIntent = new Intent();
             resultIntent.putExtra("zoom_to_device", true);
             resultIntent.putExtra("device_address", selectedDevice.address);

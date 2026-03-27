@@ -98,7 +98,7 @@ public class MapActivity extends AppCompatActivity {
             | View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
     
     // Data class for devices
-    public static class DeviceData {
+    public static class DeviceData implements android.os.Parcelable {
         public String name;
         public String address;
         public String type;
@@ -120,6 +120,66 @@ public class MapActivity extends AppCompatActivity {
         public double movementDistance;
         
         public DeviceData() {}
+        
+        protected DeviceData(android.os.Parcel in) {
+            name = in.readString();
+            address = in.readString();
+            type = in.readString();
+            signal = in.readInt();
+            encryption = in.readString();
+            lat = in.readDouble();
+            lon = in.readDouble();
+            timestamp = in.readLong();
+            vendor = in.readString();
+            frequency = in.readInt();
+            channel = in.readInt();
+            standard = in.readString();
+            channelWidth = in.readInt();
+            maxSpeed = in.readInt();
+            lastSeenLat = in.readDouble();
+            lastSeenLon = in.readDouble();
+            lastSeenTimestamp = in.readLong();
+            movementDistance = in.readDouble();
+        }
+        
+        @Override
+        public void writeToParcel(android.os.Parcel dest, int flags) {
+            dest.writeString(name);
+            dest.writeString(address);
+            dest.writeString(type);
+            dest.writeInt(signal);
+            dest.writeString(encryption);
+            dest.writeDouble(lat);
+            dest.writeDouble(lon);
+            dest.writeLong(timestamp);
+            dest.writeString(vendor);
+            dest.writeInt(frequency);
+            dest.writeInt(channel);
+            dest.writeString(standard);
+            dest.writeInt(channelWidth);
+            dest.writeInt(maxSpeed);
+            dest.writeDouble(lastSeenLat);
+            dest.writeDouble(lastSeenLon);
+            dest.writeLong(lastSeenTimestamp);
+            dest.writeDouble(movementDistance);
+        }
+        
+        @Override
+        public int describeContents() {
+            return 0;
+        }
+        
+        public static final android.os.Parcelable.Creator<DeviceData> CREATOR = new android.os.Parcelable.Creator<DeviceData>() {
+            @Override
+            public DeviceData createFromParcel(android.os.Parcel in) {
+                return new DeviceData(in);
+            }
+            
+            @Override
+            public DeviceData[] newArray(int size) {
+                return new DeviceData[size];
+            }
+        };
         
         public JSONObject toJSON() throws JSONException {
             JSONObject json = new JSONObject();
@@ -1659,9 +1719,9 @@ public class MapActivity extends AppCompatActivity {
             // Search in the entire database, not just current viewport
             try {
                 String safeQuery = sanitizeForLogging(query);
-                String sqlQuery = "SELECT device_address, device_name, device_type, latitude, longitude, vendor " +
+                String sqlQuery = "SELECT device_address, device_name, device_type, latitude, longitude, vendor_info " +
                                   "FROM device_data WHERE " +
-                                  "(device_name LIKE ? OR device_address LIKE ? OR vendor LIKE ?) " +
+                                  "(device_name LIKE ? OR device_address LIKE ? OR vendor_info LIKE ?) " +
                                   "AND latitude != 0 AND longitude != 0 " +
                                   "LIMIT 100";
                 
@@ -1821,10 +1881,10 @@ public class MapActivity extends AppCompatActivity {
         // Try device_data table
         try {
             android.database.Cursor cursor = null;
-            String sql = "SELECT name, address, type, signal, encryption, latitude, longitude, timestamp, " +
-                        "COALESCE(vendor, ''), COALESCE(frequency, 0), COALESCE(channel, 0), COALESCE(standard, ''), " +
-                        "COALESCE(channel_width, 0), COALESCE(max_speed, 0) " +
-                        "FROM device_data WHERE LOWER(name) LIKE ? OR LOWER(address) LIKE ? OR LOWER(vendor) LIKE ?";
+            String sql = "SELECT device_name, device_address, device_type, signal_strength, encryption_info, latitude, longitude, timestamp, " +
+                        "COALESCE(vendor_info, ''), COALESCE(frequency, 0), COALESCE(channel, 0), COALESCE(wifi_standard, ''), " +
+                        "COALESCE(channel_width, 0), COALESCE(max_connection_speed, 0) " +
+                        "FROM device_data WHERE LOWER(device_name) LIKE ? OR LOWER(device_address) LIKE ? OR LOWER(vendor_info) LIKE ?";
             
             Log.d("MapActivity", "Executing query: " + sql);
             
@@ -1870,9 +1930,9 @@ public class MapActivity extends AppCompatActivity {
         try {
             android.database.Cursor cursor = null;
             String sql = "SELECT ssid, bssid, 'WIFI' as type, signal_strength, encryption, latitude, longitude, timestamp, " +
-                        "COALESCE(vendor, ''), COALESCE(frequency, 0), COALESCE(channel, 0), COALESCE(standard, ''), " +
-                        "COALESCE(channel_width, 0), COALESCE(max_speed, 0) " +
-                        "FROM wifi_data WHERE LOWER(ssid) LIKE ? OR LOWER(bssid) LIKE ? OR LOWER(vendor) LIKE ?";
+                        "COALESCE(vendor_info, ''), COALESCE(frequency, 0), COALESCE(channel, 0), COALESCE(wifi_standard, ''), " +
+                        "COALESCE(channel_width, 0), COALESCE(max_connection_speed, 0) " +
+                        "FROM wifi_data WHERE LOWER(ssid) LIKE ? OR LOWER(bssid) LIKE ? OR LOWER(vendor_info) LIKE ?";
             
             if (isDatabaseEncrypted) {
                 net.sqlcipher.database.SQLiteDatabase sqlCipherDb = (net.sqlcipher.database.SQLiteDatabase) database;
@@ -1881,7 +1941,7 @@ public class MapActivity extends AppCompatActivity {
                 android.database.sqlite.SQLiteDatabase stdDb = (android.database.sqlite.SQLiteDatabase) database;
                 cursor = stdDb.rawQuery(sql, new String[]{"%" + lowerQuery + "%", "%" + lowerQuery + "%", "%" + lowerQuery + "%"});
             }
-            
+
             if (cursor != null) {
                 Log.d("MapActivity", "wifi_data query returned " + cursor.getCount() + " rows");
                 while (cursor.moveToNext()) {
@@ -1928,6 +1988,7 @@ public class MapActivity extends AppCompatActivity {
         Intent intent = new Intent(this, SearchResultsActivity.class);
         intent.putExtra("search_results", new java.util.ArrayList<>(results));
         intent.putExtra("search_query", query);
+        isInternalNavigation = true; // Prevent re-authentication when returning
         startActivityForResult(intent, SEARCH_RESULTS_REQUEST_CODE);
     }
     
@@ -2276,8 +2337,11 @@ public class MapActivity extends AppCompatActivity {
                 finish();
             }
         }
-        else if (requestCode == SEARCH_RESULTS_REQUEST_CODE && resultCode == RESULT_OK) {
-            if (data != null) {
+        else if (requestCode == SEARCH_RESULTS_REQUEST_CODE) {
+            // Reset internal navigation flag when returning from search results
+            isInternalNavigation = false;
+            
+            if (resultCode == RESULT_OK && data != null) {
                 if (data.hasExtra("zoom_to_device")) {
                     // Zoom to specific device
                     String deviceAddress = data.getStringExtra("device_address");
