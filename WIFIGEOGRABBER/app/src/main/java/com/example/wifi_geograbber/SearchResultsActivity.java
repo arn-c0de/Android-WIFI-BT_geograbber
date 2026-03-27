@@ -1,8 +1,10 @@
 package com.example.wifi_geograbber;
 
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -57,21 +59,42 @@ public class SearchResultsActivity extends AppCompatActivity {
         searchQueryText.setText(searchQuery);
         resultsCountText.setText(searchResults.size() + " results found for: " + searchQuery);
 
-        // Create and set adapter
+        // Create and set adapter with custom layout for better visibility
         List<String> resultStrings = new ArrayList<>();
         for (MapActivity.DeviceData device : searchResults) {
             String name = device.name != null && !device.name.isEmpty() ? device.name : "[Hidden/Unknown]";
-            String type = device.type != null && device.type.equals("WIFI") ? "📶" : "🔵";
+            String type = device.type != null && device.type.equals("WIFI") ? "📶 " : "🔵 ";
             String signal = device.signal + " dBm";
             String location = String.format("%.6f, %.6f", device.lat, device.lon);
             String vendor = device.vendor != null && !device.vendor.isEmpty() ? device.vendor : "Unknown";
             
-            resultStrings.add(String.format("%s %s\n%s | %s\n%s | %s", 
+            resultStrings.add(String.format("%s%s\n%s | %s\n%s | %s", 
                 type, name, device.address, signal, vendor, location));
         }
 
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, 
             android.R.layout.simple_list_item_1, resultStrings);
+        
+        // Set custom text appearance to ensure visibility on white background
+        TextView textView = new TextView(this);
+        textView.setTextColor(Color.BLACK);
+        textView.setTextSize(16);
+        textView.setPadding(16, 16, 16, 16);
+        
+        // Use custom adapter with proper text color
+        adapter = new ArrayAdapter<>(this, 
+            android.R.layout.simple_list_item_1, 
+            android.R.id.text1, 
+            resultStrings) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                TextView textView = view.findViewById(android.R.id.text1);
+                textView.setTextColor(Color.BLACK);
+                textView.setTextSize(16);
+                return view;
+            }
+        };
         resultsListView.setAdapter(adapter);
 
         // Set up click listeners

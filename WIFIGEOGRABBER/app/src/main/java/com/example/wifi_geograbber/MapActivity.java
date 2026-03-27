@@ -2362,7 +2362,7 @@ public class MapActivity extends AppCompatActivity {
                 } 
                 else if (data.hasExtra("show_all_results")) {
                     // Show all search results on map
-                    java.util.List<DeviceData> searchResults = (java.util.List<DeviceData>) data.getSerializableExtra("search_results");
+                    java.util.List<DeviceData> searchResults = data.getParcelableArrayListExtra("search_results");
                     showAllSearchResultsOnMap(searchResults);
                 }
             }
