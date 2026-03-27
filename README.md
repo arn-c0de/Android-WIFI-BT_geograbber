@@ -165,7 +165,7 @@ GeoGrabber is ideal for network analysis, signal mapping, and understanding wire
 
 ---
 
-## ScOHNEreenshots
+## Screenshots
 
 <div align="center">
   <img src="images/screenshots/Screenshot_lock.png" alt="GeoGrabber Lock Screen v1.0.4" width="300" style="display:inline-block;" />
