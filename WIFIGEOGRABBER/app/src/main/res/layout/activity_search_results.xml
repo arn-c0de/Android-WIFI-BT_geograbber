@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#f5f5f5">
+
+    <!-- Toolbar with back button and title -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#0A0A2A"
+        android:padding="12dp"
+        android:gravity="center_vertical">
+
+        <Button
+            android:id="@+id/back_button"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:text="←"
+            android:textSize="18sp"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#1a1a3a"
+            android:paddingHorizontal="16dp"/>
+
+        <TextView
+            android:id="@+id/title_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Search Results"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:layout_marginStart="12dp"/>
+    </LinearLayout>
+
+    <!-- Search bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:background="#e0e0e0"
+        android:padding="8dp">
+
+        <EditText
+            android:id="@+id/search_query_text"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_weight="1"
+            android:hint="Search query"
+            android:textColor="#000000"
+            android:background="@android:drawable/editbox_background"
+            android:padding="8dp"
+            android:inputType="text"
+            android:enabled="false"/>
+
+        <Button
+            android:id="@+id/show_all_on_map_button"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:text="Show All on Map"
+            android:textColor="#FFFFFF"
+            android:backgroundTint="#0A0A2A"
+            android:layout_marginStart="8dp"
+            android:paddingHorizontal="12dp"/>
+    </LinearLayout>
+
+    <!-- Results count -->
+    <TextView
+        android:id="@+id/results_count_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="0 results found"
+        android:textColor="#666666"
+        android:textSize="14sp"
+        android:padding="12dp"
+        android:background="#ffffff"/>
+
+    <!-- Results list -->
+    <ListView
+        android:id="@+id/results_list"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:divider="@android:color/darker_gray"
+        android:dividerHeight="1dp"
+        android:background="#ffffff"/>
+
+</LinearLayout>

@@ -10,6 +10,7 @@ import net.sqlcipher.database.SQLiteOpenHelper;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
 
 /**
  * DatabaseEncryptionHelper - Manages encrypted SQLite databases using SQLCipher
@@ -82,7 +83,7 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
             "movement_distance REAL)";
     
     public DatabaseEncryptionHelper(Context context, String passphrase) {
-        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+        super(context, getDbFile(context, DATABASE_NAME).getAbsolutePath(), null, DATABASE_VERSION);
         this.context = context;
         // Ensure passphrase is in the correct format for SQLCipher
         // If it's a hex string (64 chars), wrap it in x'...'
@@ -671,9 +672,50 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
      * Get database file path
      */
     public String getDatabasePath() {
-        return context.getDatabasePath(DATABASE_NAME).getAbsolutePath();
+        return getDbFile(context, DATABASE_NAME).getAbsolutePath();
     }
-    
+
+    /**
+     * Returns the database File in external app-specific storage so it survives
+     * Studio reinstalls (adb install -r). Falls back to internal storage if
+     * external storage is unavailable.
+     *
+     * Also migrates an existing internal-storage database on first call.
+     */
+    public static File getDbFile(Context context, String dbName) {
+        File extDir = context.getExternalFilesDir("databases");
+        if (extDir != null) {
+            extDir.mkdirs();
+            File extDb = new File(extDir, dbName);
+            if (!extDb.exists()) {
+                // One-time migration from internal storage
+                File intDb = new File(context.getApplicationInfo().dataDir + "/databases/" + dbName);
+                if (intDb.exists()) {
+                    try {
+                        copyFile(intDb, extDb);
+                        Log.i(TAG, "Migrated " + dbName + " → external storage");
+                    } catch (IOException e) {
+                        Log.w(TAG, "DB migration skipped: " + e.getMessage());
+                    }
+                }
+            }
+            return extDb;
+        }
+        // External storage unavailable — use internal path directly
+        return new File(context.getApplicationInfo().dataDir + "/databases/" + dbName);
+    }
+
+    private static void copyFile(File src, File dst) throws IOException {
+        try (FileInputStream in = new FileInputStream(src);
+             FileOutputStream out = new FileOutputStream(dst)) {
+            byte[] buf = new byte[8192];
+            int len;
+            while ((len = in.read(buf)) > 0) {
+                out.write(buf, 0, len);
+            }
+        }
+    }
+
     /**
      * Clear passphrase from memory
      */

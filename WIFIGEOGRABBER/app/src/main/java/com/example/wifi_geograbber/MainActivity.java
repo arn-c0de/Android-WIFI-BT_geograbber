@@ -34,6 +34,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -50,6 +51,15 @@ public class MainActivity extends AppCompatActivity {
      * Use this variable to visually distinguish code versions.
      */
     public static final String APP_VERSION = "1.0.5";
+
+    /**
+     * Redirect all database files to external app-specific storage so they
+     * survive Studio reinstalls (adb install -r).
+     */
+    @Override
+    public File getDatabasePath(String name) {
+        return DatabaseEncryptionHelper.getDbFile(this, name);
+    }
     private WifiManager wifiManager;
     private LocationManager locationManager;
     private BluetoothAdapter bluetoothAdapter;
@@ -5138,7 +5148,7 @@ public class MainActivity extends AppCompatActivity {
                 "movement_distance REAL)";          // Motion analysis: Distance between first and last position
 
         DatabaseHelper(Context context) {
-            super(context, DATABASE_NAME, null, DATABASE_VERSION);
+            super(context, DatabaseEncryptionHelper.getDbFile(context, DATABASE_NAME).getAbsolutePath(), null, DATABASE_VERSION);
         }
 
         @Override

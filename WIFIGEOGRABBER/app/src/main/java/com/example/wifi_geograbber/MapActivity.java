@@ -60,6 +60,7 @@ public class MapActivity extends AppCompatActivity {
     private android.widget.LinearLayout searchBarLayout;
     private FusedLocationProviderClient fusedLocationClient;
     private static final int LOCATION_PERMISSION_REQUEST_CODE = 1001;
+    private static final int SEARCH_RESULTS_REQUEST_CODE = 1002;
     private android.widget.TextView dbStatusText;
     private List<DeviceData> deviceList;
     private boolean isMapInitialized = false;
@@ -662,6 +663,8 @@ public class MapActivity extends AppCompatActivity {
             "    <meta name='viewport' content='width=device-width, initial-scale=1.0'>\n" +
             "    <title>" + getString(R.string.wifi_bluetooth_map) + "</title>\n" +
             "    <link rel='stylesheet' href='https://unpkg.com/leaflet@1.7.1/dist/leaflet.css' />\n" +
+            "    <link rel='stylesheet' href='https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css' />\n" +
+            "    <link rel='stylesheet' href='https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css' />\n" +
             "    <style>\n" +
             "        body { margin: 0; padding: 0; }\n" +
             "        #map { height: 100vh; width: 100vw; }\n" +
@@ -800,6 +803,7 @@ public class MapActivity extends AppCompatActivity {
             "    </div>\n" +
             "    \n" +
             "    <script src='https://unpkg.com/leaflet@1.7.1/dist/leaflet.js'></script>\n" +
+            "    <script src='https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js'></script>\n" +
             "    <script>\n" +
             "    function toggleFilterContainer() {\n" +
             "        var content = document.getElementById('filterContent');\n" +
@@ -842,32 +846,25 @@ public class MapActivity extends AppCompatActivity {
             "    let currentCenter = null;\n" +
             "    let currentZoom = 15;\n" +
             "    let showCircles = true; // Flag to control circle visibility\n" +
+            "    let markerCluster = null;\n" +
+            "    let canvasRenderer = null;\n" +
             "    const savedFilters = " + filterJson + ";\n" +
             "    const savedCenter = " + centerJson + ";\n" +
             "        \n" +
             "        function toggleCircles() {\n" +
-            "            const checkbox = document.getElementById('show_circles');\n" +
-            "            showCircles = checkbox.checked;\n" +
-            "            \n" +
-            "            // Toggle visibility of all circles\n" +
-            "            allCircles.forEach((circle, index) => {\n" +
-            "                if (showCircles) {\n" +
-            "                    // Only show circles for visible markers\n" +
-            "                    const marker = allMarkers[index];\n" +
-            "                    if (marker && map.hasLayer(marker)) {\n" +
-            "                        if (!map.hasLayer(circle)) {\n" +
-            "                            map.addLayer(circle);\n" +
-            "                        }\n" +
-            "                    }\n" +
+            "            showCircles = document.getElementById('show_circles').checked;\n" +
+            "            updateCircleVisibilityForZoom();\n" +
+            "        }\n" +
+            "        \n" +
+            "        function updateCircleVisibilityForZoom() {\n" +
+            "            const shouldShow = showCircles && map && map.getZoom() >= 16;\n" +
+            "            allCircles.forEach(circle => {\n" +
+            "                if (shouldShow) {\n" +
+            "                    if (!map.hasLayer(circle)) map.addLayer(circle);\n" +
             "                } else {\n" +
-            "                    // Hide all circles\n" +
-            "                    if (map.hasLayer(circle)) {\n" +
-            "                        map.removeLayer(circle);\n" +
-            "                    }\n" +
+            "                    if (map.hasLayer(circle)) map.removeLayer(circle);\n" +
             "                }\n" +
             "            });\n" +
-            "            \n" +
-            "            console.log('Circles visibility toggled:', showCircles);\n" +
             "        }\n" +
             "        \n" +
             "        function initializeMap(devices) {\n" +
@@ -896,8 +893,8 @@ public class MapActivity extends AppCompatActivity {
             "            \n" +
             "            map.on('zoomend', function() {\n" +
             "                currentZoom = map.getZoom();\n" +
-            "                // Performance optimization: Send bounding box to Android\n" +
-            "                setTimeout(notifyAndroidOfViewportChange, 200); // Debounce\n" +
+            "                updateCircleVisibilityForZoom();\n" +
+            "                setTimeout(notifyAndroidOfViewportChange, 200);\n" +
             "            });\n" +
             "            \n" +
             "            // Close filter panel when clicking on map\n" +
@@ -913,6 +910,16 @@ public class MapActivity extends AppCompatActivity {
             "            L.tileLayer('" + tileLayerUrl + "', {\n" +
             "                attribution: '" + tileLayerAttribution + "'\n" +
             "            }).addTo(map);\n" +
+            "            \n" +
+            "            canvasRenderer = L.canvas({ padding: 0.5 });\n" +
+            "            markerCluster = L.markerClusterGroup({\n" +
+            "                maxClusterRadius: 40,\n" +
+            "                disableClusteringAtZoom: 18,\n" +
+            "                spiderfyOnMaxZoom: true,\n" +
+            "                showCoverageOnHover: false,\n" +
+            "                chunkedLoading: true\n" +
+            "            });\n" +
+            "            markerCluster.addTo(map);\n" +
             "            \n" +
             "            // Only add markers if devices are present\n" +
             "            if (devices.length > 0) {\n" +
@@ -955,17 +962,8 @@ public class MapActivity extends AppCompatActivity {
             "            \n" +
             "            if (devices.length === 0) {\n" +
             "                document.getElementById('info-panel').textContent = 'No devices in visible area';\n" +
-            "                // Remove all existing markers except highlighted ones\n" +
-            "                allMarkers.forEach((marker, index) => {\n" +
-            "                    if (!highlightedMarkerIndices.has(index)) {\n" +
-            "                        map.removeLayer(marker);\n" +
-            "                    }\n" +
-            "                });\n" +
-            "                allCircles.forEach((circle, index) => {\n" +
-            "                    if (!highlightedMarkerIndices.has(index)) {\n" +
-            "                        map.removeLayer(circle);\n" +
-            "                    }\n" +
-            "                });\n" +
+            "                markerCluster.clearLayers();\n" +
+            "                allCircles.forEach(c => { if (map.hasLayer(c)) map.removeLayer(c); });\n" +
             "                allMarkers = [];\n" +
             "                allCircles = [];\n" +
             "                deviceFilterMap.clear();\n" +
@@ -980,8 +978,8 @@ public class MapActivity extends AppCompatActivity {
             "                }\n" +
             "            });\n" +
             "            \n" +
-            "            allMarkers.forEach(marker => map.removeLayer(marker));\n" +
-            "            allCircles.forEach(circle => map.removeLayer(circle));\n" +
+            "            markerCluster.clearLayers();\n" +
+            "            allCircles.forEach(c => { if (map.hasLayer(c)) map.removeLayer(c); });\n" +
             "            allMarkers = [];\n" +
             "            allCircles = [];\n" +
             "            deviceFilterMap.clear();\n" +
@@ -1035,60 +1033,50 @@ public class MapActivity extends AppCompatActivity {
             "                }\n" +
             "                deviceFilterMap.set(device.address, filterClasses);\n" +
             "                \n" +
-            "                // Icon and color\n" +
-            "                // Bluetooth: Blue | WiFi Open: Red | WiFi Encrypted: Orange\n" +
-            "                let iconColor, markerIcon;\n" +
+            "                // Icon color: Bluetooth=blue | WiFi Open=red | WiFi Encrypted=orange\n" +
+            "                let iconColor;\n" +
             "                if (device.type === 'WIFI') {\n" +
-            "                    if (device.encryption === 'open') {\n" +
-            "                        iconColor = 'red';  // Open WiFi: Red\n" +
-            "                        markerIcon = L.divIcon({html: '<span style=\"color:red;font-size:22px;\">&#9679;</span>', className: '', iconSize: [22,22]});\n" +
-            "                    } else {\n" +
-            "                        iconColor = 'orange';  // Encrypted WiFi: Orange\n" +
-            "                        markerIcon = L.divIcon({html: '<span style=\"color:orange;font-size:22px;\">&#9679;</span>', className: '', iconSize: [22,22]});\n" +
-            "                    }\n" +
+            "                    iconColor = device.encryption === 'open' ? 'red' : 'orange';\n" +
             "                } else {\n" +
-            "                    iconColor = 'blue';  // Bluetooth: Blue\n" +
-            "                    markerIcon = L.divIcon({html: '<span style=\"color:blue;font-size:22px;\">&#9679;</span>', className: '', iconSize: [22,22]});\n" +
+            "                    iconColor = 'blue';\n" +
             "                }\n" +
             "                \n" +
-            "                // Create marker (don't add to map yet - updateMarkerVisibility will do it)\n" +
-            "                let marker = L.marker([device.lat, device.lon], {icon: markerIcon});\n" +
+            "                // P1: canvas-rendered circleMarker — zero DOM nodes per marker\n" +
+            "                let marker = L.circleMarker([device.lat, device.lon], {\n" +
+            "                    renderer: canvasRenderer,\n" +
+            "                    radius: 7,\n" +
+            "                    color: iconColor,\n" +
+            "                    fillColor: iconColor,\n" +
+            "                    fillOpacity: 0.9,\n" +
+            "                    weight: 2\n" +
+            "                });\n" +
             "                \n" +
-            "                // Popup content\n" +
-            "                let popupContent = `\n" +
-            "                    <b>${device.type === 'WIFI' ? 'SSID' : 'Device'}:</b> ${device.name || '[Hidden/Unknown]'}<br>\n" +
-            "                    <b>${device.type === 'WIFI' ? 'BSSID' : 'MAC'}:</b> ${device.address}<br>\n" +
-            "                    <b>Signal:</b> ${device.signal} dBm<br>\n" +
-            "                    <b>${device.type === 'WIFI' ? 'Encryption' : 'Class'}:</b> ${device.encryption}<br>\n" +
-            "                    <b>Manufacturer:</b> ${device.vendor}<br>\n" +
-            "                    <b>Coordinates:</b> ${device.lat.toFixed(6)}, ${device.lon.toFixed(6)}\n" +
-            "                `;\n" +
+            "                // P3: lazy popup — HTML built only on click, not at load time\n" +
+            "                marker.bindPopup(function() {\n" +
+            "                    let c = `<b>${device.type === 'WIFI' ? 'SSID' : 'Device'}:</b> ${device.name || '[Hidden/Unknown]'}<br>` +\n" +
+            "                            `<b>${device.type === 'WIFI' ? 'BSSID' : 'MAC'}:</b> ${device.address}<br>` +\n" +
+            "                            `<b>Signal:</b> ${device.signal} dBm<br>` +\n" +
+            "                            `<b>${device.type === 'WIFI' ? 'Encryption' : 'Class'}:</b> ${device.encryption}<br>` +\n" +
+            "                            `<b>Manufacturer:</b> ${device.vendor}<br>` +\n" +
+            "                            `<b>Coordinates:</b> ${device.lat.toFixed(6)}, ${device.lon.toFixed(6)}`;\n" +
+            "                    if (device.type === 'WIFI' && device.frequency) c += `<br><b>Frequency:</b> ${device.frequency} MHz`;\n" +
+            "                    if (device.channel) c += `<br><b>Channel:</b> ${device.channel}`;\n" +
+            "                    return c;\n" +
+            "                });\n" +
             "                \n" +
-            "                if (device.type === 'WIFI' && device.frequency) {\n" +
-            "                    popupContent += `<br><b>Frequency:</b> ${device.frequency} MHz`;\n" +
-            "                }\n" +
-            "                if (device.channel) {\n" +
-            "                    popupContent += `<br><b>Channel:</b> ${device.channel}`;\n" +
-            "                }\n" +
-            "                \n" +
-            "                marker.bindPopup(popupContent);\n" +
-            "                \n" +
-            "                // Circle around marker (don't add to map yet)\n" +
-            "                let radius = device.signal >= -50 ? 10 : device.signal >= -70 ? 20 : 30;\n" +
+            "                // P1: canvas circle for signal radius (not added to map yet)\n" +
             "                let circle = L.circle([device.lat, device.lon], {\n" +
+            "                    renderer: canvasRenderer,\n" +
             "                    color: iconColor,\n" +
             "                    fillColor: iconColor,\n" +
             "                    fillOpacity: 0.2,\n" +
-            "                    radius: radius,\n" +
+            "                    radius: device.signal >= -50 ? 10 : device.signal >= -70 ? 20 : 30,\n" +
             "                    weight: 2\n" +
             "                });\n" +
             "                \n" +
             "                allMarkers.push(marker);\n" +
             "                allCircles.push(circle);\n" +
             "            });\n" +
-            "            \n" +
-            "            // Initially hide all\n" +
-            "            updateMarkerVisibility();\n" +
             "        }\n" +
             "        \n" +
             "        function toggleFilter(filterKey) {\n" +
@@ -1116,60 +1104,22 @@ public class MapActivity extends AppCompatActivity {
             "        }\n" +
             "        \n" +
             "        function updateMarkerVisibility() {\n" +
-            "            console.log('updateMarkerVisibility called. Active filters:', activeFilters.size, 'Highlighted:', highlightedMarkerIndices.size);\n" +
+            "            // P0: drop all from cluster in one shot, then re-add matching ones\n" +
+            "            markerCluster.clearLayers();\n" +
+            "            allCircles.forEach(c => { if (map.hasLayer(c)) map.removeLayer(c); });\n" +
             "            \n" +
             "            if (activeFilters.size === 0) {\n" +
-            "                // Alle verstecken, außer die hervorgehobenen\n" +
-            "                console.log('No filters active - showing only highlighted markers');\n" +
-            "                allMarkers.forEach((marker, index) => {\n" +
-            "                    if (highlightedMarkerIndices.has(index)) {\n" +
-            "                        if (!map.hasLayer(marker)) {\n" +
-            "                            map.addLayer(marker);\n" +
-            "                            console.log('Added highlighted marker', index);\n" +
-            "                        }\n" +
-            "                    } else {\n" +
-            "                        if (map.hasLayer(marker)) {\n" +
-            "                            map.removeLayer(marker);\n" +
-            "                        }\n" +
+            "                highlightedMarkerIndices.forEach(i => markerCluster.addLayer(allMarkers[i]));\n" +
+            "            } else {\n" +
+            "                deviceData.forEach((device, i) => {\n" +
+            "                    const filters = deviceFilterMap.get(device.address) || [];\n" +
+            "                    if (filters.some(f => activeFilters.has(f)) || highlightedMarkerIndices.has(i)) {\n" +
+            "                        markerCluster.addLayer(allMarkers[i]);\n" +
             "                    }\n" +
             "                });\n" +
-            "                allCircles.forEach((circle, index) => {\n" +
-            "                    if (highlightedMarkerIndices.has(index) && showCircles) {\n" +
-            "                        if (!map.hasLayer(circle)) {\n" +
-            "                            map.addLayer(circle);\n" +
-            "                            console.log('Added highlighted circle', index);\n" +
-            "                        }\n" +
-            "                    } else {\n" +
-            "                        if (map.hasLayer(circle)) {\n" +
-            "                            map.removeLayer(circle);\n" +
-            "                        }\n" +
-            "                    }\n" +
-            "                });\n" +
-            "                updateInfoPanel();\n" +
-            "                return;\n" +
             "            }\n" +
             "            \n" +
-            "            console.log('Filters active - showing filter matches + highlighted markers');\n" +
-            "            deviceData.forEach((device, index) => {\n" +
-            "                const deviceFilters = deviceFilterMap.get(device.address) || [];\n" +
-            "                const matchesFilter = deviceFilters.some(cls => activeFilters.has(cls));\n" +
-            "                const isHighlighted = highlightedMarkerIndices.has(index);\n" +
-            "                const shouldShow = matchesFilter || isHighlighted;\n" +
-            "                \n" +
-            "                const marker = allMarkers[index];\n" +
-            "                const circle = allCircles[index];\n" +
-            "                \n" +
-            "                if (shouldShow) {\n" +
-            "                    if (!map.hasLayer(marker)) map.addLayer(marker);\n" +
-            "                    // Only show circle if showCircles is enabled\n" +
-            "                    if (showCircles && !map.hasLayer(circle)) map.addLayer(circle);\n" +
-            "                    else if (!showCircles && map.hasLayer(circle)) map.removeLayer(circle);\n" +
-            "                } else {\n" +
-            "                    if (map.hasLayer(marker)) map.removeLayer(marker);\n" +
-            "                    if (map.hasLayer(circle)) map.removeLayer(circle);\n" +
-            "                }\n" +
-            "            });\n" +
-            "            \n" +
+            "            updateCircleVisibilityForZoom();\n" +
             "            updateInfoPanel();\n" +
             "        }\n" +
             "        \n" +
@@ -1177,24 +1127,19 @@ public class MapActivity extends AppCompatActivity {
             "            let wifiCount = 0;\n" +
             "            let bluetoothCount = 0;\n" +
             "            let bluetoothKnownCount = 0;\n" +
-            "            let visibleCount = 0;\n" +
+            "            // P0: markerCluster manages visibility; map.hasLayer() is unreliable for clustered layers\n" +
+            "            const visibleCount = markerCluster ? markerCluster.getLayers().length : 0;\n" +
             "            \n" +
-            "            deviceData.forEach((device, index) => {\n" +
+            "            deviceData.forEach(device => {\n" +
             "                if (device.type === 'WIFI') {\n" +
             "                    wifiCount++;\n" +
             "                } else {\n" +
             "                    bluetoothCount++;\n" +
-            "                    // Count Bluetooth without Unknown\n" +
-            "                    if (device.name && device.name.trim() !== '' && \n" +
+            "                    if (device.name && device.name.trim() !== '' &&\n" +
             "                        !device.name.toLowerCase().includes('unknown device') &&\n" +
             "                        device.name !== '[Hidden/Unknown]') {\n" +
             "                        bluetoothKnownCount++;\n" +
             "                    }\n" +
-            "                }\n" +
-            "                \n" +
-            "                const marker = allMarkers[index];\n" +
-            "                if (marker && map.hasLayer(marker)) {\n" +
-            "                    visibleCount++;\n" +
             "                }\n" +
             "            });\n" +
             "            \n" +
@@ -1834,8 +1779,8 @@ public class MapActivity extends AppCompatActivity {
             return;
         }
         
-        // Show results in a dialog
-        showSearchResultsDialog(searchResults, query);
+        // Show results in dedicated activity
+        showSearchResultsActivity(searchResults, query);
     }
     
     private java.util.List<DeviceData> searchInDatabase(String query) {
@@ -1979,6 +1924,45 @@ public class MapActivity extends AppCompatActivity {
         return results;
     }
     
+    private void showSearchResultsActivity(java.util.List<DeviceData> results, String query) {
+        Intent intent = new Intent(this, SearchResultsActivity.class);
+        intent.putExtra("search_results", new java.util.ArrayList<>(results));
+        intent.putExtra("search_query", query);
+        startActivityForResult(intent, SEARCH_RESULTS_REQUEST_CODE);
+    }
+    
+    private void showAllSearchResultsOnMap(java.util.List<DeviceData> searchResults) {
+        // Stop live location tracking if active
+        if (isLiveLocationActive) {
+            stopLiveLocationTracking();
+            Toast.makeText(MapActivity.this, "Live Location stopped (search active)", Toast.LENGTH_SHORT).show();
+        }
+        
+        // Convert search results to JSON for JavaScript
+        StringBuilder jsonBuilder = new StringBuilder("[");
+        for (int i = 0; i < searchResults.size(); i++) {
+            DeviceData device = searchResults.get(i);
+            if (i > 0) jsonBuilder.append(",");
+            jsonBuilder.append(String.format(
+                "{'address':'%s','lat':%f,'lon':%f,'name':'%s','type':'%s'}",
+                device.address.replace("'", "\\'"),
+                device.lat,
+                device.lon,
+                device.name != null ? device.name.replace("'", "\\'") : "",
+                device.type != null ? device.type : "UNKNOWN"
+            ));
+        }
+        jsonBuilder.append("]");
+        
+        // Call JavaScript function to show all search results
+        String jsCode = String.format("javascript:showAllSearchResults(%s);", jsonBuilder.toString());
+        mapWebView.evaluateJavascript(jsCode, null);
+        
+        Toast.makeText(this, "Showing " + searchResults.size() + " search results on map", Toast.LENGTH_SHORT).show();
+    }
+    
+    // Keep old method for backward compatibility (can be removed later)
+    @SuppressWarnings("unused")
     private void showSearchResultsDialog(java.util.List<DeviceData> results, String query) {
         // Create dialog items
         String[] items = new String[results.size()];
@@ -2290,6 +2274,33 @@ public class MapActivity extends AppCompatActivity {
                 Toast.makeText(this, "Database unlock required", Toast.LENGTH_SHORT).show();
                 isWaitingForUnlock = false;
                 finish();
+            }
+        }
+        else if (requestCode == SEARCH_RESULTS_REQUEST_CODE && resultCode == RESULT_OK) {
+            if (data != null) {
+                if (data.hasExtra("zoom_to_device")) {
+                    // Zoom to specific device
+                    String deviceAddress = data.getStringExtra("device_address");
+                    double deviceLat = data.getDoubleExtra("device_lat", 0);
+                    double deviceLon = data.getDoubleExtra("device_lon", 0);
+                    
+                    // Stop live location tracking if active
+                    if (isLiveLocationActive) {
+                        stopLiveLocationTracking();
+                        Toast.makeText(MapActivity.this, "Live Location stopped (search active)", Toast.LENGTH_SHORT).show();
+                    }
+                    
+                    String jsCode = String.format("javascript:zoomToDevice('%s', %f, %f);", 
+                        deviceAddress.replace("'", "\\'"),
+                        deviceLat,
+                        deviceLon);
+                    mapWebView.evaluateJavascript(jsCode, null);
+                } 
+                else if (data.hasExtra("show_all_results")) {
+                    // Show all search results on map
+                    java.util.List<DeviceData> searchResults = (java.util.List<DeviceData>) data.getSerializableExtra("search_results");
+                    showAllSearchResultsOnMap(searchResults);
+                }
             }
         }
     }

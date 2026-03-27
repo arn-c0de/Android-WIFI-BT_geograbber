@@ -22,7 +22,7 @@
 </div>
 
 <div align="left">
-   <b>Current Version: v1.0.5</b>
+   <b>Current Version: 1.0.6</b>
 </div>
 
 ---
@@ -33,7 +33,7 @@
 
 ---
 
-**Python Integration Notice (v1.0.5)**
+**Python Integration Notice**
 
 - On Linux, databases can currently be loaded and visualized.
 - Passphrase unlocking is buggy: correct passphrases may be rejected.
@@ -165,7 +165,7 @@ GeoGrabber is ideal for network analysis, signal mapping, and understanding wire
 
 ---
 
-## Screenshots
+## ScOHNEreenshots
 
 <div align="center">
   <img src="images/screenshots/Screenshot_lock.png" alt="GeoGrabber Lock Screen v1.0.4" width="300" style="display:inline-block;" />

@@ -58,6 +58,13 @@
             android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"
             android:configChanges="orientation|screenSize|keyboardHidden"/>
         
+        <!-- Search Results Activity -->
+        <activity android:name=".SearchResultsActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"
+            android:configChanges="orientation|screenSize|keyboardHidden"/>
+        
         <service android:name=".ScanService" 
             android:foregroundServiceType="location"
             android:enabled="true" 

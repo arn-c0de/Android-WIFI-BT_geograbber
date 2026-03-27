@@ -123,7 +123,7 @@
         <Button
             android:id="@+id/location_button"
             android:layout_width="0dp"
-            android:layout_height="wrap_content"
+            android:layout_height="48dp"
             android:layout_marginStart="8dp"
             android:layout_weight="1"
             android:backgroundTint="#0A0A2A"
