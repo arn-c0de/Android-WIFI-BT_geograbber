@@ -5,11 +5,14 @@ import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.content.BroadcastReceiver;
+import android.content.ClipboardManager;
+import android.content.ClipData;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
@@ -40,10 +43,13 @@ import com.example.wifi_geograbber.utils.EncryptionManager;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import org.json.JSONObject;
 
-public class MainActivity extends MainActivityBase {
-    private DatabaseManager databaseManager;
+public class MainActivity extends com.example.wifi_geograbber.activities.main.MainActivityActions {
     private WiFiScanner wiFiScanner;
     private UIManager uiManager;
 
@@ -115,7 +121,7 @@ public class MainActivity extends MainActivityBase {
 
         // Initialize database with encryption support
         initializeDatabase();
-        
+
         // Log database encryption status
         addLogMessage("📱 App started (v" + APP_VERSION + ")");
         addLogMessage("🔐 Database encryption: " + (isDatabaseEncrypted ? "ENABLED (AES-256)" : "DISABLED"));
@@ -164,10 +170,41 @@ public class MainActivity extends MainActivityBase {
         mapButton.setOnClickListener(v -> {
             // Set flag to indicate internal navigation
             isNavigatingInternally = true;
-            
+
             Intent mapIntent = new Intent(MainActivity.this, MapActivity.class);
             startActivity(mapIntent);
         });
+
+        // Toggle WiFi scan button
+        toggleScanButton.setOnClickListener(v -> {
+            if (isScanning) {
+                stopScanning();
+            } else {
+                startScanning();
+            }
+            updateToggleScanButton();
+        });
+        updateToggleScanButton();
+
+        // Bluetooth toggle button
+        bluetoothToggleButton.setOnClickListener(v -> {
+            isBluetoothScanningEnabled = !isBluetoothScanningEnabled;
+            updateBluetoothToggleButton();
+            if (isBluetoothScanningEnabled) {
+                Toast.makeText(this, "Bluetooth scanning enabled", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "Bluetooth scanning disabled", Toast.LENGTH_SHORT).show();
+            }
+        });
+        updateBluetoothToggleButton();
+
+        // More button
+        moreButton = findViewById(com.example.wifi_geograbber.R.id.more_button);
+        moreButton.setOnClickListener(v -> showMoreDialog());
+
+        // Export log button
+        Button exportLogButton = findViewById(com.example.wifi_geograbber.R.id.export_log_button);
+        exportLogButton.setOnClickListener(v -> exportDebugLogToTxt());
 
         // WiFi Scan receiver
         IntentFilter intentFilter = new IntentFilter(WifiManager.SCAN_RESULTS_AVAILABLE_ACTION);
@@ -209,7 +246,7 @@ public class MainActivity extends MainActivityBase {
         };
     }
 
-    private void initializeDatabase() {
+    protected void initializeDatabase() {
         try {
             DatabaseHelper dbHelper = new DatabaseHelper(this);
             if (encryptionManager.isEncryptionEnabled()) {
@@ -231,7 +268,7 @@ public class MainActivity extends MainActivityBase {
         }
     }
 
-    private void loadAndDisplayAvailableNetworks() {
+    protected void loadAndDisplayAvailableNetworks() {
         if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             List<ScanResult> availableNetworks = wiFiScanner.getScanResults();
             if (availableNetworks != null && !availableNetworks.isEmpty()) {
@@ -319,7 +356,7 @@ public class MainActivity extends MainActivityBase {
         updateToggleScanButton();
     }
 
-    private void stopScanning() {
+    protected void stopScanning() {
         isScanning = false;
         if (handler != null && scanRunnable != null) {
             handler.removeCallbacks(scanRunnable);
@@ -629,9 +666,9 @@ public class MainActivity extends MainActivityBase {
     private final BroadcastReceiver wifiScanReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            boolean success = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false);
-            if (success) {
-                if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                boolean success = intent.getBooleanExtra(WifiManager.EXTRA_RESULTS_UPDATED, false);
+                if (success) {
                     List<ScanResult> results = wifiManager.getScanResults();
                     if (results != null && !results.isEmpty()) {
                         if (!isShowingStoredData) {
@@ -656,7 +693,8 @@ public class MainActivity extends MainActivityBase {
                 }
             } else {
                 // Scan failed - use cache anyway
-                List<ScanResult> cachedResults = wifiManager.getScanResults();
+                if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                    List<ScanResult> cachedResults = wifiManager.getScanResults();
                 if (cachedResults != null && !cachedResults.isEmpty()) {
                     uiManager.displayResults(cachedResults);
                     if (!isShowingStoredData) {
@@ -673,7 +711,9 @@ public class MainActivity extends MainActivityBase {
                     // Try a new scan immediately
                     if (wiFiScanner.isWifiEnabled()) {
                         try {
-                            wifiManager.startScan();
+                            if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                                wifiManager.startScan();
+                            }
                         } catch (Exception e) {
                             if (!isShowingStoredData) {
                                 statusText.setText("WiFi scan blocked - Android limitation");
@@ -684,6 +724,7 @@ public class MainActivity extends MainActivityBase {
             }
         }
     };
+    };
 
     private final BroadcastReceiver bluetoothScanReceiver = new BroadcastReceiver() {
         @Override
@@ -691,9 +732,9 @@ public class MainActivity extends MainActivityBase {
             String action = intent.getAction();
             
             if (BluetoothDevice.ACTION_FOUND.equals(action)) {
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                if (device != null) {
-                    if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                if (ActivityCompat.checkSelfPermission(MainActivity.this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED) {
+                    BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                    if (device != null) {
                         try {
                             String deviceName = device.getName();
                             String deviceAddress = device.getAddress();
@@ -803,7 +844,7 @@ public class MainActivity extends MainActivityBase {
         }
     }
 
-    private void showData() {
+    protected void showData() {
         List<String> dataList = new ArrayList<>();
 
         // Show both old Wi-Fi data and new unified data
@@ -930,7 +971,7 @@ public class MainActivity extends MainActivityBase {
         updateInfoSummary(0, 0); // No active, only total
     }
 
-    private void updateInfoSummary(int activeWifi, int activeBluetooth) {
+    protected void updateInfoSummary(int activeWifi, int activeBluetooth) {
         // Retrieve total figures from the database
         int totalWifi = 0;
         int totalBluetooth = 0;
@@ -1031,9 +1072,202 @@ public class MainActivity extends MainActivityBase {
         }
     }
 
+    /**
+     * Show unlock dialog
+     */
     private void showUnlockDialog() {
-        // Implementation would go here - this is just a placeholder
-        // to show where the unlock dialog would be shown
+        // Check if biometric unlock is enabled
+        BiometricAuthManager biometricAuthManager = new BiometricAuthManager(this, encryptionManager);
+        if (biometricAuthManager.isBiometricEnabled() && biometricAuthManager.isBiometricSupported()) {
+            // Show biometric unlock prompt
+            showBiometricUnlockPrompt();
+        } else {
+            // Fall back to manual passphrase entry
+            showUnlockDialog(0); // Start with 0 attempts
+        }
+    }
+
+    /**
+     * Show unlock dialog with retry capability
+     * @param attemptCount Number of failed attempts
+     */
+    private void showUnlockDialog(final int attemptCount) {
+        // Show security overlay to hide app content
+        if (securityOverlay != null) {
+            securityOverlay.setVisibility(View.VISIBLE);
+            securityOverlay.bringToFront();
+        }
+
+        android.app.AlertDialog.Builder builder = new android.app.AlertDialog.Builder(this);
+        builder.setTitle(com.example.wifi_geograbber.R.string.unlock_database_title);
+
+        // Show attempt count if not first attempt
+        String message = getString(com.example.wifi_geograbber.R.string.unlock_database_message);
+        if (attemptCount > 0) {
+            message += "\n\n❌ Wrong passphrase! Attempt " + (attemptCount + 1) + "/5";
+        }
+        builder.setMessage(message);
+        builder.setCancelable(false);
+
+        final android.widget.EditText input = new android.widget.EditText(this);
+        input.setHint(com.example.wifi_geograbber.R.string.passphrase_hint);
+        input.setInputType(android.text.InputType.TYPE_CLASS_TEXT |
+                           android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD);
+
+        android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+        layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+        layout.setPadding(50, 40, 50, 10);
+        layout.addView(input);
+
+        builder.setView(layout);
+
+        builder.setPositiveButton(com.example.wifi_geograbber.R.string.unlock, (dialog, which) -> {
+            String passphrase = input.getText().toString();
+
+            if (encryptionManager.unlockWithPassphrase(passphrase.toCharArray())) {
+                // Successful unlock - reset failed attempts and dialog flag
+                encryptionManager.resetFailedAttempts();
+                isUnlockDialogShowing = false;
+
+                // Hide security overlay - show app content
+                if (securityOverlay != null) {
+                    securityOverlay.setVisibility(View.GONE);
+                }
+
+                // Initialize database asynchronously to prevent UI freeze
+                new android.os.AsyncTask<Void, Void, Void>() {
+                    @Override
+                    protected Void doInBackground(Void... voids) {
+                        initializeDatabase();
+                        return null;
+                    }
+
+                    @Override
+                    protected void onPostExecute(Void result) {
+                        // Show data view after successful unlock
+                        if (dataListView != null) {
+                            dataListView.setVisibility(View.VISIBLE);
+                        }
+                        Toast.makeText(MainActivity.this, "✓ Database unlocked", Toast.LENGTH_SHORT).show();
+                        updateInfoSummary(0, 0);
+                    }
+                }.execute();
+            } else {
+                // Wrong passphrase - increment failed attempts
+                encryptionManager.incrementFailedAttempts();
+
+                // Check if database should be wiped
+                if (encryptionManager.shouldWipeDatabase()) {
+                    isUnlockDialogShowing = false;
+                    Toast.makeText(this, "⚠️ Too many failed attempts. Database will be wiped for security.",
+                                  Toast.LENGTH_LONG).show();
+
+                    new android.os.Handler().postDelayed(() -> {
+                        resetEncryption();
+                        if (securityOverlay != null) {
+                            securityOverlay.setVisibility(View.GONE);
+                        }
+                    }, 2000);
+                    return;
+                }
+
+                // Show remaining attempts
+                int remaining = encryptionManager.getRemainingAttempts();
+                int newAttemptCount = attemptCount + 1;
+
+                Toast.makeText(this, "✗ Wrong passphrase. " + remaining + " attempts remaining.",
+                              Toast.LENGTH_LONG).show();
+
+                // Reset flag to allow showing dialog again
+                isUnlockDialogShowing = false;
+
+                // Show dialog again with retry after a short delay
+                new android.os.Handler().postDelayed(() -> {
+                    if (!encryptionManager.isPassphraseCached()) {
+                        showUnlockDialog(newAttemptCount);
+                    }
+                }, 500);
+            }
+        });
+
+        // Always show "Exit" button to allow user to close app
+        builder.setNegativeButton("Exit", (dialog, which) -> {
+            // Reset dialog flag and close app
+            isUnlockDialogShowing = false;
+            Toast.makeText(this, "App closed", Toast.LENGTH_SHORT).show();
+            finish();
+        });
+
+        builder.setCancelable(false);
+        builder.show();
+    }
+
+    /**
+     * Show biometric unlock prompt
+     */
+    private void showBiometricUnlockPrompt() {
+        // Show security overlay to hide app content
+        if (securityOverlay != null) {
+            securityOverlay.setVisibility(View.VISIBLE);
+            securityOverlay.bringToFront();
+        }
+
+        BiometricAuthManager biometricAuthManager = new BiometricAuthManager(this, encryptionManager);
+
+        biometricAuthManager.authenticateWithBiometric(this, new BiometricAuthManager.BiometricAuthCallback() {
+            @Override
+            public void onAuthenticationSucceeded(char[] decryptedPassphrase) {
+                if (encryptionManager.unlockWithPassphrase(decryptedPassphrase)) {
+                    encryptionManager.resetFailedAttempts();
+                    isUnlockDialogShowing = false;
+
+                    if (securityOverlay != null) {
+                        securityOverlay.setVisibility(View.GONE);
+                    }
+
+                    new android.os.AsyncTask<Void, Void, Void>() {
+                        @Override
+                        protected Void doInBackground(Void... voids) {
+                            initializeDatabase();
+                            return null;
+                        }
+
+                        @Override
+                        protected void onPostExecute(Void result) {
+                            if (dataListView != null) {
+                                dataListView.setVisibility(View.VISIBLE);
+                            }
+                            Toast.makeText(MainActivity.this, "✓ Unlocked with biometric", Toast.LENGTH_SHORT).show();
+                            updateInfoSummary(0, 0);
+                        }
+                    }.execute();
+                } else {
+                    Toast.makeText(MainActivity.this,
+                        "Biometric unlock failed. Please enter passphrase manually.",
+                        Toast.LENGTH_LONG).show();
+                    showUnlockDialog(0);
+                }
+
+                if (decryptedPassphrase != null) {
+                    Arrays.fill(decryptedPassphrase, '\0');
+                }
+            }
+
+            @Override
+            public void onAuthenticationError(String error) {
+                Toast.makeText(MainActivity.this,
+                    "Biometric authentication failed: " + error,
+                    Toast.LENGTH_LONG).show();
+                showUnlockDialog(0);
+            }
+
+            @Override
+            public void onAuthenticationFailed() {
+                Toast.makeText(MainActivity.this,
+                    "Biometric not recognized. Try again or use passphrase.",
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @Override
@@ -1061,21 +1295,73 @@ public class MainActivity extends MainActivityBase {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        
-        // Unregister receivers
+
+        // Only unregister receivers if they were actually registered
         if (receiversRegistered) {
             try {
                 unregisterReceiver(wifiScanReceiver);
                 unregisterReceiver(bluetoothScanReceiver);
-            } catch (Exception e) {
-                android.util.Log.e("MainActivity", "Error unregistering receivers: " + e.getMessage());
+                receiversRegistered = false;
+            } catch (IllegalArgumentException e) {
+                // Receiver was already unregistered, ignore
             }
-            receiversRegistered = false;
         }
-        
+
+        // Stop background service only if scanning was active.
+        if (isScanning) {
+            Intent serviceIntent = new Intent(this, ScanService.class);
+            stopService(serviceIntent);
+        }
+
+        // Stop scanning if handler was initialized
+        if (handler != null) {
+            stopScanning();
+        }
+
+        // Clear encryption passphrase from memory
+        if (encryptionManager != null) {
+            encryptionManager.clearPassphrase();
+        }
+        if (encryptedDbHelper != null) {
+            encryptedDbHelper.clearPassphrase();
+        }
+
         // Close database
         if (databaseManager != null) {
             databaseManager.dbClose();
         }
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+
+        if (encryptionManager != null && encryptionManager.isEncryptionEnabled() &&
+            !isNavigatingInternally && !isScanning) {
+            encryptionManager.clearPassphrase();
+            if (encryptedDbHelper != null) {
+                encryptedDbHelper.clearPassphrase();
+            }
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+
+        if (encryptionManager != null && encryptionManager.isEncryptionEnabled() &&
+            !isScanning && !isNavigatingInternally) {
+            encryptionManager.clearPassphrase();
+            if (encryptedDbHelper != null) {
+                encryptedDbHelper.clearPassphrase();
+            }
+        }
+    }
+
+    /**
+     * Update total networks count display (after import, etc.)
+     */
+    protected void updateTotalNetworksCount() {
+        updateInfoSummary(0, 0);
     }
 }
