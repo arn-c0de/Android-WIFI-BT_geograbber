@@ -1,4 +1,4 @@
-package com.example.wifi_geograbber;
+package com.example.wifi_geograbber.utils;
 
 import android.content.Context;
 import android.database.Cursor;
@@ -242,7 +242,7 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
                     db.close();
 
                     // Securely delete the readonly database file and associated files
-                    SecureFileDelete.secureDatabaseDelete(dbFile);
+                    com.example.wifi_geograbber.utils.SecureFileDelete.secureDatabaseDelete(dbFile);
 
                     // Create new writable database
                     db = getWritableDatabase(passphrase);
@@ -281,7 +281,7 @@ public class DatabaseEncryptionHelper extends SQLiteOpenHelper {
                 try {
                     // Securely delete corrupted database file and associated files
                     Log.d(TAG, "Deleting corrupted database file");
-                    SecureFileDelete.secureDatabaseDelete(dbFile);
+                    com.example.wifi_geograbber.utils.SecureFileDelete.secureDatabaseDelete(dbFile);
 
                     Log.d(TAG, "Creating new encrypted database...");
                     // Try to create new database

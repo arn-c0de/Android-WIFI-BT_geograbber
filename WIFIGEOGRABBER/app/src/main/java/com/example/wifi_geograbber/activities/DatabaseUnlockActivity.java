@@ -1,4 +1,4 @@
-package com.example.wifi_geograbber;
+package com.example.wifi_geograbber.activities;
 
 import android.content.Intent;
 import android.os.Bundle;
@@ -16,6 +16,10 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
 import java.util.Arrays;
+
+import com.example.wifi_geograbber.R;
+import com.example.wifi_geograbber.utils.EncryptionManager;
+import com.example.wifi_geograbber.utils.BiometricAuthManager;
 
 /**
  * DatabaseUnlockActivity - Handles database unlock via biometric or passphrase
@@ -270,7 +274,7 @@ public class DatabaseUnlockActivity extends AppCompatActivity {
     }
     
     private void proceedToMainActivity() {
-        Intent intent = new Intent(this, MainActivity.class);
+        Intent intent = new Intent(this, com.example.wifi_geograbber.MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();

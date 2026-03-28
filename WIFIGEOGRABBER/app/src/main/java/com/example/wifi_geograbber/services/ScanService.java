@@ -1,4 +1,4 @@
-package com.example.wifi_geograbber;
+package com.example.wifi_geograbber.services;
 
 import android.Manifest;
 import android.app.Notification;
@@ -27,6 +27,11 @@ import android.os.IBinder;
 import android.util.Log;
 import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
+import com.example.wifi_geograbber.R;
+import com.example.wifi_geograbber.activities.main.database.DatabaseHelper;
+import com.example.wifi_geograbber.utils.DatabaseEncryptionHelper;
+import com.example.wifi_geograbber.utils.EncryptionManager;
+import com.example.wifi_geograbber.utils.SecureFileDelete;
 import java.util.List;
 
 public class ScanService extends Service {
@@ -333,7 +338,7 @@ public class ScanService extends Service {
                 Log.d("ScanService", "Using external database: " + databasePath);
             } else {
                 // Use internal database
-                MainActivity.DatabaseHelper dbHelper = new MainActivity.DatabaseHelper(this);
+                DatabaseHelper dbHelper = new DatabaseHelper(this);
                 database = dbHelper.getWritableDatabase();
                 isUsingEncryptedDatabase = false;
                 Log.d("ScanService", "Using internal database");
@@ -386,7 +391,7 @@ public class ScanService extends Service {
     }
 
     private Notification createNotification() {
-        Intent notificationIntent = new Intent(this, MainActivity.class);
+        Intent notificationIntent = new Intent(this, com.example.wifi_geograbber.MainActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE);
 
         String contentText = "WiFi: " + wifiCount;

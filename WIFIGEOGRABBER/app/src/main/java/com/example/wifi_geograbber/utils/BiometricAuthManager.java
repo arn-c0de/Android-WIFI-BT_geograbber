@@ -1,4 +1,4 @@
-package com.example.wifi_geograbber;
+package com.example.wifi_geograbber.utils;
 
 import android.content.Context;
 import android.content.SharedPreferences;

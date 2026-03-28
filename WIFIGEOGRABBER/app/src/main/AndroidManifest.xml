@@ -44,7 +44,7 @@
         </activity>
         
         <!-- Database Unlock Activity -->
-        <activity android:name=".DatabaseUnlockActivity"
+        <activity android:name=".activities.DatabaseUnlockActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"
@@ -52,14 +52,14 @@
             android:configChanges="orientation|screenSize|keyboardHidden"/>
         
         <!-- Karten-Activity -->
-        <activity android:name=".MapActivity" 
+        <activity android:name=".activities.MapActivity" 
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"
             android:configChanges="orientation|screenSize|keyboardHidden"/>
         
         <!-- Search Results Activity -->
-        <activity android:name=".SearchResultsActivity"
+        <activity android:name=".activities.SearchResultsActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"

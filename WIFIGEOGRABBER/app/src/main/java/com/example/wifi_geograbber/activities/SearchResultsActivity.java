@@ -1,4 +1,4 @@
-package com.example.wifi_geograbber;
+package com.example.wifi_geograbber.activities;
 
 import android.content.Intent;
 import android.graphics.Color;
@@ -14,6 +14,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.example.wifi_geograbber.R;
 import java.util.ArrayList;
 import java.util.List;
 

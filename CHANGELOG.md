@@ -2,7 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.0.6] – 2026-03-27
+## [1.0.6] – 2026-03-28
+
+### 🔧 Refactoring & Bug Fixes
+- **Fixed ActivityNotFoundException crashes** by correcting activity package paths in AndroidManifest.xml
+  - Updated `.DatabaseUnlockActivity` → `.activities.DatabaseUnlockActivity`
+  - Updated `.MapActivity` → `.activities.MapActivity`
+  - Updated `.SearchResultsActivity` → `.activities.SearchResultsActivity`
+- **Major code reorganization**: Moved classes into proper package structure
+  - Created `activities/` package for all Activity classes
+  - Created `services/` package for Service classes
+  - Created `utils/` package for utility classes
+  - MainActivity remains in root package as entry point
 
 ### Map Performance (Issue #27)
 - Leaflet.markercluster: clusters markers at low zoom

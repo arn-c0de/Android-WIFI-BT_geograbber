@@ -1,4 +1,4 @@
-package com.example.wifi_geograbber;
+package com.example.wifi_geograbber.activities;
 
 import android.Manifest;
 import android.content.BroadcastReceiver;
@@ -20,6 +20,10 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
+import com.example.wifi_geograbber.R;
+import com.example.wifi_geograbber.utils.DatabaseEncryptionHelper;
+import com.example.wifi_geograbber.utils.EncryptionManager;
+import com.example.wifi_geograbber.activities.main.database.DatabaseHelper;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import org.json.JSONArray;
@@ -371,7 +375,7 @@ public class MapActivity extends AppCompatActivity {
         } else {
             // Open unencrypted database
             try {
-                MainActivity.DatabaseHelper dbHelper = new MainActivity.DatabaseHelper(this);
+                DatabaseHelper dbHelper = new DatabaseHelper(this);
                 database = dbHelper.getReadableDatabase();
                 isDatabaseEncrypted = false;
                 Log.d("MapActivity", "Opened unencrypted database in readonly mode");

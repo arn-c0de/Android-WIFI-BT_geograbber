@@ -1,4 +1,4 @@
-package com.example.wifi_geograbber;
+package com.example.wifi_geograbber.utils;
 
 import android.util.Log;
 
@@ -16,7 +16,7 @@ import java.security.SecureRandom;
  * - Handles file size and permissions properly
  *
  * Usage:
- * SecureFileDelete.secureDelete(file);
+ * com.example.wifi_geograbber.utils.SecureFileDelete.secureDelete(file);
  */
 public class SecureFileDelete {
     private static final String TAG = "SecureFileDelete";
