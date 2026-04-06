@@ -41,6 +41,15 @@ public abstract class MainActivityActions extends MainActivityBase {
         updateInfoSummary(0, 0);
     }
 
+    /**
+     * Validates that a URI uses the "content" scheme before passing it to ContentResolver.
+     * Rejects file:// and other schemes that could bypass the app sandbox or access
+     * arbitrary file paths (CWE-441 / CodeQL: uncontrolled-data-used-in-content-resolution).
+     */
+    private boolean isValidContentUri(android.net.Uri uri) {
+        return uri != null && "content".equals(uri.getScheme());
+    }
+
 
     // ====================================================================
     //  MORE DIALOG AND DATABASE MANAGEMENT METHODS
@@ -108,6 +117,7 @@ public abstract class MainActivityActions extends MainActivityBase {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == EXPORT_DB_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
             android.net.Uri uri = data.getData();
+            if (!isValidContentUri(uri)) return;
             if (uri != null) {
                 try {
                     String dbPath = getDatabasePath("wifi_scanner.db").getAbsolutePath();
@@ -169,6 +179,7 @@ public abstract class MainActivityActions extends MainActivityBase {
             }
         } else if (requestCode == EXPORT_CHECKSUM_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
             android.net.Uri uri = data.getData();
+            if (!isValidContentUri(uri)) return;
             if (uri != null && lastExportedDbChecksum != null && lastExportedDbFilename != null) {
                 try {
                     String metadata = createChecksumMetadata(
@@ -197,16 +208,19 @@ public abstract class MainActivityActions extends MainActivityBase {
             }
         } else if (requestCode == IMPORT_DB_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
             android.net.Uri uri = data.getData();
+            if (!isValidContentUri(uri)) return;
             if (uri != null) {
                 loadExternalDatabaseAndShowMap(uri);
             }
         } else if (requestCode == IMPORT_ACTIVE_DB_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
             android.net.Uri uri = data.getData();
+            if (!isValidContentUri(uri)) return;
             if (uri != null) {
                 loadExternalDatabaseAsActive(uri);
             }
         } else if (requestCode == IMPORT_CHECKSUM_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
             android.net.Uri uri = data.getData();
+            if (!isValidContentUri(uri)) return;
             if (uri != null && pendingImportFile != null) {
                 verifyAndImportWithChecksum(uri, pendingImportFile);
             }
@@ -393,6 +407,10 @@ public abstract class MainActivityActions extends MainActivityBase {
 
     // Verify checksum and import database
     protected void verifyAndImportWithChecksum(android.net.Uri checksumUri, java.io.File dbFile) {
+        if (!isValidContentUri(checksumUri)) {
+            Toast.makeText(this, "Invalid URI scheme rejected", Toast.LENGTH_SHORT).show();
+            return;
+        }
         try {
             java.io.InputStream inStream = getContentResolver().openInputStream(checksumUri);
             java.io.BufferedReader reader = new java.io.BufferedReader(
@@ -702,6 +720,10 @@ public abstract class MainActivityActions extends MainActivityBase {
 
     // Load external database and display map
     protected void loadExternalDatabaseAndShowMap(android.net.Uri uri) {
+        if (!isValidContentUri(uri)) {
+            Toast.makeText(this, "Invalid URI scheme rejected", Toast.LENGTH_SHORT).show();
+            return;
+        }
         try {
             java.io.File tempFile = new java.io.File(getFilesDir(), "temp_external.db");
 
@@ -1006,6 +1028,10 @@ public abstract class MainActivityActions extends MainActivityBase {
 
     // Load external database as active database
     protected void loadExternalDatabaseAsActive(android.net.Uri uri) {
+        if (!isValidContentUri(uri)) {
+            Toast.makeText(this, "Invalid URI scheme rejected", Toast.LENGTH_SHORT).show();
+            return;
+        }
         try {
             java.io.File externalDbFile = new java.io.File(getFilesDir(), "external_active.db");
 

@@ -265,6 +265,7 @@ public class MainActivity extends com.example.wifi_geograbber.activities.main.Ma
         } catch (Exception e) {
             android.util.Log.e("MainActivity", "Error initializing database: " + e.getMessage(), e);
             addLogMessage("ERROR: Database initialization failed: " + e.getMessage());
+            Toast.makeText(this, "Database init failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -972,10 +973,12 @@ public class MainActivity extends com.example.wifi_geograbber.activities.main.Ma
     }
 
     protected void updateInfoSummary(int activeWifi, int activeBluetooth) {
+        if (databaseManager == null) return;
+
         // Retrieve total figures from the database
         int totalWifi = 0;
         int totalBluetooth = 0;
-        
+
         // Count WiFi devices in DB
         Cursor wifiCursor = databaseManager.dbRawQuery("SELECT COUNT(*) FROM device_data WHERE device_type = 'WIFI'", null);
         if (wifiCursor != null) {
