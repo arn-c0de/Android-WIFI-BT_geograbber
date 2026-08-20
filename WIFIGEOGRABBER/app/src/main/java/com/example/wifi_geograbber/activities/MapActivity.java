@@ -46,8 +46,11 @@ public class MapActivity extends AppCompatActivity {
      */
     private static String sanitizeForLogging(String input) {
         if (input == null) return "";
-        // Remove CR, LF, Vertical Tab, Form Feed, Unicode Next Line, Unicode Line Separator, Unicode Paragraph Separator
-        return input.replaceAll("[\\r\\n\\u000B\\u000C\\u0085\\u2028\\u2029]", "");
+        // Allow-list approach: keep letters, digits, punctuation, symbols and plain spaces.
+        // Everything else - control characters (CR/LF/TAB), Unicode line/paragraph
+        // separators and invisible format characters - is dropped, so a value cannot forge
+        // extra log lines (CodeQL java/log-injection).
+        return input.replaceAll("[^\\p{L}\\p{N}\\p{P}\\p{S}\\p{Zs}]", "");
     }
     private static final String PREF_FILTERS = "activeFilters";
     private static final String PREF_CENTER_LAT = "centerLat";
@@ -440,7 +443,9 @@ public class MapActivity extends AppCompatActivity {
         webSettings.setAllowFileAccess(false);
         // SECURITY: Prevent access to content:// URLs
         webSettings.setAllowContentAccess(false);
-        webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        // SECURITY: every resource used by the map (Leaflet, tiles) is served over HTTPS,
+        // so plain-HTTP sub-resources are never needed and are blocked outright.
+        webSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 
         // SECURITY: Add JavaScript interface
         // This is safe because:

@@ -50,6 +50,12 @@ public abstract class MainActivityActions extends MainActivityBase {
         return uri != null && "content".equals(uri.getScheme());
     }
 
+    // Shared rejection notice for URIs that resolve into internal app storage
+    private void rejectInternalUri() {
+        Toast.makeText(this, "Rejected URI pointing to internal app storage", Toast.LENGTH_LONG).show();
+        addLogMessage("SECURITY: Rejected content URI resolving to internal storage");
+    }
+
 
     // ====================================================================
     //  MORE DIALOG AND DATABASE MANAGEMENT METHODS
@@ -118,6 +124,20 @@ public abstract class MainActivityActions extends MainActivityBase {
         if (requestCode == EXPORT_DB_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
             android.net.Uri uri = data.getData();
             if (!isValidContentUri(uri)) return;
+            // SECURITY: the URI is supplied by another app, so verify it cannot be pointed at this
+            // app's own private storage. The path is normalized first so that ".." segments cannot
+            // be used to escape the check (CodeQL java/android/unsafe-content-uri-resolution).
+            String uriPath = uri.getPath();
+            if (uriPath == null || uriPath.indexOf('\0') >= 0) {
+                rejectInternalUri();
+                return;
+            }
+            java.nio.file.Path normalizedUriPath =
+                    java.nio.file.FileSystems.getDefault().getPath(uriPath).normalize();
+            if (normalizedUriPath.startsWith("/data")) {
+                rejectInternalUri();
+                return;
+            }
             if (uri != null) {
                 try {
                     String dbPath = getDatabasePath("wifi_scanner.db").getAbsolutePath();
@@ -180,6 +200,20 @@ public abstract class MainActivityActions extends MainActivityBase {
         } else if (requestCode == EXPORT_CHECKSUM_REQUEST_CODE && resultCode == RESULT_OK && data != null) {
             android.net.Uri uri = data.getData();
             if (!isValidContentUri(uri)) return;
+            // SECURITY: the URI is supplied by another app, so verify it cannot be pointed at this
+            // app's own private storage. The path is normalized first so that ".." segments cannot
+            // be used to escape the check (CodeQL java/android/unsafe-content-uri-resolution).
+            String uriPath = uri.getPath();
+            if (uriPath == null || uriPath.indexOf('\0') >= 0) {
+                rejectInternalUri();
+                return;
+            }
+            java.nio.file.Path normalizedUriPath =
+                    java.nio.file.FileSystems.getDefault().getPath(uriPath).normalize();
+            if (normalizedUriPath.startsWith("/data")) {
+                rejectInternalUri();
+                return;
+            }
             if (uri != null && lastExportedDbChecksum != null && lastExportedDbFilename != null) {
                 try {
                     String metadata = createChecksumMetadata(
@@ -409,6 +443,20 @@ public abstract class MainActivityActions extends MainActivityBase {
     protected void verifyAndImportWithChecksum(android.net.Uri checksumUri, java.io.File dbFile) {
         if (!isValidContentUri(checksumUri)) {
             Toast.makeText(this, "Invalid URI scheme rejected", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        // SECURITY: the URI is supplied by another app, so verify it cannot be pointed at this
+        // app's own private storage. The path is normalized first so that ".." segments cannot
+        // be used to escape the check (CodeQL java/android/unsafe-content-uri-resolution).
+        String uriPath = checksumUri.getPath();
+        if (uriPath == null || uriPath.indexOf('\0') >= 0) {
+            rejectInternalUri();
+            return;
+        }
+        java.nio.file.Path normalizedUriPath =
+                java.nio.file.FileSystems.getDefault().getPath(uriPath).normalize();
+        if (normalizedUriPath.startsWith("/data")) {
+            rejectInternalUri();
             return;
         }
         try {
@@ -724,6 +772,20 @@ public abstract class MainActivityActions extends MainActivityBase {
             Toast.makeText(this, "Invalid URI scheme rejected", Toast.LENGTH_SHORT).show();
             return;
         }
+        // SECURITY: the URI is supplied by another app, so verify it cannot be pointed at this
+        // app's own private storage. The path is normalized first so that ".." segments cannot
+        // be used to escape the check (CodeQL java/android/unsafe-content-uri-resolution).
+        String uriPath = uri.getPath();
+        if (uriPath == null || uriPath.indexOf('\0') >= 0) {
+            rejectInternalUri();
+            return;
+        }
+        java.nio.file.Path normalizedUriPath =
+                java.nio.file.FileSystems.getDefault().getPath(uriPath).normalize();
+        if (normalizedUriPath.startsWith("/data")) {
+            rejectInternalUri();
+            return;
+        }
         try {
             java.io.File tempFile = new java.io.File(getFilesDir(), "temp_external.db");
 
@@ -1030,6 +1092,20 @@ public abstract class MainActivityActions extends MainActivityBase {
     protected void loadExternalDatabaseAsActive(android.net.Uri uri) {
         if (!isValidContentUri(uri)) {
             Toast.makeText(this, "Invalid URI scheme rejected", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        // SECURITY: the URI is supplied by another app, so verify it cannot be pointed at this
+        // app's own private storage. The path is normalized first so that ".." segments cannot
+        // be used to escape the check (CodeQL java/android/unsafe-content-uri-resolution).
+        String uriPath = uri.getPath();
+        if (uriPath == null || uriPath.indexOf('\0') >= 0) {
+            rejectInternalUri();
+            return;
+        }
+        java.nio.file.Path normalizedUriPath =
+                java.nio.file.FileSystems.getDefault().getPath(uriPath).normalize();
+        if (normalizedUriPath.startsWith("/data")) {
+            rejectInternalUri();
             return;
         }
         try {
